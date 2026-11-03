@@ -1,6 +1,6 @@
 # Verification Application
 
-**Status:** first version: `service.py`, `worker.py`, `RunsPanel.tsx`, `EngineBadge.tsx` (VER-01/02; VER-03/04 partial: lifecycle SSE and idempotent start only); `solver_license.py` and `EngineView.tsx` (VER-05). **Owner:** B; C owns run interaction; A reviews verdict semantics.
+**Status:** first version: `service.py`, `worker.py`, `RunsPanel.tsx`, `EngineBadge.tsx` (VER-01/02; VER-03/04 partial: lifecycle SSE and idempotent start only); `solver_license.py`, `EngineView.tsx`, `GurobiLicensePanel.tsx` (apply a license from WLS credentials, pasted text, or a file, with Gurobi's verdict), and `GurobiBadge.tsx` (top-bar license state; opens the Engine tab) (VER-05). **Owner:** B; C owns run interaction; A reviews verdict semantics.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 ## 1. Subproblems and Objective

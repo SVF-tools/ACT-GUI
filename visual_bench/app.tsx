@@ -11,6 +11,7 @@ import { RecordsView } from "./records/RecordsView";
 import { RunsPanel } from "./verification/RunsPanel";
 import { EngineBadge } from "./verification/EngineBadge";
 import { EngineView } from "./verification/EngineView";
+import { GurobiBadge } from "./verification/GurobiBadge";
 import { initialSelection, selectionReducer } from "./workspace/selection";
 import { Empty } from "./workspace/Empty";
 import { ThemeToggle } from "./workspace/theme";
@@ -23,6 +24,7 @@ export function App() {
   const [sel, dispatch] = useReducer(selectionReducer, initialSelection);
   const [tab, setTab] = useState<Tab>("Propagation");
   const [runsVersion, setRunsVersion] = useState(0);
+  const [licenseVersion, setLicenseVersion] = useState(0);
   const model = useQuery(sel.modelId, () => api.model(sel.modelId!));
 
   return (
@@ -39,6 +41,7 @@ export function App() {
           <Ctx label="index" value={sel.neuron} />
         </div>
         <EngineBadge />
+        <GurobiBadge version={licenseVersion} onOpen={() => setTab("Engine")} />
         <ThemeToggle />
       </header>
       <aside className="sidebar">
@@ -90,7 +93,9 @@ export function App() {
               }} />
           )}
           {tab === "Records" && <RecordsView runId={sel.runId} version={runsVersion} />}
-          {tab === "Engine" && <EngineView />}
+          {tab === "Engine" && (
+            <EngineView licenseVersion={licenseVersion} onLicenseChanged={() => setLicenseVersion((v) => v + 1)} />
+          )}
         </div>
       </section>
     </div>
