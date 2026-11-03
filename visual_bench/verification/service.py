@@ -317,14 +317,18 @@ class Workbench:
         wn = S.wire_number
         ces = [S.FuzzCounterexampleOut(**{**c, "severity": wn(c["severity"]), "input": [wn(x) for x in c["input"]],
                                           "output": [wn(x) for x in c["output"]],
-                                          "seed_input": [wn(x) for x in c["seed_input"]]})
+                                          "seed_input": [wn(x) for x in c["seed_input"]],
+                                          "seed_output": None if c.get("seed_output") is None else
+                                          [wn(x) for x in c["seed_output"]]})
                for c in raw["counterexamples"]]
+        seeds = [S.FuzzSeedOut(row=s["row"], input=[wn(x) for x in s["input"]], output=[wn(x) for x in s["output"]])
+                 for s in raw.get("seeds", [])]
         summary = S.FuzzSummaryOut.model_validate({k: raw[k] for k in S.FuzzSummaryOut.model_fields})
         base["config"] = raw["config"]
         return S.FuzzingOut(availability="available", summary=summary,
                             timeline=[S.FuzzPointOut.model_validate(p) for p in raw["timeline"]],
                             strategies=[S.FuzzStrategyOut.model_validate(s) for s in raw["strategies"]],
-                            counterexamples=ces, **base)
+                            counterexamples=ces, seeds=seeds, **base)
 
     def is_terminal(self, run_id: str) -> bool:
         return self.get_run(run_id).status in ("completed", "failed")

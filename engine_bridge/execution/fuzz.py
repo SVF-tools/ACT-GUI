@@ -20,12 +20,13 @@ from pathlib import Path
 from typing import Any
 
 from engine_bridge.contracts import (
-    BridgeError, FuzzCounterexample, FuzzOutcome, FuzzProgress, FuzzStrategyStats,
+    BridgeError, FuzzCounterexample, FuzzOutcome, FuzzProgress, FuzzSeed, FuzzStrategyStats,
 )
 from engine_bridge.engine_session import act_imports
 from engine_bridge.model_spec.describe import load_net
 
 COUNTEREXAMPLE_LIMIT = 20
+SEED_LIMIT = 20
 TIMELINE_LIMIT = 600
 TIMELINE_EVERY_S = 0.2
 PROGRESS_EVERY_S = 0.5
@@ -72,12 +73,21 @@ def run_fuzzing(model_path: Path, time_budget_s: float, max_iterations: int, rng
                     output_dir=Path(tmp), report_interval=1, verbose=0, trace_level=0,
                 )
                 fuzzer = ACTFuzzer(wrapped_model=model, initial_seeds=seeds, config=cfg)
-                return _fuzz(fuzzer, cfg, rng_seed, on_progress)
+                return _fuzz(fuzzer, cfg, rng_seed, rows, on_progress)
         finally:
             VerifiableModel.set_strict_mode(strict)
 
 
-def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, on_progress: Callable[[FuzzProgress], None] | None) -> FuzzOutcome:
+def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
+          on_progress: Callable[[FuzzProgress], None] | None) -> FuzzOutcome:
+    import torch
+
+    def forward(x: Any) -> Any:
+        # ACT's own rebuilt model, the same forward ACTFuzzer checks; display only, no verdict.
+        with torch.no_grad():
+            out = fuzzer.model(x.to(fuzzer.device))
+        return (out["output"] if isinstance(out, dict) else out).detach().cpu()  # as ACTFuzzer unpacks it
+
     weights = {str(k): float(v) for k, v in cfg.mutation_weights.items()}
     selected = dict.fromkeys(weights, 0)
     violations = dict.fromkeys(weights, 0)
@@ -120,14 +130,19 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, on_progress: Callable[[FuzzProgr
     report = fuzzer.fuzz()
     observe(report.total_iterations, final=True)
 
+    kept = report.counterexamples[:COUNTEREXAMPLE_LIMIT]
+    seed_outs = forward(torch.stack([ce.seed_input for ce in kept])) if kept else []
+    seed_rows = rows[:SEED_LIMIT]
+    seeds = tuple(FuzzSeed(row=i, input=_floats(x), output=_floats(y))
+                  for i, (x, y) in enumerate(zip(seed_rows, forward(seed_rows), strict=True)))
     ces = tuple(
         FuzzCounterexample(
             index=i, iteration=found[i][0], elapsed_s=round(found[i][1], 4), strategy=found[i][2],
             kind=str(getattr(ce.kind, "value", ce.kind)), spec_row=int(ce.spec_row), severity=float(ce.severity),
             true_class=ce.true_class, input=_floats(ce.input), output=_floats(ce.output),
-            seed_input=_floats(ce.seed_input),
+            seed_input=_floats(ce.seed_input), seed_output=_floats(seed_outs[i]),
         )
-        for i, ce in enumerate(report.counterexamples[:COUNTEREXAMPLE_LIMIT])
+        for i, ce in enumerate(kept)
     )
     n = len(report.counterexamples)
     config: dict[str, object] = {
@@ -145,7 +160,7 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, on_progress: Callable[[FuzzProgr
         seeds_explored=int(report.seeds_explored), total_mutations=int(report.total_mutations),
         counterexample_count=n, never_activated_count=int(report.num_of_never_activated_neurons),
         never_activated_sample=tuple(f"{layer}[{idx}]" for layer, idx in report.never_activated_neurons),
-        counterexamples=ces, timeline=tuple(timeline),
+        counterexamples=ces, seeds=seeds, timeline=tuple(timeline),
         strategies=tuple(FuzzStrategyStats(name=k, weight=weights.get(k, 0.0), selected=selected[k],
                                            violations=violations[k]) for k in selected),
         config=config, rng_seed=rng_seed, device=str(fuzzer.device),

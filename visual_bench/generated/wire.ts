@@ -55,6 +55,7 @@ export type Iteration = number
 export type Kind2 = string
 export type Output = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type SeedInput = (number | ("Infinity" | "-Infinity" | "NaN"))[]
+export type SeedOutput = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type Severity1 = (number | ("Infinity" | "-Infinity" | "NaN"))
 export type SpecRow = number
 export type Strategy = (string | null)
@@ -67,6 +68,9 @@ export type Counterexamples = number
 export type Coverage = number
 export type ElapsedS1 = number
 export type Iteration1 = number
+export type Input1 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
+export type Output1 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
+export type Row = number
 export type Name1 = string
 export type Selected = number
 export type Violations = number
@@ -86,6 +90,7 @@ export type TotalMutations = number
 export type Availability1 = ("available" | "pending" | "not_recorded" | "unsupported")
 export type Counterexamples1 = FuzzCounterexampleOut[]
 export type RunId3 = string
+export type Seeds = FuzzSeedOut[]
 export type Status = ("queued" | "running" | "completed" | "failed")
 export type Strategies = FuzzStrategyOut[]
 export type Timeline = FuzzPointOut[]
@@ -199,6 +204,7 @@ ExplainResponse?: ExplainResponse
 FuzzCounterexampleOut?: FuzzCounterexampleOut
 FuzzOptions?: FuzzOptions
 FuzzPointOut?: FuzzPointOut
+FuzzSeedOut?: FuzzSeedOut
 FuzzStrategyOut?: FuzzStrategyOut
 FuzzSummaryOut?: FuzzSummaryOut
 FuzzingOut?: FuzzingOut
@@ -350,6 +356,7 @@ iteration: Iteration
 kind: Kind2
 output: Output
 seed_input: SeedInput
+seed_output?: SeedOutput
 severity: Severity1
 spec_row: SpecRow
 strategy: Strategy
@@ -376,6 +383,15 @@ counterexamples: Counterexamples
 coverage: Coverage
 elapsed_s: ElapsedS1
 iteration: Iteration1
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "FuzzSeedOut".
+ */
+export interface FuzzSeedOut {
+input: Input1
+output: Output1
+row: Row
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -418,6 +434,7 @@ counterexamples: Counterexamples1
 options: (FuzzOptions | null)
 provenance: Provenance
 run_id: RunId3
+seeds?: Seeds
 status: Status
 strategies: Strategies
 summary: (FuzzSummaryOut | null)

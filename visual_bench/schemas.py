@@ -253,6 +253,13 @@ class FuzzCounterexampleOut(Wire):
     input: list[WireNumber]
     output: list[WireNumber]
     seed_input: list[WireNumber]
+    seed_output: list[WireNumber] | None = None  # absent in records written before it was captured
+
+
+class FuzzSeedOut(Wire):
+    row: int
+    input: list[WireNumber]
+    output: list[WireNumber]
 
 
 class FuzzSummaryOut(Wire):
@@ -280,6 +287,7 @@ class FuzzingOut(Wire):
     timeline: list[FuzzPointOut]
     strategies: list[FuzzStrategyOut]
     counterexamples: list[FuzzCounterexampleOut]
+    seeds: list[FuzzSeedOut] = []
     config: dict[str, Scalar]
     provenance: dict[str, str]
 

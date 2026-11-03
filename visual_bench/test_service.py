@@ -82,6 +82,7 @@ def test_fuzz_run_streams_progress_and_records_act_counterexamples(client: TestC
     assert fz["availability"] == "available" and fz["options"]["rng_seed"] == 7
     assert fz["summary"]["iterations"] == 50 and fz["summary"]["counterexample_count"] >= 1
     assert run["result"]["counterexample"] == fz["counterexamples"][0]["input"]
+    assert fz["seeds"] and len(fz["counterexamples"][0]["seed_output"]) == len(fz["seeds"][0]["output"])
     assert fz["timeline"][-1]["iteration"] == 50
     assert sum(s["selected"] for s in fz["strategies"]) == 50
     assert "fuzzing.json" in json.loads((tmp_path / "records" / run_id / "artifacts.json").read_text())

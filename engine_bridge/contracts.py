@@ -164,6 +164,15 @@ class FuzzCounterexample:
     input: tuple[float, ...]  # flattened; ACT checked it satisfies the input spec
     output: tuple[float, ...]
     seed_input: tuple[float, ...]
+    seed_output: tuple[float, ...]  # ACT model output on seed_input (the unmutated input)
+
+
+@dataclass(frozen=True)
+class FuzzSeed:
+    """An initial seed (one INPUT row) and the ACT model's output on it."""
+    row: int
+    input: tuple[float, ...]
+    output: tuple[float, ...]
 
 
 @dataclass(frozen=True)
@@ -181,6 +190,7 @@ class FuzzOutcome:
     never_activated_count: int
     never_activated_sample: tuple[str, ...]  # "layer[index]"
     counterexamples: tuple[FuzzCounterexample, ...]  # first ones in discovery order (capped)
+    seeds: tuple[FuzzSeed, ...]  # initial seeds (capped)
     timeline: tuple[FuzzProgress, ...]
     strategies: tuple[FuzzStrategyStats, ...]
     config: dict[str, object]  # effective ACT FuzzingConfig scalars

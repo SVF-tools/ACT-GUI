@@ -119,6 +119,8 @@ def test_fuzzing_reports_act_counterexample_inside_the_input_box():
     box = describe_model(model_path("unsafe_linear")).input_specs[0]
     assert all(lo <= x <= hi for x, lo, hi in zip(ce.input, box.lb, box.ub, strict=True))
     assert ce.iteration == out.iterations and ce.strategy in {s.name for s in out.strategies}
+    assert out.seeds and out.seeds[0].row == 0 and len(out.seeds[0].input) == len(ce.input)
+    assert len(ce.seed_output) == len(ce.output) == len(out.seeds[0].output)
     assert progress and progress[-1] == out.timeline[-1] and progress[-1].counterexamples == 1
 
 
