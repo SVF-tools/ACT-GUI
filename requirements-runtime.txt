@@ -1,0 +1,20 @@
+# Container runtime (Dockerfile). Versions match the act-py312 environment that produced
+# fixtures/catalog.json, limited to what the workbench's ACT paths import. torch/torchvision
+# come from the CUDA 12.8 wheel index (also runs on CPU); gurobipy is installed separately
+# with a build-time version argument.
+# ACT engine path
+numpy==2.3.5
+scipy==1.16.3
+sympy==1.14.0
+onnx==1.19.1
+onnx2torch==1.5.15
+protobuf==6.31.1
+PyYAML==6.0.3
+psutil==7.1.3
+tqdm==4.67.1
+# Workbench service
+fastapi==0.120.4
+starlette==0.49.3
+pydantic==2.14.2
+pydantic-core==2.50.2
+uvicorn==0.48.0

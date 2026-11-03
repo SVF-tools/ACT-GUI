@@ -1,6 +1,6 @@
 # BaB Explorer
 
-**Status:** design specification; not implemented. **Owner:** C; D may support rendering; A reviews search semantics.
+**Status:** not started beyond `BabView.tsx`, which shows observation coverage and ACT's final BaB summary; BAB-01..03 need committed node events (ACT-03). **Owner:** C; D may support rendering; A reviews search semantics.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 ## 1. Subproblems and Objective
@@ -48,7 +48,7 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 | ID | Deliverable | Depends on | Completion evidence |
 | --- | --- | --- | --- |
 | BAB-01 | Show committed node table and selected path | VER-03, WS-02 | A recorded real run has matching IDs/status/bound origins in table and detail. |
-| BAB-02 | Add bounded local graph navigation | BAB-01 | Expand/page a subtree while preserving selected path and positions; large fixtures stay within a measured view budget. |
+| BAB-02 | Add bounded local graph navigation | BAB-01, PERF-01 | Expand/page a subtree while preserving selected path and positions; large fixtures stay within a measured view budget. |
 | BAB-03 | Add supported node actions | BAB-02, VER-04 | An action creates one shared command and shows accepted/applied/rejected independently of graph appearance. |
 
 Owner: **C**. A reviews scientific semantics; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.

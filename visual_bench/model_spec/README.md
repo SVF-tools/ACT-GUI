@@ -1,6 +1,6 @@
 # Model and Specification View
 
-**Status:** design specification; not implemented. **Owner:** C; B integrates data; A reviews variable and constraint semantics.
+**Status:** first version: `ModelList.tsx`, `ModelGraph.tsx` (in-house SVG DAG), `SpecPanel.tsx` (MSV-01); MSV-02/03 not started. **Owner:** C; B integrates data; A reviews variable and constraint semantics.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 ## 1. Subproblems and Objective

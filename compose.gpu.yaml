@@ -1,0 +1,12 @@
+# Overlay: run ACT on NVIDIA GPUs. Requires the NVIDIA Container Toolkit on the host.
+services:
+  workbench:
+    environment:
+      ACT_GUI_DEVICE: cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

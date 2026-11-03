@@ -1,6 +1,6 @@
 # Visual Bench Scope
 
-**Status:** design only. **Owner:** C owns interaction and product consistency; B owns application services and AI orchestration; D, when available, owns visualization and test integration.
+**Status:** first version: service (`server.py`, `schemas.py`) and browser (`app.tsx`) run on localhost (see [plan status](../docs/plan.md#first-version-status)). **Owner:** C owns interaction and product consistency; B owns application services and AI orchestration; D, when available, owns visualization and test integration.
 
 ## Purpose
 
@@ -71,9 +71,9 @@ The service maps neutral bridge data to wire schemas. The browser uses generated
 
 ## First-slice Acceptance
 
-Load a small real ACT model/spec through the bridge and display structure, constraints, provenance, and error states. Full docking and AI are not first-slice requirements. Then deliver node selection → evidence query → AI explanation → navigation, followed by supported execution plans.
+Load a small real ACT model/spec through the bridge and display structure, constraints, provenance, and error states. Full docking and AI are not first-slice requirements. Then deliver layer/stage selection → evidence query → AI explanation → navigation on a completed run, extend it to committed BaB nodes, and follow with supported execution plans.
 
-Tests grow with implementation. No startup commands, application test results, or platform compatibility certification exist yet.
+During development the workbench is opened in a local browser at the localhost URL printed by the BASE-02 development commands. Tests grow with implementation. No startup commands, application test results, or platform compatibility certification exist yet.
 
 ## Maintenance
 

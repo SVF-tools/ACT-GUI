@@ -1,0 +1,12 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "extraPaths": [
+    "/data1/guanqin/ACT"
+  ],
+  "include": [
+    "engine_bridge",
+    "visual_bench",
+    "scripts"
+  ]
+}

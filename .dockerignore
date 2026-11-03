@@ -1,0 +1,12 @@
+.git
+.venv
+.omo
+.pytest_cache
+.env
+build
+dist
+var
+node_modules
+**/node_modules
+**/__pycache__
+**/*.pyc

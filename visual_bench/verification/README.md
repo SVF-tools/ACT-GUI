@@ -1,6 +1,6 @@
 # Verification Application
 
-**Status:** design specification; not implemented. **Owner:** B; C owns run interaction; A reviews verdict semantics.
+**Status:** first version: `service.py`, `worker.py`, `RunsPanel.tsx`, `EngineBadge.tsx` (VER-01/02; VER-03/04 partial: lifecycle SSE and idempotent start only); `solver_license.py` and `EngineView.tsx` (VER-05). **Owner:** B; C owns run interaction; A reviews verdict semantics.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 ## 1. Subproblems and Objective
@@ -50,9 +50,10 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 
 | ID | Deliverable | Depends on | Completion evidence |
 | --- | --- | --- | --- |
-| VER-01 | Implement description gateway and wire generation | MSB-03, BASE-02 | Real bridge data validates through Pydantic; browser types and event schema generation have no drift. |
+| VER-01 | Implement description gateway and wire generation | MSB-03, BASE-02 | Applies the BASE-02 generation pipeline to real descriptions: real bridge data validates through Pydantic and generated browser types have no drift. |
 | VER-02 | Implement isolated run lifecycle | VER-01, EXE-01, REC-01 | Start returns a run reference without waiting for completion; a deterministic sample matches native ACT; worker failure is visible. |
-| VER-03 | Implement committed snapshots and reconnect | VER-02, EVT-02, REC-02 | Snapshot at S plus events after S reconstructs the same state; duplicates and gaps do not corrupt it. |
+| VER-03 | Implement committed snapshots, SSE stream, and reconnect | VER-02, EVT-02, REC-02 | The service SSE route emits payloads that validate against the generated event schema; snapshot at S plus events after S reconstructs the same state; duplicates and gaps do not corrupt it. |
+| VER-05 | Accept a user-supplied Gurobi license and hand it to run workers | ES-04 | `PUT/DELETE /api/solvers/gurobi/license` and `GET /api/solvers/gurobi`; only text shaped like a Gurobi license is stored (0600, under `ACT_GUI_SECRETS`, default `<records>/../secrets`), its content is never returned, an uploaded license overrides `GRB_LICENSE_FILE`, and each run manifest records the license source and requested device (`test_service.py`). |
 | VER-04 | Implement the shared command gateway | VER-03, EXE-03 | Same-ID retry cannot apply twice; changed parameters, stale revision, unsupported actions, and expired authority are rejected. |
 
 Owner: **B**. A reviews scientific semantics; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.

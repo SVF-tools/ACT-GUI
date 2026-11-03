@@ -1,0 +1,8 @@
+# Installed into .venv, created on top of the ACT conda env (act-py312) with --system-site-packages.
+# ACT itself (torch, onnx, ...) comes from that env; see README "Development".
+fastapi==0.120.4
+httpx==0.28.1
+pydantic==2.14.2
+pydantic-core==2.50.2
+pytest==9.2.0
+starlette==0.49.3

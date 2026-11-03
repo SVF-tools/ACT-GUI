@@ -1,6 +1,6 @@
 # Records and Replay
 
-**Status:** design specification; not implemented. **Owner:** B; D/C integrate figure and data export.
+**Status:** first version: `store.py`, `RecordsView.tsx` (REC-01; REC-02/03 partial: lifecycle events, recovery, replay; REC-04 export only). **Owner:** B; D/C integrate figure and data export.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 ## 1. Subproblems and Objective
@@ -50,7 +50,7 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 
 | ID | Deliverable | Depends on | Completion evidence |
 | --- | --- | --- | --- |
-| REC-01 | Persist immutable run metadata and final result | BASE-02 | Save/read a real run manifest and artifact with identical hashes; no private absolute paths are required in a bundle. |
+| REC-01 | Persist immutable run metadata and final result | BASE-03 | Save/read a manifest and artifact for the native ACT run recorded in BASE-03 with identical hashes; no private absolute paths are required in a bundle. |
 | REC-02 | Persist commit batches and snapshot boundaries | REC-01, EVT-02 | A simulated interrupted write recovers the last committed prefix; incomplete references are never visible. |
 | REC-03 | Implement replay, coverage, and resync reads | REC-02 | Snapshot S plus following events reproduces recorded state; missing/expired history is explicitly represented. |
 | REC-04 | Export fixed research data and figure configuration | REC-03, ANA-02 | Export/import preserves numerical data, selected coordinates, guarantees, revision, and plot configuration; invalid bundle paths are rejected. |

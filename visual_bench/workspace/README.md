@@ -1,6 +1,6 @@
 # Workspace
 
-**Status:** design specification; not implemented. **Owner:** C.
+**Status:** first version: `selection.ts`, `useQuery.ts` (WS-01/02, vitest); WS-03 not started. **Owner:** C.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 ## 1. Subproblems and Objective

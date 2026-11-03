@@ -1,6 +1,6 @@
 # Analysis and Propagation
 
-**Status:** design specification; not implemented. **Owner:** D; with three contributors C implements, B integrates data, and A reviews numerical semantics.
+**Status:** first version: `AnalysisView.tsx` (ANA-01 on recorded interval states; ANA-02 limited to interval-box projection); ANA-03 not started. **Owner:** D; with three contributors C implements, B integrates data, and A reviews numerical semantics.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 ## 1. Subproblems and Objective

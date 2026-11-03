@@ -1,6 +1,6 @@
 # AI Assistant
 
-**Status:** design specification; not implemented. **Owner:** B owns orchestration; C owns interaction; A reviews scientific explanations.
+**Status:** first version: `explain.py`, `AssistantView.tsx` (AI-01 with a deterministic fake provider); no real provider (AI-02), AI-03/04 not started. **Owner:** B owns orchestration; C owns interaction; A reviews scientific explanations.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 ## 1. Subproblems and Objective
@@ -51,8 +51,9 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 | ID | Deliverable | Depends on | Completion evidence |
 | --- | --- | --- | --- |
 | AI-01 | Define context/evidence/tools with fake provider | VER-01, WS-02 | Tools validate arguments and preserve frozen context; malicious instructions in tool data cannot change scope. |
-| AI-02 | Integrate one provider for evidence explanation | AI-01, BAB-01 | A real unresolved node produces an evidence-linked answer; missing evidence and provider failure remain explicit; manual GUI remains usable. |
-| AI-03 | Implement versioned plan execution and evaluation | AI-02, VER-04 | Authorized steps share command IDs across retries; stale plans stop dependents; reviewed research cases record correctness, evidence support, latency, and use. |
+| AI-02 | Integrate one provider for layer/stage evidence explanation | AI-01, ANA-01 | A selected real layer/stage of a completed run produces an answer whose evidence links resolve to the exact ACT stage data; missing evidence and provider failure remain explicit; manual GUI remains usable. |
+| AI-03 | Extend evidence explanation to committed BaB nodes | AI-02, BAB-01 | A real unresolved node produces an evidence-linked answer bound to its run/node/revision; summary-only coverage is stated rather than filled in. |
+| AI-04 | Implement versioned plan execution and evaluation | AI-03, VER-04 | Authorized steps share command IDs across retries; stale plans stop dependents; reviewed research cases record correctness, evidence support, latency, and use. |
 
 Owner: **B**. A reviews scientific semantics; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.
 

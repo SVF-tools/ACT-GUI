@@ -1,0 +1,101 @@
+{
+  "kind": "act-gui-fixture-catalog",
+  "version": 1,
+  "act": {
+    "repo": "https://github.com/SVF-tools/ACT",
+    "commit": "deff2fb0c0316030727b9864c555085855dbca5a"
+  },
+  "environment": {
+    "python": "3.12.12",
+    "torch": "2.11.0.dev20260120+cu128",
+    "device": "cpu",
+    "env": "conda act-py312",
+    "bab_budget_s": 15.0,
+    "bab_entry": "verify_bab_batched(TorchLPSolver, PipelineConfig.from_yaml().bab)"
+  },
+  "recorded_by": "scripts/record_fixtures.py",
+  "models": [
+    {
+      "id": "bab_deep_mlp",
+      "act_path": "act/back_end/examples/nets/layer_testing_bab_deep.json",
+      "sha256": "cfe5b83e769b68bc606b323f66963d1329610291b63c42e342f4c47637c12bff",
+      "methods": [
+        "interval",
+        "bab"
+      ],
+      "description": "4-8-4-2 ReLU MLP, box input; interval is inconclusive, BaB certifies",
+      "native": {
+        "interval": {
+          "status": "UNKNOWN",
+          "elapsed_s": 0.004,
+          "nodes": null
+        },
+        "bab": {
+          "status": "CERTIFIED",
+          "elapsed_s": 1.605,
+          "nodes": 3
+        }
+      }
+    },
+    {
+      "id": "unsafe_linear",
+      "act_path": "act/back_end/examples/nets/layer_testing_unsafe_linear.json",
+      "sha256": "91d4608bba827c2831378b9ea7b3ea4018a4cb280f41bf7542287d540a7202be",
+      "methods": [
+        "interval",
+        "bab"
+      ],
+      "description": "Linear network whose property is violated; BaB finds a counterexample",
+      "native": {
+        "interval": {
+          "status": "UNKNOWN",
+          "elapsed_s": 0.001,
+          "nodes": null
+        },
+        "bab": {
+          "status": "FALSIFIED",
+          "elapsed_s": 0.054,
+          "nodes": 1
+        }
+      }
+    },
+    {
+      "id": "range_check",
+      "act_path": "act/back_end/examples/nets/layer_testing_range.json",
+      "sha256": "f2e4f7b730f30e6f9931e99cf7d6c4b1d38dbbc5ab1e09a9f6fcda0c4807b03b",
+      "methods": [
+        "interval",
+        "bab"
+      ],
+      "description": "Range output property certified by interval analysis",
+      "native": {
+        "interval": {
+          "status": "CERTIFIED",
+          "elapsed_s": 0.001,
+          "nodes": null
+        },
+        "bab": {
+          "status": "CERTIFIED",
+          "elapsed_s": 0.05,
+          "nodes": 1
+        }
+      }
+    },
+    {
+      "id": "cnn_1x8x8",
+      "act_path": "act/back_end/examples/nets/cnn2d_plain_1x8x8_8_322351658.json",
+      "sha256": "55d52506df4104f28d0315983cc5f09b2311215da057a03d888bf0aca35c0d58",
+      "methods": [
+        "interval"
+      ],
+      "description": "Small CNN (conv/relu/avgpool/flatten/dense); BaB is not recorded (exceeds a 15 s budget)",
+      "native": {
+        "interval": {
+          "status": "UNKNOWN",
+          "elapsed_s": 0.068,
+          "nodes": null
+        }
+      }
+    }
+  ]
+}
