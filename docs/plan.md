@@ -20,14 +20,14 @@ BASE-02 does not wait for ACT; only BASE-03 needs the pinned engine. Development
 | --- | --- | --- | --- |
 | visual_bench/workspace | C | WS-01, WS-02, WS-03 | [README](../visual_bench/workspace/README.md) |
 | visual_bench/model_spec | C | MSV-01, MSV-02, MSV-03 | [README](../visual_bench/model_spec/README.md) |
-| visual_bench/verification | B | VER-01, VER-02, VER-03, VER-04 | [README](../visual_bench/verification/README.md) |
+| visual_bench/verification | B | VER-01, VER-02, VER-03, VER-04, VER-05, VER-06 | [README](../visual_bench/verification/README.md) |
 | visual_bench/bab | C | BAB-01, BAB-02, BAB-03 | [README](../visual_bench/bab/README.md) |
 | visual_bench/analysis | D | ANA-01, ANA-02, ANA-03 | [README](../visual_bench/analysis/README.md) |
 | visual_bench/assistant | B | AI-01, AI-02, AI-03, AI-04 | [README](../visual_bench/assistant/README.md) |
 | visual_bench/records | B | REC-01, REC-02, REC-03, REC-04 | [README](../visual_bench/records/README.md) |
 | engine_bridge/engine_session | B | ES-01, ES-02, ES-03 | [README](../engine_bridge/engine_session/README.md) |
 | engine_bridge/model_spec | B | MSB-01, MSB-02, MSB-03 | [README](../engine_bridge/model_spec/README.md) |
-| engine_bridge/execution | B | EXE-01, EXE-02, EXE-03 | [README](../engine_bridge/execution/README.md) |
+| engine_bridge/execution | B | EXE-01, EXE-02, EXE-03, EXE-04 | [README](../engine_bridge/execution/README.md) |
 | engine_bridge/inspection | A | INSP-01, INSP-02, INSP-03 | [README](../engine_bridge/inspection/README.md) |
 | engine_bridge/events | A | EVT-01, EVT-02, EVT-03 | [README](../engine_bridge/events/README.md) |
 
@@ -77,7 +77,7 @@ Each task owner supplies its tests. A reviews mathematical semantics; C reviews 
 
 ## First-version status
 
-Recorded 2026-11-03 against ACT `deff2fb0c031` (branch CLIMB, tracked tree clean), CPU, conda `act-py312` (Python 3.12, torch 2.11). Evidence: `.venv/bin/python -m pytest` (29 passed, real ACT), `npm test` (5 passed), `npm run typecheck`, `npm run check:types`, plus a headless-Chrome walk-through of the localhost UI (model → BaB run → layer → assistant → export).
+Recorded 2026-11-03 against ACT `deff2fb0c031` (branch CLIMB, tracked tree clean), CPU, conda `act-py312` (Python 3.12, torch 2.11). Evidence: `.venv/bin/python -m pytest` (29 passed, real ACT), `npm test` (5 passed), `npm run typecheck`, `npm run check:types`, plus a headless-Chrome walk-through of the localhost UI (model → BaB run → layer → assistant → export). Fuzzing addition (same day): 39 passed, plus a headless-Chrome walk-through of live and completed fuzz runs on `bab_deep_mlp` and `unsafe_linear` (desktop dark/light, 390 px width).
 
 | Task | State | What exists / what is missing |
 | --- | --- | --- |
@@ -99,6 +99,7 @@ Recorded 2026-11-03 against ACT `deff2fb0c031` (branch CLIMB, tracked tree clean
 | ANA-01 | First version | Stepper over recorded layer states, before/after bars, value selection. ANA-02: interval-box 2-D projection only. ANA-03 not started. |
 | BAB-01..03 | Not started | Blocked on committed node events (ACT-03); the BaB tab shows coverage and the summary only. |
 | AI-01 | First version | Frozen context, typed evidence, deterministic fake provider, cited ids must resolve. AI-02 needs a real provider (not configured). |
+| EXE-04, VER-06 | First version | ACTFuzzer as run method `fuzz` on every catalog model (`engine_bridge/execution/fuzz.py`, worker progress pipe, `fuzz.progress` SSE events, sealed `fuzzing.json`, `GET /api/runs/{id}/fuzzing`, Fuzzing tab with live timeline, strategies, and counterexamples). Progress relies on ACTFuzzer's private `_print_progress`; no public ACT observer exists. Fuzzing reports `falsified` or `unknown`, never `certified`. |
 | ES-04, VER-05 | First version | Gurobi probe in a subprocess (`engine_bridge/engine_session/session.py`), license upload/remove/status API and the Engine tab; uploaded license stored 0600 and passed to run workers. Current methods do not use Gurobi. |
 | DIST-02 | First version | `Dockerfile`, `compose.yaml` (+ `compose.gpu.yaml`, `compose.gurobi.yaml`), `scripts/docker_build.sh`. No registry publishing or CI yet; the pinned ACT commit is not yet pushed upstream. |
 | DIST-01, PERF-01, REL-01 | Not started | The container serves one origin on loopback, but remote HTTPS/authentication mode is not implemented. |

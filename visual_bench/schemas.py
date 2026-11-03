@@ -11,13 +11,13 @@ from __future__ import annotations
 import math
 from typing import Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 WireNumber = Union[float, Literal["Infinity", "-Infinity", "NaN"]]
 Scalar = Union[str, int, float, bool, None]
 Availability = Literal["available", "pending", "not_recorded", "unsupported"]
 Verdict = Literal["certified", "falsified", "unknown", "timeout", "error"]
-Method = Literal["interval", "bab"]
+Method = Literal["interval", "bab", "fuzz"]
 RunState = Literal["queued", "running", "completed", "failed"]
 
 
@@ -133,11 +133,25 @@ class ModelDescriptionOut(Wire):
     output_dim: int
 
 
+class FuzzOptions(Wire):
+    """ACTFuzzer budget for method "fuzz"; other settings come from ACT's pipeline.yaml."""
+    max_iterations: int = Field(default=100000, ge=1, le=1_000_000)
+    rng_seed: int = Field(default=0, ge=0, le=2**31 - 1)
+    stop_on_first: bool = False
+
+
 class RunRequest(Wire):
     model_id: str = Field(min_length=1, max_length=64)
     method: Method
     time_budget_s: float = Field(default=30.0, gt=0, le=600)
     client_request_id: str | None = Field(default=None, min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.:-]+$")
+    fuzz: FuzzOptions | None = None
+
+    @model_validator(mode="after")
+    def _fuzz_options_only_for_fuzz(self) -> "RunRequest":
+        if self.fuzz is not None and self.method != "fuzz":
+            raise ValueError("fuzz options are only valid with method 'fuzz'")
+        return self
 
 
 class RunResultOut(Wire):
@@ -191,7 +205,7 @@ class LayerStatesOut(Wire):
     provenance: dict[str, str]
 
 
-RunEventKind = Literal["run.queued", "run.started", "run.completed", "run.failed", "bab.summary"]
+RunEventKind = Literal["run.queued", "run.started", "run.completed", "run.failed", "bab.summary", "fuzz.progress"]
 
 
 class RunEvent(Wire):
@@ -210,6 +224,64 @@ class CoverageOut(Wire):
     final_summary: Availability
     reason: str
     summary: dict[str, Scalar] | None
+
+
+class FuzzPointOut(Wire):
+    iteration: int
+    elapsed_s: float
+    coverage: float
+    counterexamples: int
+    corpus: int
+
+
+class FuzzStrategyOut(Wire):
+    name: str
+    weight: float
+    selected: int
+    violations: int
+
+
+class FuzzCounterexampleOut(Wire):
+    index: int
+    iteration: int
+    elapsed_s: float
+    strategy: str | None
+    kind: str
+    spec_row: int
+    severity: WireNumber
+    true_class: int | None
+    input: list[WireNumber]
+    output: list[WireNumber]
+    seed_input: list[WireNumber]
+
+
+class FuzzSummaryOut(Wire):
+    act_status: str
+    iterations: int
+    elapsed_s: float
+    neuron_coverage: float
+    coverage_strategy: str
+    seeds_explored: int
+    total_mutations: int
+    counterexample_count: int
+    never_activated_count: int
+    never_activated_sample: list[str]
+    rng_seed: int
+    device: str
+
+
+class FuzzingOut(Wire):
+    """ACTFuzzer record of a run. While running, timeline comes from committed fuzz.progress events."""
+    run_id: str
+    availability: Availability
+    status: RunState
+    options: FuzzOptions | None
+    summary: FuzzSummaryOut | None
+    timeline: list[FuzzPointOut]
+    strategies: list[FuzzStrategyOut]
+    counterexamples: list[FuzzCounterexampleOut]
+    config: dict[str, Scalar]
+    provenance: dict[str, str]
 
 
 class SelectionContext(Wire):
@@ -282,6 +354,6 @@ class SolverStatusOut(Wire):
 
 WIRE_MODELS: tuple[type[BaseModel], ...] = (
     ErrorResponse, HealthOut, EngineInfoOut, ModelSummary, ModelDescriptionOut, RunRequest, RunOut, RunList,
-    LayerStatesOut, RunEvent, CoverageOut, ExplainRequest, ExplainResponse, ProviderList, SolverLicenseUpload,
+    LayerStatesOut, RunEvent, CoverageOut, FuzzingOut, ExplainRequest, ExplainResponse, ProviderList, SolverLicenseUpload,
     SolverStatusOut,
 )

@@ -11,7 +11,7 @@ from typing import Literal
 
 Availability = Literal["available", "pending", "not_recorded", "unsupported"]
 Verdict = Literal["certified", "falsified", "unknown", "timeout", "error"]
-Method = Literal["interval", "bab"]
+Method = Literal["interval", "bab", "fuzz"]
 
 
 class BridgeError(Exception):
@@ -131,6 +131,61 @@ class RunOutcome:
     metadata: dict[str, object]
     counterexample: tuple[float, ...] | None
     device: str  # torch default device after the ACT call, e.g. "cpu" or "cuda:0"
+
+
+@dataclass(frozen=True)
+class FuzzProgress:
+    """ACTFuzzer state after `iteration` samples (read between fuzzing iterations)."""
+    iteration: int
+    elapsed_s: float
+    coverage: float  # ACT CoverageTracker value for the configured coverage strategy
+    counterexamples: int  # counterexamples ACT's PropertyChecker has reported so far
+    corpus: int  # seed corpus size
+
+
+@dataclass(frozen=True)
+class FuzzStrategyStats:
+    name: str
+    weight: float  # selection weight from ACT's fuzzing config
+    selected: int  # fuzzing iterations (batches) that used this mutation strategy
+    violations: int  # counterexamples reported in those iterations
+
+
+@dataclass(frozen=True)
+class FuzzCounterexample:
+    index: int  # discovery order
+    iteration: int  # samples completed when ACT reported it
+    elapsed_s: float
+    strategy: str | None  # mutation strategy of the iteration that produced it
+    kind: str  # OutputSpec kind ACT checked
+    spec_row: int
+    severity: float  # ACT's signed violation margin
+    true_class: int | None
+    input: tuple[float, ...]  # flattened; ACT checked it satisfies the input spec
+    output: tuple[float, ...]
+    seed_input: tuple[float, ...]
+
+
+@dataclass(frozen=True)
+class FuzzOutcome:
+    """ACTFuzzer report. Fuzzing can falsify (a concrete counterexample) but never certify."""
+    verdict: Verdict  # "falsified" iff ACT reported a counterexample, otherwise "unknown"
+    act_status: str  # "COUNTEREXAMPLE_FOUND" or "NO_COUNTEREXAMPLE"
+    iterations: int
+    elapsed_s: float
+    neuron_coverage: float
+    coverage_strategy: str
+    seeds_explored: int
+    total_mutations: int
+    counterexample_count: int
+    never_activated_count: int
+    never_activated_sample: tuple[str, ...]  # "layer[index]"
+    counterexamples: tuple[FuzzCounterexample, ...]  # first ones in discovery order (capped)
+    timeline: tuple[FuzzProgress, ...]
+    strategies: tuple[FuzzStrategyStats, ...]
+    config: dict[str, object]  # effective ACT FuzzingConfig scalars
+    rng_seed: int
+    device: str
 
 
 LicenseState = Literal["licensed", "restricted", "invalid", "not_installed"]

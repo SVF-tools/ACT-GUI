@@ -1,6 +1,6 @@
 // Typed browser client for the workbench service. Types are generated from Pydantic.
 import type {
-  CoverageOut, EngineInfoOut, ErrorResponse, ExplainRequest, ExplainResponse, LayerStatesOut,
+  CoverageOut, EngineInfoOut, ErrorResponse, ExplainRequest, ExplainResponse, FuzzingOut, LayerStatesOut,
   ModelDescriptionOut, ModelSummary, ProviderList, RunEvent, RunList, RunOut, RunRequest, SolverLicenseUpload,
   SolverStatusOut,
 } from "./generated/wire";
@@ -33,6 +33,7 @@ export const api = {
   startRun: (req: RunRequest) => call<RunOut>("/api/runs", { method: "POST", body: JSON.stringify(req) }),
   layers: (id: string) => call<LayerStatesOut>(`/api/runs/${id}/layers`),
   coverage: (id: string) => call<CoverageOut>(`/api/runs/${id}/coverage`),
+  fuzzing: (id: string) => call<FuzzingOut>(`/api/runs/${id}/fuzzing`),
   providers: () => call<ProviderList>("/api/assistant/providers"),
   explain: (req: ExplainRequest) => call<ExplainResponse>("/api/assistant/explain", { method: "POST", body: JSON.stringify(req) }),
   exportUrl: (id: string) => `/api/runs/${id}/export`,

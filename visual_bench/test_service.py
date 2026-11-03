@@ -67,6 +67,34 @@ def test_falsified_run_reports_act_counterexample(client: TestClient):
     assert result["verdict"] == "falsified" and result["counterexample"]
 
 
+def test_fuzz_run_streams_progress_and_records_act_counterexamples(client: TestClient, tmp_path: Path):
+    assert "fuzz" in client.get("/api/models").json()[0]["methods"]
+    body = {"model_id": "unsafe_linear", "method": "fuzz", "time_budget_s": 10,
+            "fuzz": {"max_iterations": 50, "rng_seed": 7}}
+    run_id = client.post("/api/runs", json=body).json()["run_id"]
+    kinds = [e["kind"] for e in follow_to_end(client, run_id)]
+    assert kinds[:2] == ["run.queued", "run.started"] and kinds[-1] == "run.completed"
+    assert set(kinds[2:-1]) == {"fuzz.progress"}
+
+    run = client.get(f"/api/runs/{run_id}").json()
+    assert run["result"]["verdict"] == "falsified" and run["native_reference"] is None
+    fz = client.get(f"/api/runs/{run_id}/fuzzing").json()
+    assert fz["availability"] == "available" and fz["options"]["rng_seed"] == 7
+    assert fz["summary"]["iterations"] == 50 and fz["summary"]["counterexample_count"] >= 1
+    assert run["result"]["counterexample"] == fz["counterexamples"][0]["input"]
+    assert fz["timeline"][-1]["iteration"] == 50
+    assert sum(s["selected"] for s in fz["strategies"]) == 50
+    assert "fuzzing.json" in json.loads((tmp_path / "records" / run_id / "artifacts.json").read_text())
+
+
+def test_fuzz_options_require_fuzz_method_and_other_runs_have_no_fuzzing(client: TestClient):
+    bad = client.post("/api/runs", json={"model_id": "range_check", "method": "interval", "fuzz": {}})
+    assert bad.status_code == 422 and bad.json()["error"]["code"] == "invalid_request"
+    run_id = client.post("/api/runs", json={"model_id": "range_check", "method": "interval"}).json()["run_id"]
+    follow_to_end(client, run_id)
+    assert client.get(f"/api/runs/{run_id}/fuzzing").json()["availability"] == "unsupported"
+
+
 def test_idempotent_start_and_conflict(client: TestClient):
     body = {"model_id": "range_check", "method": "interval", "client_request_id": "req-1"}
     first = client.post("/api/runs", json=body)

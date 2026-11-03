@@ -83,8 +83,8 @@ button { cursor: pointer; } button:disabled { opacity: .5; cursor: not-allowed; 
 .kv span { color: var(--muted); } .kv b { font-weight: 500; overflow-wrap: anywhere; }
 .av-unsupported { color: var(--bad); } .av-available { color: var(--good); } .av-pending { color: var(--accent); } .av-not_recorded { color: var(--warn); }
 
-.tabs { display: flex; border-bottom: 1px solid var(--line); }
-.tab { flex: 1; background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px; color: var(--muted); }
+.tabs { display: flex; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tab { flex: 1 0 auto; background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px; color: var(--muted); }
 .tab.active { color: var(--text); border-bottom-color: var(--accent); }
 .tabbody { overflow: auto; padding: 12px; flex: 1; min-height: 0; }
 .empty { text-align: center; color: var(--muted); padding: 30px 12px; } .empty h3 { color: var(--text); }
@@ -121,6 +121,20 @@ button { cursor: pointer; } button:disabled { opacity: .5; cursor: not-allowed; 
 .seckind { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 .sec-observation { border-left-color: var(--good); } .sec-interpretation { border-left-color: var(--accent); }
 .sec-hypothesis { border-left-color: var(--violet); } .sec-missing { border-left-color: var(--warn); }
+
+/* Fuzzing view (verification/FuzzView.tsx) */
+.form .check { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 6px; }
+.form .check input { width: auto; }
+.sw.ce { background: var(--bad); } .sw.seed { background: var(--muted); }
+.fuzzchart .cov { fill: none; stroke: var(--accent); stroke-width: 2; }
+.fuzzchart .ces { fill: none; stroke: var(--bad); stroke-width: 2; }
+.fuzzchart .firstce { stroke: var(--bad); stroke-dasharray: 3 3; opacity: .7; }
+.track.share { display: block; min-width: 60px; }
+.track .pin { position: absolute; top: -1px; width: 3px; height: 16px; margin-left: -1px; border-radius: 1px; }
+.pin.ce { background: var(--bad); } .pin.seed { background: var(--muted); opacity: .8; }
+.tblwrap { overflow-x: auto; }
+.tbl tr.rowlink { cursor: pointer; } .tbl tr.rowlink:hover { background: var(--panel2); }
+.tbl tr.rowsel { background: var(--panel2); box-shadow: inset 3px 0 0 var(--bad); }
 
 @media (max-width: 1100px) {
   .shell { grid-template-columns: 260px minmax(0, 1fr); grid-template-areas: "top top" "side center" "insp insp"; grid-template-rows: auto minmax(0, 1fr) auto; height: auto; min-height: 100vh; }

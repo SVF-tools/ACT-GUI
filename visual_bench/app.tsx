@@ -11,13 +11,14 @@ import { RecordsView } from "./records/RecordsView";
 import { RunsPanel } from "./verification/RunsPanel";
 import { EngineBadge } from "./verification/EngineBadge";
 import { EngineView } from "./verification/EngineView";
+import { FuzzView } from "./verification/FuzzView";
 import { GurobiBadge } from "./verification/GurobiBadge";
 import { initialSelection, selectionReducer } from "./workspace/selection";
 import { Empty } from "./workspace/Empty";
 import { ThemeToggle } from "./workspace/theme";
 import { useQuery } from "./workspace/useQuery";
 
-const TABS = ["Propagation", "BaB", "Assistant", "Records", "Engine"] as const;
+const TABS = ["Propagation", "BaB", "Fuzzing", "Assistant", "Records", "Engine"] as const;
 type Tab = (typeof TABS)[number];
 
 export function App() {
@@ -53,6 +54,7 @@ export function App() {
             version={runsVersion}
             onChanged={() => setRunsVersion((v) => v + 1)}
             onSelect={(runId) => dispatch({ type: "selectRun", runId, modelId: sel.modelId! })}
+            onStarted={(method) => method === "fuzz" && setTab("Fuzzing")}
           />
         )}
       </aside>
@@ -84,6 +86,7 @@ export function App() {
               onSelectNeuron={(neuron) => dispatch({ type: "selectNeuron", neuron })} />
           )}
           {tab === "BaB" && <BabView runId={sel.runId} version={runsVersion} />}
+          {tab === "Fuzzing" && <FuzzView runId={sel.runId} version={runsVersion} model={model.status === "ok" ? model.data : null} />}
           {tab === "Assistant" && (
             <AssistantView sel={sel}
               onNavigate={(layerId, neuron) => {

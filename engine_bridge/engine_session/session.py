@@ -47,6 +47,7 @@ _BASELINE_CAPABILITIES = (
     Capability("spec.read", "available", "INPUT_SPEC / ASSERT layer params"),
     Capability("verify.interval", "available", "act.back_end.verifier.verify_once"),
     Capability("verify.bab", "available", "act.back_end.bab.bab.verify_bab_batched + TorchLPSolver (as act/config/pipeline_cli.py)"),
+    Capability("fuzz.actfuzzer", "available", "act.pipeline.fuzzing.ACTFuzzer on ACTToTorch(net); progress via the instance's _print_progress seam"),
     Capability("inspect.layer_bounds.interval", "available", "act.back_end.analyze.analyze after-facts"),
     Capability("events.bab_nodes", "unsupported", "no BaB observer hook in baseline (plan ACT-03)"),
     Capability("events.bab_summary", "available", "VerifyResult.metadata after completion"),

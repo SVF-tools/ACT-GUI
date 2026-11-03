@@ -31,6 +31,8 @@ from visual_bench.verification.solver_license import GurobiLicense
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKER_GRACE_S = 120.0
+# Every catalog net is a JSON ACT net that ACTToTorch rebuilds, so ACTFuzzer applies to all of them.
+WORKBENCH_METHODS: tuple[S.Method, ...] = ("fuzz",)
 
 
 class AppError(Exception):
@@ -90,9 +92,13 @@ class Workbench:
             raise AppError(409, "snapshot_mismatch", f"{entry['act_path']} does not match the pinned sha256")
         return path
 
+    @staticmethod
+    def _methods(entry: dict[str, Any]) -> list[S.Method]:
+        return [*entry["methods"], *WORKBENCH_METHODS]
+
     def models(self) -> list[S.ModelSummary]:
         return [S.ModelSummary(model_id=m["id"], description=m["description"], act_path=m["act_path"],
-                               sha256=m["sha256"], methods=m["methods"], native=m["native"])
+                               sha256=m["sha256"], methods=self._methods(m), native=m["native"])
                 for m in self.catalog["models"]]
 
     def describe(self, model_id: str) -> S.ModelDescriptionOut:
@@ -132,8 +138,10 @@ class Workbench:
     def start_run(self, req: S.RunRequest) -> tuple[S.RunOut, bool]:
         """Return (run, created). Never waits for ACT."""
         entry = self._model_entry(req.model_id)
-        if req.method not in entry["methods"]:
-            raise AppError(422, "unsupported_method", f"{req.model_id} supports {entry['methods']}, not {req.method!r}")
+        if req.method not in self._methods(entry):
+            raise AppError(422, "unsupported_method", f"{req.model_id} supports {self._methods(entry)}, not {req.method!r}")
+        if req.method == "fuzz" and req.fuzz is None:
+            req = req.model_copy(update={"fuzz": S.FuzzOptions()})
         self._require_engine()
         with self._lock:
             if req.client_request_id:
@@ -172,20 +180,39 @@ class Workbench:
     def _supervise(self, run_id: str, model_path: Path, req: S.RunRequest, env: dict[str, str]) -> None:
         try:
             with tempfile.TemporaryDirectory(prefix="act-gui-run-") as tmp:
-                req_file, out_file = Path(tmp) / "request.json", Path(tmp) / "output.json"
+                req_file, out_file, err_file = (Path(tmp) / n for n in ("request.json", "output.json", "stderr.txt"))
                 req_file.write_text(json.dumps({"model_path": str(model_path), "method": req.method,
-                                                "time_budget_s": req.time_budget_s}))
-                proc = subprocess.Popen([sys.executable, "-m", "visual_bench.verification.worker", str(req_file), str(out_file)],
-                                        cwd=REPO_ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
-                self.records.append_event(run_id, "run.started", "running", {"pid": proc.pid})
-                try:
-                    _, stderr = proc.communicate(timeout=req.time_budget_s + WORKER_GRACE_S)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
-                    proc.communicate()
+                                                "time_budget_s": req.time_budget_s,
+                                                "fuzz": req.fuzz.model_dump() if req.fuzz else None}))
+                read_fd, write_fd = os.pipe()
+                with open(err_file, "w") as stderr:
+                    try:
+                        proc = subprocess.Popen(
+                            [sys.executable, "-m", "visual_bench.verification.worker", str(req_file), str(out_file),
+                             str(write_fd)],
+                            cwd=REPO_ROOT, env=env, stdout=subprocess.DEVNULL, stderr=stderr, pass_fds=(write_fd,))
+                    finally:
+                        os.close(write_fd)
+                    self.records.append_event(run_id, "run.started", "running", {"pid": proc.pid})
+                    killed = threading.Event()
+
+                    def kill() -> None:
+                        killed.set()
+                        proc.kill()
+
+                    timer = threading.Timer(req.time_budget_s + WORKER_GRACE_S, kill)
+                    timer.start()
+                    try:
+                        with os.fdopen(read_fd) as progress:
+                            for line in progress:  # ends at EOF: worker exited or was killed
+                                self.records.append_event(run_id, "fuzz.progress", "running", json.loads(line))
+                        proc.wait()
+                    finally:
+                        timer.cancel()
+                if killed.is_set():
                     raise AppError(504, "worker_timeout", "Worker exceeded its budget plus grace period and was killed.")
                 if proc.returncode != 0 or not out_file.is_file():
-                    tail = (stderr or "").strip().splitlines()[-3:]
+                    tail = err_file.read_text().strip().splitlines()[-3:]
                     raise AppError(500, "worker_crashed", f"Worker exited with code {proc.returncode}: {' | '.join(tail)}")
                 out = json.loads(out_file.read_text())
             if "error" in out:
@@ -207,6 +234,8 @@ class Workbench:
         self.records.write_artifact(run_id, "result.json", result)
         if "layer_states" in out:
             self.records.write_artifact(run_id, "layers.json", out["layer_states"])
+        if "fuzzing" in out:
+            self.records.write_artifact(run_id, "fuzzing.json", out["fuzzing"])
         hashes = self.records.seal(run_id)
         if result["bab_summary"] is not None:
             self.records.append_event(run_id, "bab.summary", "running", result["bab_summary"])
@@ -269,6 +298,33 @@ class Workbench:
                              final_summary="available" if summary is not None else
                              ("pending" if run.status in ("queued", "running") else "not_recorded"),
                              reason=cov["reason"], summary=summary)
+
+    def fuzzing(self, run_id: str) -> S.FuzzingOut:
+        run = self.get_run(run_id)
+        opts = S.RunRequest.model_validate(self.records.manifest(run_id)["request"]).fuzz
+        base = {"run_id": run_id, "status": run.status, "options": opts, "config": {},
+                "provenance": {"act_call": "act.pipeline.fuzzing.ACTFuzzer(ACTToTorch(net)).fuzz()",
+                               "config": "ACT act/config/pipeline.yaml fuzzing section + options"}}
+        if run.method != "fuzz":
+            return S.FuzzingOut(availability="unsupported", summary=None, timeline=[], strategies=[],
+                                counterexamples=[], **base)
+        raw = self.records.artifact(run_id, "fuzzing.json") if run.status == "completed" else None
+        if raw is None:
+            live = [S.FuzzPointOut.model_validate(e["payload"]) for e in self.records.events(run_id)
+                    if e["kind"] == "fuzz.progress"]
+            return S.FuzzingOut(availability="pending" if run.status in ("queued", "running") else "not_recorded",
+                                summary=None, timeline=live, strategies=[], counterexamples=[], **base)
+        wn = S.wire_number
+        ces = [S.FuzzCounterexampleOut(**{**c, "severity": wn(c["severity"]), "input": [wn(x) for x in c["input"]],
+                                          "output": [wn(x) for x in c["output"]],
+                                          "seed_input": [wn(x) for x in c["seed_input"]]})
+               for c in raw["counterexamples"]]
+        summary = S.FuzzSummaryOut.model_validate({k: raw[k] for k in S.FuzzSummaryOut.model_fields})
+        base["config"] = raw["config"]
+        return S.FuzzingOut(availability="available", summary=summary,
+                            timeline=[S.FuzzPointOut.model_validate(p) for p in raw["timeline"]],
+                            strategies=[S.FuzzStrategyOut.model_validate(s) for s in raw["strategies"]],
+                            counterexamples=ces, **base)
 
     def is_terminal(self, run_id: str) -> bool:
         return self.get_run(run_id).status in ("completed", "failed")

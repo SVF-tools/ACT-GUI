@@ -77,6 +77,10 @@ def create_app(records_root: Path | None = None, secrets_root: Path | None = Non
     def coverage(run_id: str) -> S.CoverageOut:
         return wb.coverage(run_id)
 
+    @app.get("/api/runs/{run_id}/fuzzing", response_model=S.FuzzingOut)
+    def fuzzing(run_id: str) -> S.FuzzingOut:
+        return wb.fuzzing(run_id)
+
     @app.get("/api/runs/{run_id}/events")
     async def events(run_id: str, request: Request, after: int = 0) -> StreamingResponse:
         """SSE: replay committed events after seq 'after' (or Last-Event-ID), then follow until terminal."""

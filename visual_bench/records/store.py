@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 _RUN_ID = re.compile(r"^run-[0-9a-f]{12}$")
-ARTIFACTS = ("manifest.json", "result.json", "layers.json")
+ARTIFACTS = ("manifest.json", "result.json", "layers.json", "fuzzing.json")
 
 
 def now_iso() -> str:

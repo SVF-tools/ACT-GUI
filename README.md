@@ -4,7 +4,7 @@ A visualization and interaction interface for the [ACT](https://github.com/SVF-t
 
 This repository contains the GUI product. ACT remains a separate computation engine. React/TypeScript and FastAPI/Pydantic are implementation technologies within the workbench.
 
-**Status:** first runnable version (2026-11-03). The workbench loads real ACT networks, runs real ACT verification (interval and BaB) in a worker process, records runs, and lets you browse layer-wise interval bounds in the browser. Node-level BaB history, controls, geometry beyond interval boxes, and a real AI provider are not implemented; see [plan status](docs/plan.md#first-version-status).
+**Status:** first runnable version (2026-11-03). The workbench loads real ACT networks, runs real ACT verification (interval and BaB) and ACT's fuzzer (ACTFuzzer) in a worker process, records runs, and lets you browse layer-wise interval bounds in the browser. Node-level BaB history, controls, geometry beyond interval boxes, and a real AI provider are not implemented; see [plan status](docs/plan.md#first-version-status).
 
 ```text
 ACT-GUI/
@@ -37,7 +37,7 @@ npm install
 
 `dev.sh` starts the FastAPI service on 127.0.0.1:18765 and the Vite dev server on 127.0.0.1:5173, which proxies `/api` to the service. Both bind to loopback only. If the workbench runs on a remote machine, forward the port: `ssh -L 5173:127.0.0.1:5173 <host>` and open the same URL locally. Runs execute on CPU by default (`ACT_GUI_DEVICE=cpu`); records are written to `var/records/` (`ACT_GUI_RECORDS` overrides).
 
-In the browser: pick a model, press **Run ACT**, select the run, then click a layer in the network or use the Propagation stepper. The BaB, Assistant, and Records tabs act on the same selection.
+In the browser: pick a model, press **Run ACT**, select the run, then click a layer in the network or use the Propagation stepper. The BaB, Assistant, and Records tabs act on the same selection. To demonstrate fuzzing, choose method **fuzz (ACTFuzzer)**, set the budget, iteration limit, and seed, and press **Run ACT**: the **Fuzzing** tab follows the run live (coverage and counterexamples over iterations), then shows the mutation strategies and each counterexample ACT found against the input box. `unsafe_linear` yields counterexamples immediately; `bab_deep_mlp` and `range_check` yield none, which is consistent with BaB certifying them but is not a proof.
 
 ### Run with Docker
 

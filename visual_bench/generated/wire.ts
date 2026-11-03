@@ -48,42 +48,83 @@ export type Provider = string
 export type ProviderKind = ("fake" | "real")
 export type Question1 = string
 export type Sections = AnswerSection[]
-export type Service = string
-export type Status = "ok"
-export type Version = string
+export type ElapsedS = number
+export type Index = number
+export type Input = (number | ("Infinity" | "-Infinity" | "NaN"))[]
+export type Iteration = number
 export type Kind2 = string
+export type Output = (number | ("Infinity" | "-Infinity" | "NaN"))[]
+export type SeedInput = (number | ("Infinity" | "-Infinity" | "NaN"))[]
+export type Severity1 = (number | ("Infinity" | "-Infinity" | "NaN"))
+export type SpecRow = number
+export type Strategy = (string | null)
+export type TrueClass = (number | null)
+export type MaxIterations = number
+export type RngSeed = number
+export type StopOnFirst = boolean
+export type Corpus = number
+export type Counterexamples = number
+export type Coverage = number
+export type ElapsedS1 = number
+export type Iteration1 = number
+export type Name1 = string
+export type Selected = number
+export type Violations = number
+export type Weight = number
+export type ActStatus = string
+export type CounterexampleCount = number
+export type CoverageStrategy = string
+export type Device = string
+export type ElapsedS2 = number
+export type Iterations = number
+export type NeuronCoverage = number
+export type NeverActivatedCount = number
+export type NeverActivatedSample = string[]
+export type RngSeed1 = number
+export type SeedsExplored = number
+export type TotalMutations = number
+export type Availability1 = ("available" | "pending" | "not_recorded" | "unsupported")
+export type Counterexamples1 = FuzzCounterexampleOut[]
+export type RunId3 = string
+export type Status = ("queued" | "running" | "completed" | "failed")
+export type Strategies = FuzzStrategyOut[]
+export type Timeline = FuzzPointOut[]
+export type Service = string
+export type Status1 = "ok"
+export type Version = string
+export type Kind3 = string
 export type LayerId2 = number
 export type Lb = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type Ub = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type InVars = number
-export type Kind3 = string
+export type Kind4 = string
 export type LayerId3 = number
 export type OutVars = number
 export type OutputShape = (number[] | null)
-export type Name1 = string
+export type Name2 = string
 export type Shape = (number[] | null)
 export type Value1 = (string | null)
 export type Params = ParamOut[]
 export type Preds = number[]
 export type Succs = number[]
 export type BeforeLayerIds = number[]
-export type Kind4 = string
+export type Kind5 = string
 export type LayerId4 = number
 export type Lb1 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type Shape1 = number[]
 export type Stage = "after"
 export type Ub1 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
-export type Availability1 = ("available" | "pending" | "not_recorded" | "unsupported")
+export type Availability2 = ("available" | "pending" | "not_recorded" | "unsupported")
 export type Layers = LayerStateOut[]
 export type Method = ("interval" | null)
-export type RunId3 = string
+export type RunId4 = string
 export type ActCommit = (string | null)
 export type InputDim = number
 export type InputSpecs = InputSpecOut[]
 export type Layers1 = LayerOut[]
 export type ModelId1 = string
 export type OutputDim = number
-export type Kind5 = string
+export type Kind6 = string
 export type LayerId5 = number
 export type Matrix = (number[][] | null)
 export type Rows = number
@@ -92,46 +133,46 @@ export type Thresholds = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null
 export type Sha256 = string
 export type ActPath = string
 export type Description = string
-export type Methods = ("interval" | "bab")[]
+export type Methods = ("interval" | "bab" | "fuzz")[]
 export type ModelId2 = string
-export type ElapsedS = number
+export type ElapsedS3 = number
 export type Nodes = (number | null)
-export type Status1 = string
+export type Status2 = string
 export type Sha2561 = string
-export type Availability2 = ("available" | "not_configured")
-export type Kind6 = ("fake" | "real")
-export type Name2 = string
+export type Availability3 = ("available" | "not_configured")
+export type Kind7 = ("fake" | "real")
+export type Name3 = string
 export type Note = string
 export type Providers = ProviderOut[]
 export type At = string
-export type Kind7 = ("run.queued" | "run.started" | "run.completed" | "run.failed" | "bab.summary")
-export type RunId4 = string
+export type Kind8 = ("run.queued" | "run.started" | "run.completed" | "run.failed" | "bab.summary" | "fuzz.progress")
+export type RunId5 = string
 export type Seq = number
-export type Status2 = ("queued" | "running" | "completed" | "failed")
+export type Status3 = ("queued" | "running" | "completed" | "failed")
 export type ActCommit1 = (string | null)
 export type ClientRequestId = (string | null)
 export type CreatedAt = string
 export type FinishedAt = (string | null)
 export type LastSeq = number
 export type MatchesNative = (boolean | null)
-export type Method1 = ("interval" | "bab")
+export type Method1 = ("interval" | "bab" | "fuzz")
 export type ModelId3 = string
 export type ModelSha256 = string
-export type ActStatus = string
+export type ActStatus1 = string
 export type BabSummary = ({
 [k: string]: string | number | boolean | null
 } | null)
 export type Counterexample = (number[] | null)
-export type Device = (string | null)
-export type ElapsedS1 = number
+export type Device1 = (string | null)
+export type ElapsedS4 = number
 export type Verdict = ("certified" | "falsified" | "unknown" | "timeout" | "error")
-export type RunId5 = string
+export type RunId6 = string
 export type StartedAt = (string | null)
-export type Status3 = ("queued" | "running" | "completed" | "failed")
+export type Status4 = ("queued" | "running" | "completed" | "failed")
 export type TimeBudgetS = number
 export type Runs = RunOut[]
 export type ClientRequestId1 = (string | null)
-export type Method2 = ("interval" | "bab")
+export type Method2 = ("interval" | "bab" | "fuzz")
 export type ModelId4 = string
 export type TimeBudgetS1 = number
 export type Content = string
@@ -141,7 +182,7 @@ export type LicenseState = ("licensed" | "restricted" | "invalid" | "not_install
 export type LicenseUpdatedAt = (string | null)
 export type Message2 = string
 export type Solver = "gurobi"
-export type UsedByMethods = ("interval" | "bab")[]
+export type UsedByMethods = ("interval" | "bab" | "fuzz")[]
 export type Version1 = (string | null)
 
 export interface ActGuiWire {
@@ -155,6 +196,12 @@ ErrorResponse?: ErrorResponse
 EvidenceRef?: EvidenceRef
 ExplainRequest?: ExplainRequest
 ExplainResponse?: ExplainResponse
+FuzzCounterexampleOut?: FuzzCounterexampleOut
+FuzzOptions?: FuzzOptions
+FuzzPointOut?: FuzzPointOut
+FuzzStrategyOut?: FuzzStrategyOut
+FuzzSummaryOut?: FuzzSummaryOut
+FuzzingOut?: FuzzingOut
 HealthOut?: HealthOut
 InputSpecOut?: InputSpecOut
 LayerOut?: LayerOut
@@ -293,11 +340,102 @@ sections: Sections
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "FuzzCounterexampleOut".
+ */
+export interface FuzzCounterexampleOut {
+elapsed_s: ElapsedS
+index: Index
+input: Input
+iteration: Iteration
+kind: Kind2
+output: Output
+seed_input: SeedInput
+severity: Severity1
+spec_row: SpecRow
+strategy: Strategy
+true_class: TrueClass
+}
+/**
+ * ACTFuzzer budget for method "fuzz"; other settings come from ACT's pipeline.yaml.
+ * 
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "FuzzOptions".
+ */
+export interface FuzzOptions {
+max_iterations?: MaxIterations
+rng_seed?: RngSeed
+stop_on_first?: StopOnFirst
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "FuzzPointOut".
+ */
+export interface FuzzPointOut {
+corpus: Corpus
+counterexamples: Counterexamples
+coverage: Coverage
+elapsed_s: ElapsedS1
+iteration: Iteration1
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "FuzzStrategyOut".
+ */
+export interface FuzzStrategyOut {
+name: Name1
+selected: Selected
+violations: Violations
+weight: Weight
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "FuzzSummaryOut".
+ */
+export interface FuzzSummaryOut {
+act_status: ActStatus
+counterexample_count: CounterexampleCount
+coverage_strategy: CoverageStrategy
+device: Device
+elapsed_s: ElapsedS2
+iterations: Iterations
+neuron_coverage: NeuronCoverage
+never_activated_count: NeverActivatedCount
+never_activated_sample: NeverActivatedSample
+rng_seed: RngSeed1
+seeds_explored: SeedsExplored
+total_mutations: TotalMutations
+}
+/**
+ * ACTFuzzer record of a run. While running, timeline comes from committed fuzz.progress events.
+ * 
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "FuzzingOut".
+ */
+export interface FuzzingOut {
+availability: Availability1
+config: Config
+counterexamples: Counterexamples1
+options: (FuzzOptions | null)
+provenance: Provenance
+run_id: RunId3
+status: Status
+strategies: Strategies
+summary: (FuzzSummaryOut | null)
+timeline: Timeline
+}
+export interface Config {
+[k: string]: string | number | boolean | null
+}
+export interface Provenance {
+[k: string]: string
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "HealthOut".
  */
 export interface HealthOut {
 service: Service
-status: Status
+status: Status1
 version: Version
 }
 /**
@@ -305,7 +443,7 @@ version: Version
  * via the `definition` "InputSpecOut".
  */
 export interface InputSpecOut {
-kind: Kind2
+kind: Kind3
 layer_id: LayerId2
 lb: Lb
 ub: Ub
@@ -316,7 +454,7 @@ ub: Ub
  */
 export interface LayerOut {
 in_vars: InVars
-kind: Kind3
+kind: Kind4
 layer_id: LayerId3
 out_vars: OutVars
 output_shape: OutputShape
@@ -329,7 +467,7 @@ succs: Succs
  * via the `definition` "ParamOut".
  */
 export interface ParamOut {
-name: Name1
+name: Name2
 shape: Shape
 value: Value1
 }
@@ -339,7 +477,7 @@ value: Value1
  */
 export interface LayerStateOut {
 before_layer_ids: BeforeLayerIds
-kind: Kind4
+kind: Kind5
 layer_id: LayerId4
 lb: Lb1
 shape: Shape1
@@ -351,13 +489,13 @@ ub: Ub1
  * via the `definition` "LayerStatesOut".
  */
 export interface LayerStatesOut {
-availability: Availability1
+availability: Availability2
 layers: Layers
 method: Method
-provenance: Provenance
-run_id: RunId3
+provenance: Provenance1
+run_id: RunId4
 }
-export interface Provenance {
+export interface Provenance1 {
 [k: string]: string
 }
 /**
@@ -379,7 +517,7 @@ sha256: Sha256
  * via the `definition` "OutputSpecOut".
  */
 export interface OutputSpecOut {
-kind: Kind5
+kind: Kind6
 layer_id: LayerId5
 matrix: Matrix
 rows: Rows
@@ -406,9 +544,9 @@ export interface Native {
  * via the `definition` "NativeResult".
  */
 export interface NativeResult {
-elapsed_s: ElapsedS
+elapsed_s: ElapsedS3
 nodes: Nodes
-status: Status1
+status: Status2
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -422,9 +560,9 @@ providers: Providers
  * via the `definition` "ProviderOut".
  */
 export interface ProviderOut {
-availability: Availability2
-kind: Kind6
-name: Name2
+availability: Availability3
+kind: Kind7
+name: Name3
 note: Note
 }
 /**
@@ -433,11 +571,11 @@ note: Note
  */
 export interface RunEvent {
 at: At
-kind: Kind7
+kind: Kind8
 payload: Payload
-run_id: RunId4
+run_id: RunId5
 seq: Seq
-status: Status2
+status: Status3
 }
 export interface Payload {
 [k: string]: string | number | boolean | null
@@ -466,9 +604,9 @@ model_id: ModelId3
 model_sha256: ModelSha256
 native_reference: (NativeResult | null)
 result: (RunResultOut | null)
-run_id: RunId5
+run_id: RunId6
 started_at: StartedAt
-status: Status3
+status: Status4
 time_budget_s: TimeBudgetS
 }
 /**
@@ -476,11 +614,11 @@ time_budget_s: TimeBudgetS
  * via the `definition` "RunResultOut".
  */
 export interface RunResultOut {
-act_status: ActStatus
+act_status: ActStatus1
 bab_summary: BabSummary
 counterexample: Counterexample
-device?: Device
-elapsed_s: ElapsedS1
+device?: Device1
+elapsed_s: ElapsedS4
 metadata: Metadata
 verdict: Verdict
 }
@@ -493,6 +631,7 @@ export interface Metadata {
  */
 export interface RunRequest {
 client_request_id?: ClientRequestId1
+fuzz?: (FuzzOptions | null)
 method: Method2
 model_id: ModelId4
 time_budget_s?: TimeBudgetS1

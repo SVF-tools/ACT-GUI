@@ -1,16 +1,25 @@
 import { useEffect, useState } from "react";
 import { api, followRun } from "../api";
-import type { RunOut } from "../generated/wire";
+import type { RunOut, RunRequest } from "../generated/wire";
 import { useQuery } from "../workspace/useQuery";
 
-export function RunsPanel({ modelId, selectedRun, version, onChanged, onSelect }: {
+type Method = RunRequest["method"];
+const METHOD_LABEL: Record<Method, string> = {
+  interval: "interval (verify_once)", bab: "BaB (verify_bab_batched)", fuzz: "fuzz (ACTFuzzer)",
+};
+
+export function RunsPanel({ modelId, selectedRun, version, onChanged, onSelect, onStarted }: {
   modelId: string; selectedRun: string | null; version: number; onChanged: () => void; onSelect: (runId: string) => void;
+  onStarted: (method: Method) => void;
 }) {
   const models = useQuery("models", api.models);
   const runs = useQuery(`runs:${version}`, api.runs);
   const methods = models.status === "ok" ? models.data.find((m) => m.model_id === modelId)?.methods ?? [] : [];
-  const [method, setMethod] = useState<"interval" | "bab">("bab");
+  const [method, setMethod] = useState<Method>("bab");
   const [budget, setBudget] = useState(30);
+  const [iterations, setIterations] = useState(100000);
+  const [rngSeed, setRngSeed] = useState(0);
+  const [stopOnFirst, setStopOnFirst] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const effective = methods.includes(method) ? method : methods[0] ?? "interval";
@@ -30,9 +39,11 @@ export function RunsPanel({ modelId, selectedRun, version, onChanged, onSelect }
     setBusy(true);
     setErr(null);
     try {
-      const run = await api.startRun({ model_id: modelId, method: effective, time_budget_s: budget, client_request_id: crypto.randomUUID() });
+      const fuzz = effective === "fuzz" ? { max_iterations: iterations, rng_seed: rngSeed, stop_on_first: stopOnFirst } : null;
+      const run = await api.startRun({ model_id: modelId, method: effective, time_budget_s: budget, client_request_id: crypto.randomUUID(), fuzz });
       onChanged();
       onSelect(run.run_id);
+      onStarted(effective);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -45,13 +56,26 @@ export function RunsPanel({ modelId, selectedRun, version, onChanged, onSelect }
       <h2>Verification runs</h2>
       <div className="form">
         <label>Method
-          <select value={effective} onChange={(e) => setMethod(e.target.value as "interval" | "bab")}>
-            {methods.map((m) => <option key={m} value={m}>{m === "bab" ? "BaB (verify_bab_batched)" : "interval (verify_once)"}</option>)}
+          <select value={effective} onChange={(e) => setMethod(e.target.value as Method)}>
+            {methods.map((m) => <option key={m} value={m}>{METHOD_LABEL[m]}</option>)}
           </select>
         </label>
         <label>Budget (s)
           <input type="number" min={1} max={600} value={budget} onChange={(e) => setBudget(Number(e.target.value))} />
         </label>
+        {effective === "fuzz" && (
+          <>
+            <label>Max iterations
+              <input type="number" min={1} max={1000000} value={iterations} onChange={(e) => setIterations(Number(e.target.value))} />
+            </label>
+            <label>Seed
+              <input type="number" min={0} value={rngSeed} onChange={(e) => setRngSeed(Number(e.target.value))} />
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={stopOnFirst} onChange={(e) => setStopOnFirst(e.target.checked)} /> stop at first counterexample
+            </label>
+          </>
+        )}
         <button className="primary" disabled={busy || methods.length === 0} onClick={start}>{busy ? "Starting…" : "Run ACT"}</button>
       </div>
       {err && <div className="error">{err}</div>}

@@ -15,7 +15,7 @@ import pytest
 
 from engine_bridge.contracts import BridgeError, Method
 from engine_bridge.engine_session import act_imports, act_root, probe, probe_gurobi
-from engine_bridge.execution import run_verification
+from engine_bridge.execution import run_fuzzing, run_verification
 from engine_bridge.inspection import interval_layer_states
 from engine_bridge.model_spec import describe_model
 
@@ -109,6 +109,28 @@ def test_interval_layer_states_match_native_verify_once_facts():
         assert s.ub == tuple(facts[s.layer_id].bounds.ub.reshape(-1).tolist())
 
 
+def test_fuzzing_reports_act_counterexample_inside_the_input_box():
+    progress = []
+    out = run_fuzzing(model_path("unsafe_linear"), 10.0, 1000, rng_seed=0, stop_on_first=True,
+                      on_progress=progress.append)
+    assert (out.verdict, out.act_status) == ("falsified", "COUNTEREXAMPLE_FOUND")
+    assert out.counterexample_count == len(out.counterexamples) == 1
+    ce = out.counterexamples[0]
+    box = describe_model(model_path("unsafe_linear")).input_specs[0]
+    assert all(lo <= x <= hi for x, lo, hi in zip(ce.input, box.lb, box.ub, strict=True))
+    assert ce.iteration == out.iterations and ce.strategy in {s.name for s in out.strategies}
+    assert progress and progress[-1] == out.timeline[-1] and progress[-1].counterexamples == 1
+
+
+def test_fuzzing_never_falsifies_a_property_act_certifies():
+    assert MODELS["bab_deep_mlp"]["native"]["bab"]["status"] == "CERTIFIED"
+    out = run_fuzzing(model_path("bab_deep_mlp"), 60.0, 200, rng_seed=0)
+    assert (out.verdict, out.iterations, out.counterexample_count) == ("unknown", 200, 0)
+    assert sum(s.selected for s in out.strategies) == out.iterations  # batch size 1: one strategy per sample
+    iters = [p.iteration for p in out.timeline]
+    assert iters == sorted(iters) and iters[-1] == 200
+
+
 def test_invalid_inputs_raise_structured_errors(tmp_path):
     with pytest.raises(BridgeError) as e1:
         run_verification(model_path("bab_deep_mlp"), cast(Method, cast(object, "magic")), 5)
@@ -116,6 +138,9 @@ def test_invalid_inputs_raise_structured_errors(tmp_path):
     with pytest.raises(BridgeError) as e2:
         describe_model(tmp_path / "missing.json")
     assert e2.value.code == "model_not_found"
+    with pytest.raises(BridgeError) as e3:
+        run_fuzzing(model_path("bab_deep_mlp"), 5, 0)
+    assert e3.value.code == "invalid_budget"
 
 
 def test_gurobi_probe_reports_gurobi_license_rejection(tmp_path):
