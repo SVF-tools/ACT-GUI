@@ -1,6 +1,6 @@
 # Inspection Adapter
 
-**Status:** design specification; not implemented. **Owner:** B; A owns layer-state and projection semantics.
+**Status:** first version: `layers.py` (INSP-01 interval after-states via public `analyze`); INSP-02/03 not started. **Owner:** A; B integrates workbench mappings and reviews contract consistency.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 ## 1. Subproblems and Objective
@@ -50,11 +50,11 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 
 | ID | Deliverable | Depends on | Completion evidence |
 | --- | --- | --- | --- |
-| INSP-01 | Expose fixed-run layer states | EXE-02, MSB-03 | A small real network yields correctly mapped before/after data for input through output; absent stages are explicit. |
-| INSP-02 | Expose geometry and projection metadata | INSP-01 | Coordinates, representation, guarantee, method, dtype/tolerance, and source are present; interval-only data is not upgraded into fabricated geometry. |
+| INSP-01 | Expose fixed-run layer states | EXE-01, MSB-03, ACT-01 | A small real network yields correctly mapped before/after data for input through output; absent stages are explicit. |
+| INSP-02 | Expose geometry and projection metadata | INSP-01, ACT-04 | Coordinates, representation, guarantee, method, dtype/tolerance, and source are present; interval-only data is not upgraded into fabricated geometry. |
 | INSP-03 | Define historical availability and new inspection semantics | INSP-01, REC-02 | Integration with retained records distinguishes old evidence, missing history, and recomputation; new inspection data never overwrites original historical provenance. |
 
-Owner: **B**. A reviews scientific semantics; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.
+Owner: **A**. B reviews integration and contract consistency; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.
 
 Missing ACT interfaces require linked ACT issues/changes owned by A. Record the required capability and engine PR before marking the corresponding GUI integration task complete.
 

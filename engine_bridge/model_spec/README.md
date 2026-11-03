@@ -1,6 +1,6 @@
 # Model and Specification Adapter
 
-**Status:** design specification; not implemented. **Owner:** B; A reviews scientific mapping.
+**Status:** first version: `describe.py` (MSB-01..03 for JSON nets with box INPUT_SPEC); parity tests in `../test_bridge.py`; A review pending. **Owner:** B; A reviews scientific mapping.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 ## 1. Subproblems and Objective
@@ -47,7 +47,7 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 
 | ID | Deliverable | Depends on | Completion evidence |
 | --- | --- | --- | --- |
-| MSB-01 | Define neutral descriptions against a real sample | ES-01 | Field map covers DAG, layer/tensor identity, shapes, provenance, and required spec semantics; A reviews it. |
+| MSB-01 | Define neutral descriptions against a real sample | ES-01, BASE-03 | Field map covers DAG, layer/tensor identity, shapes, provenance, and required spec semantics; A reviews it. |
 | MSB-02 | Implement model loading and mapping | MSB-01, ES-02 | Repeated reads of one snapshot preserve IDs and match native ACT connectivity/shape; no mutable tensor escapes. |
 | MSB-03 | Implement spec loading and validation | MSB-02 | Real input-domain/output-constraint mapping matches ACT; invalid variables and unsupported representations have explicit errors. |
 

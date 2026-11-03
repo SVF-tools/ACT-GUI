@@ -1,6 +1,6 @@
 # Committed Events Adapter
 
-**Status:** design specification; not implemented. **Owner:** B; A verifies ACT commit points.
+**Status:** first version: `coverage.py` (EVT-01 audit: final summary only); EVT-02/03 blocked on ACT-03. **Owner:** A; B integrates workbench mappings and reviews contract consistency.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 ## 1. Subproblems and Objective
@@ -50,10 +50,10 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 | ID | Deliverable | Depends on | Completion evidence |
 | --- | --- | --- | --- |
 | EVT-01 | Audit and expose actual ACT observation coverage | EXE-02 | Record concrete hooks/commit points and limitations; summary-only data is labeled summary-only. |
-| EVT-02 | Implement committed node/event batches | EVT-01 | After the required ACT changes, rollback/retry leaves no ghost nodes; batch identity, seq, revision, and snapshot boundary agree. |
-| EVT-03 | Validate backpressure and observation overhead | EVT-02 | A burst either preserves complete committed data or reports an explicit gap/degradation; deterministic scientific outcomes match observer-off execution. |
+| EVT-02 | Implement committed node/event batches | EVT-01, ACT-03 | With ACT-03 in the pinned baseline, rollback/retry leaves no ghost nodes; batch identity, seq, revision, and snapshot boundary agree. |
+| EVT-03 | Validate backpressure and observation overhead | EVT-02, PERF-01 | A burst either preserves complete committed data or reports an explicit gap/degradation; deterministic scientific outcomes match observer-off execution. |
 
-Owner: **B**. A reviews scientific semantics; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.
+Owner: **A**. B reviews integration and contract consistency; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.
 
 Missing ACT interfaces require linked ACT issues/changes owned by A. Record the required capability and engine PR before marking the corresponding GUI integration task complete.
 

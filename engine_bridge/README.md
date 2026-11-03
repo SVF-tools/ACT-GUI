@@ -1,6 +1,6 @@
 # Engine Bridge Scope
 
-**Status:** design only. **Owner:** B; A reviews ACT interfaces and scientific semantics. The ACT engine itself remains in its separate repository.
+**Status:** first version: all five modules have code (see [plan status](../docs/plan.md#first-version-status)). **Owner:** B for engine_session, model_spec, and execution; A for inspection and events and reviews ACT interfaces and scientific semantics. The ACT engine itself remains in its separate repository.
 
 ## Purpose
 

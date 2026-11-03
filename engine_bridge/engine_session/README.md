@@ -1,6 +1,6 @@
 # Engine Session
 
-**Status:** design specification; not implemented. **Owner:** B; A reviews environment and capability semantics.
+**Status:** first version: `session.py` (ES-01 probe, diagnostics, capabilities; ES-04 Gurobi license probe); ES-02 handles and ES-03 not started. **Owner:** B; A reviews environment and capability semantics.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 ## 1. Subproblems and Objective
@@ -47,9 +47,10 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 
 | ID | Deliverable | Depends on | Completion evidence |
 | --- | --- | --- | --- |
-| ES-01 | Implement version/capability probe | BASE-01 | Against the pinned baseline, every advertised capability has a known support source or verified sample. |
+| ES-01 | Implement version/capability probe | BASE-01 | Against the pinned baseline, every advertised capability has a known support source or verified sample; missing ACT and version mismatch produce deterministic diagnostics. |
 | ES-02 | Implement explicit resource handles | ES-01 | Open/use/close has a defined lifecycle; crossing a process boundary does not transfer native solver/GPU objects. |
-| ES-03 | Validate compatibility and cleanup behavior | ES-02 | Missing ACT, version mismatch, repeated close, and post-close access produce deterministic diagnostics with no leaked resources. |
+| ES-04 | Probe optional solver licenses (Gurobi) | ES-01 | `probe_gurobi(license_file)` starts a Gurobi environment in a fresh process and returns Gurobi's own verdict as licensed, restricted, invalid, or not_installed, without credential values; a host-bound license for another host reports invalid with Gurobi's HostID message (`test_bridge.py`). |
+| ES-03 | Validate cleanup and compatibility regression | ES-02 | Repeated close and post-close access produce deterministic diagnostics with no leaked resources; ES-01 incompatibility diagnostics hold across every declared engine combination. |
 
 Owner: **B**. A reviews scientific semantics; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.
 
