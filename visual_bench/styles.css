@@ -74,6 +74,11 @@ a.button.secondary { background: var(--panel2); color: inherit; border: 1px soli
 .danger:hover:not(:disabled) { background: var(--error-bg); }
 .runitem.live { display: flex; gap: 6px; align-items: stretch; } .runitem.live .item { flex: 1; min-width: 0; }
 .bannerrow { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.verdict { font-size: 13px; display: flex; flex-direction: column; gap: 6px; margin-top: 0; }
+.verdict.bannerrow { flex-direction: row; }
+.verdict .vbig { font-size: 16px; letter-spacing: .05em; }
+.verdicthead { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.verdictce { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .ceactions { display: flex; gap: 6px; flex-wrap: wrap; } .cecard.saved { border-color: var(--good); }
 
 /* margin:auto centers a narrow graph yet keeps a wide one scrollable from its first layer. */

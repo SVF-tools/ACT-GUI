@@ -14,6 +14,7 @@ import { EngineBadge } from "./verification/EngineBadge";
 import { EngineView } from "./verification/EngineView";
 import { FuzzView } from "./verification/FuzzView";
 import { GurobiBadge } from "./verification/GurobiBadge";
+import { VerdictBanner } from "./verification/VerdictBanner";
 import { initialSelection, selectionReducer } from "./workspace/selection";
 import { Empty } from "./workspace/Empty";
 import { ThemeToggle } from "./workspace/theme";
@@ -91,6 +92,10 @@ export function App() {
                 ))}
               </nav>
               <div className="modebody">
+                {(mode === "Verification" || mode === "BaB") && (
+                  <VerdictBanner runId={sel.runId} version={runsVersion} model={model.data}
+                    onStopped={() => setRunsVersion((v) => v + 1)} />
+                )}
                 {mode === "Verification" && (
                   <AnalysisView sel={sel} version={runsVersion} model={model.data}
                     onSelectLayer={(layerId) => dispatch({ type: "selectLayer", layerId })}
