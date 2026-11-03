@@ -12,6 +12,10 @@ from typing import Literal
 Availability = Literal["available", "pending", "not_recorded", "unsupported"]
 Verdict = Literal["certified", "falsified", "unknown", "timeout", "error"]
 Method = Literal["interval", "bab", "fuzz"]
+# Abstract domain of single-shot verification (method "interval", ACT verify_once):
+# interval = IntervalTF bounds, dual = ACT DualSolver, hybridz = HybridzTF + HZSolver.
+Domain = Literal["interval", "dual", "hybridz"]
+DOMAINS: tuple[Domain, ...] = ("interval", "dual", "hybridz")
 
 
 class BridgeError(Exception):
@@ -80,6 +84,9 @@ class InputSpec:
     kind: str
     lb: tuple[float, ...]
     ub: tuple[float, ...]
+    shape: tuple[int, ...] = ()  # tensor shape of lb/ub as ACT stores it, e.g. (1, 3, 32, 32)
+    center: tuple[float, ...] | None = None  # unperturbed input when the spec records one
+    dataset: str | None = None  # INPUT layer dataset_name, e.g. "mnist", "cifar10"
 
 
 @dataclass(frozen=True)
@@ -90,6 +97,39 @@ class OutputSpec:
     matrix: tuple[tuple[float, ...], ...] | None  # C, one row per constraint lane
     thresholds: tuple[float, ...] | None
     text: str  # human-readable rendering of what ACT checks
+    true_class: int | None = None  # y_true of a TOP1/margin robustness assertion
+
+
+@dataclass(frozen=True)
+class VnnlibInstance:
+    benchmark: str  # directory under ACT_ROOT/data/vnnlib
+    onnx: str  # path relative to the benchmark directory, as listed in instances.csv
+    vnnlib: str
+
+
+@dataclass(frozen=True)
+class ClassifierSource:
+    source_id: str
+    dataset: str  # "mnist" | "cifar10"
+    onnx: str  # path relative to ACT_ROOT
+    description: str
+
+
+@dataclass(frozen=True)
+class DatasetSample:
+    dataset: str
+    index: int
+    size: int  # number of test images
+    label: int
+    shape: tuple[int, ...]  # C, H, W
+    pixels: tuple[float, ...]  # CHW in [0, 1]
+
+
+@dataclass(frozen=True)
+class BuiltNet:
+    """An ACT net written by a model source builder; params record how it was built."""
+    description: str
+    params: dict[str, str | int | float]
 
 
 @dataclass(frozen=True)
@@ -131,6 +171,7 @@ class RunOutcome:
     metadata: dict[str, object]
     counterexample: tuple[float, ...] | None
     device: str  # torch default device after the ACT call, e.g. "cpu" or "cuda:0"
+    domain: Domain | None = None  # set for verify_once runs; None for BaB
 
 
 @dataclass(frozen=True)
@@ -176,6 +217,19 @@ class FuzzSeed:
 
 
 @dataclass(frozen=True)
+class FuzzFrame:
+    """Lane 0 of the batch ACTFuzzer mutated in one iteration, read after that iteration (display only)."""
+    iteration: int
+    elapsed_s: float
+    strategy: str | None  # mutation strategy ACT selected for that batch
+    seed_row: int  # INPUT row the mutated lane descends from (FuzzingSeed.original_index)
+    depth: int  # mutations applied since that INPUT row, including this one
+    violation: bool  # the iteration added a counterexample to ACT's list
+    input: tuple[float, ...]  # flattened mutated input that ACT ran through the model
+    seed_input: tuple[float, ...]  # flattened original INPUT row (FuzzingSeed.original_tensor)
+
+
+@dataclass(frozen=True)
 class FuzzOutcome:
     """ACTFuzzer report. Fuzzing can falsify (a concrete counterexample) but never certify."""
     verdict: Verdict  # "falsified" iff ACT reported a counterexample, otherwise "unknown"
@@ -191,6 +245,7 @@ class FuzzOutcome:
     never_activated_sample: tuple[str, ...]  # "layer[index]"
     counterexamples: tuple[FuzzCounterexample, ...]  # first ones in discovery order (capped)
     seeds: tuple[FuzzSeed, ...]  # initial seeds (capped)
+    frames: tuple[FuzzFrame, ...]  # mutated inputs sampled over the run (capped, evenly thinned)
     timeline: tuple[FuzzProgress, ...]
     strategies: tuple[FuzzStrategyStats, ...]
     config: dict[str, object]  # effective ACT FuzzingConfig scalars

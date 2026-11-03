@@ -23,7 +23,9 @@ from typing import Any
 from engine_bridge.contracts import BridgeError, EngineInfo
 from engine_bridge.engine_session import act_root, probe
 from engine_bridge.events import observation_coverage
+from engine_bridge.contracts import VnnlibInstance
 from engine_bridge.model_spec import describe_model, file_sha256
+from engine_bridge.model_spec import sources as model_sources
 from visual_bench import schemas as S
 from visual_bench.records import RecordStore
 from visual_bench.records.store import now_iso
@@ -50,9 +52,16 @@ class Workbench:
         self.catalog_path = catalog_path or REPO_ROOT / "fixtures" / "catalog.json"
         self.catalog = json.loads(self.catalog_path.read_text())
         self.records = RecordStore(records_root)
+        # Nets built from VNN-LIB / classifier sources: <id>.json + <id>.meta.json, content-addressed by sha256.
+        self.models_root = Path(os.environ.get("ACT_GUI_MODELS", records_root.parent / "models"))
+        self._derived: dict[str, dict[str, Any]] = {}
+        for meta in sorted(self.models_root.glob("*.meta.json")) if self.models_root.is_dir() else ():
+            entry = json.loads(meta.read_text())
+            self._derived[entry["id"]] = entry
         self.gurobi = GurobiLicense(secrets_root or records_root.parent / "secrets")
         self._lock = threading.Lock()
         self._active: dict[str, threading.Thread] = {}
+        self._live_frames: dict[str, dict[str, Any]] = {}  # latest mutated input per running fuzz run; not recorded
         self._recover_interrupted()
 
     # -- engine ------------------------------------------------------------
@@ -81,11 +90,13 @@ class Workbench:
         for m in self.catalog["models"]:
             if m["id"] == model_id:
                 return m
+        if model_id in self._derived:
+            return self._derived[model_id]
         raise AppError(404, "model_not_found", f"Unknown model_id {model_id!r}")
 
     def model_path(self, model_id: str) -> Path:
         entry = self._model_entry(model_id)
-        path = act_root() / entry["act_path"]
+        path = self.models_root / f"{model_id}.json" if model_id in self._derived else act_root() / entry["act_path"]
         if not path.is_file():
             raise AppError(503, "model_missing", f"{entry['act_path']} is missing from the ACT checkout")
         if file_sha256(path) != entry["sha256"]:
@@ -98,8 +109,59 @@ class Workbench:
 
     def models(self) -> list[S.ModelSummary]:
         return [S.ModelSummary(model_id=m["id"], description=m["description"], act_path=m["act_path"],
-                               sha256=m["sha256"], methods=self._methods(m), native=m["native"])
-                for m in self.catalog["models"]]
+                               sha256=m["sha256"], methods=self._methods(m), native=m["native"],
+                               source=m.get("source", "catalog"), params=m.get("params", {}))
+                for m in [*self.catalog["models"], *self._derived.values()]]
+
+    # -- model sources (MSB-04) ---------------------------------------------
+    def sources(self) -> S.SourcesOut:
+        self._require_engine()
+        groups: dict[str, list[S.VnnlibInstanceOut]] = {}
+        for inst in model_sources.vnnlib_instances():
+            groups.setdefault(inst.benchmark, []).append(S.VnnlibInstanceOut(onnx=inst.onnx, vnnlib=inst.vnnlib))
+        return S.SourcesOut(
+            vnnlib=[S.VnnlibBenchmarkOut(benchmark=b, instances=i) for b, i in groups.items()],
+            classifiers=[S.ClassifierSourceOut(source_id=c.source_id, dataset=c.dataset, onnx=c.onnx,
+                                               description=c.description)
+                         for c in model_sources.classifier_sources()],
+            vnnlib_root=str(model_sources.vnnlib_root()))
+
+    def sample(self, dataset: str, index: int) -> S.SampleOut:
+        self._require_engine()
+        try:
+            s = model_sources.dataset_sample(dataset, index)
+        except BridgeError as err:
+            raise _bridge_error(err, 404 if err.code == "dataset_not_found" else 422) from err
+        return S.SampleOut(dataset=s.dataset, index=s.index, size=s.size, label=s.label, shape=list(s.shape),
+                           pixels=list(s.pixels))
+
+    def load_model(self, req: S.LoadVnnlibRequest | S.LoadTorchRequest) -> tuple[S.ModelSummary, bool]:
+        """Build a net from a source; the same content returns the existing model (idempotent by sha256)."""
+        self._require_engine()
+        self.models_root.mkdir(parents=True, exist_ok=True)
+        tmp = self.models_root / f".build-{uuid.uuid4().hex}.json"
+        try:
+            if isinstance(req, S.LoadVnnlibRequest):
+                built = model_sources.build_vnnlib_net(VnnlibInstance(req.benchmark, req.onnx, req.vnnlib), tmp)
+            else:
+                built = model_sources.build_classifier_net(req.source_id, req.index, req.eps, tmp)
+        except BridgeError as err:
+            tmp.unlink(missing_ok=True)
+            raise _bridge_error(err, 404 if err.code == "source_not_found" else 422) from err
+        sha = file_sha256(tmp)
+        model_id = f"{req.kind}-{sha[:12]}"
+        with self._lock:
+            created = model_id not in self._derived
+            if created:
+                tmp.replace(self.models_root / f"{model_id}.json")
+                entry = {"id": model_id, "description": built.description, "act_path": f"workbench-models/{model_id}.json",
+                         "sha256": sha, "methods": ["interval", "bab"], "native": {}, "source": req.kind,
+                         "params": built.params}
+                (self.models_root / f"{model_id}.meta.json").write_text(json.dumps(entry, indent=2))
+                self._derived[model_id] = entry
+            else:
+                tmp.unlink(missing_ok=True)
+        return next(m for m in self.models() if m.model_id == model_id), created
 
     def describe(self, model_id: str) -> S.ModelDescriptionOut:
         self._require_engine()
@@ -116,6 +178,8 @@ class Workbench:
         for spec in raw["input_specs"]:
             spec["lb"] = [S.wire_number(x) for x in spec["lb"]]
             spec["ub"] = [S.wire_number(x) for x in spec["ub"]]
+            if spec["center"] is not None:
+                spec["center"] = [S.wire_number(x) for x in spec["center"]]
         if raw["output_spec"] and raw["output_spec"]["thresholds"] is not None:
             raw["output_spec"]["thresholds"] = [S.wire_number(x) for x in raw["output_spec"]["thresholds"]]
         raw.pop("source_path")
@@ -142,6 +206,8 @@ class Workbench:
             raise AppError(422, "unsupported_method", f"{req.model_id} supports {self._methods(entry)}, not {req.method!r}")
         if req.method == "fuzz" and req.fuzz is None:
             req = req.model_copy(update={"fuzz": S.FuzzOptions()})
+        if req.method == "interval" and req.domain is None:
+            req = req.model_copy(update={"domain": "interval"})
         self._require_engine()
         with self._lock:
             if req.client_request_id:
@@ -182,7 +248,7 @@ class Workbench:
             with tempfile.TemporaryDirectory(prefix="act-gui-run-") as tmp:
                 req_file, out_file, err_file = (Path(tmp) / n for n in ("request.json", "output.json", "stderr.txt"))
                 req_file.write_text(json.dumps({"model_path": str(model_path), "method": req.method,
-                                                "time_budget_s": req.time_budget_s,
+                                                "time_budget_s": req.time_budget_s, "domain": req.domain,
                                                 "fuzz": req.fuzz.model_dump() if req.fuzz else None}))
                 read_fd, write_fd = os.pipe()
                 with open(err_file, "w") as stderr:
@@ -205,7 +271,12 @@ class Workbench:
                     try:
                         with os.fdopen(read_fd) as progress:
                             for line in progress:  # ends at EOF: worker exited or was killed
-                                self.records.append_event(run_id, "fuzz.progress", "running", json.loads(line))
+                                msg = json.loads(line)
+                                if "frame" in msg:
+                                    with self._lock:
+                                        self._live_frames[run_id] = msg["frame"]
+                                else:
+                                    self.records.append_event(run_id, "fuzz.progress", "running", msg["progress"])
                         proc.wait()
                     finally:
                         timer.cancel()
@@ -225,6 +296,7 @@ class Workbench:
         finally:
             with self._lock:
                 self._active.pop(run_id, None)
+                self._live_frames.pop(run_id, None)
 
     def _commit_result(self, run_id: str, out: dict[str, Any]) -> None:
         o = out["outcome"]
@@ -260,12 +332,16 @@ class Workbench:
                 result = S.RunResultOut.model_validate(raw)
         elif status == "failed" and last:
             error = S.ErrorBody(code=str(last["payload"].get("code")), message=str(last["payload"].get("message")))
-        native_raw = self._model_entry(req.model_id)["native"].get(req.method)
+        # Records written before domains existed are interval-domain verify_once runs.
+        domain = req.domain or ("interval" if req.method == "interval" else None)
+        # Native references were recorded with the default (interval) domain only.
+        native_raw = None if domain not in (None, "interval") else self._model_entry(req.model_id)["native"].get(req.method)
         native = S.NativeResult.model_validate(native_raw) if native_raw else None
         matches = None
         if result and native:
             matches = result.act_status == native.status
-        return S.RunOut(run_id=run_id, model_id=req.model_id, method=req.method, time_budget_s=req.time_budget_s,
+        return S.RunOut(run_id=run_id, model_id=req.model_id, method=req.method, domain=domain,
+                        time_budget_s=req.time_budget_s,
                         client_request_id=req.client_request_id, status=status, created_at=m["created_at"],
                         started_at=started, finished_at=last["at"] if status in ("completed", "failed") and last else None,
                         model_sha256=m["model"]["sha256"], act_commit=m["act"]["commit"], result=result, error=error,
@@ -304,17 +380,26 @@ class Workbench:
         opts = S.RunRequest.model_validate(self.records.manifest(run_id)["request"]).fuzz
         base = {"run_id": run_id, "status": run.status, "options": opts, "config": {},
                 "provenance": {"act_call": "act.pipeline.fuzzing.ACTFuzzer(ACTToTorch(net)).fuzz()",
-                               "config": "ACT act/config/pipeline.yaml fuzzing section + options"}}
+                               "config": "ACT act/config/pipeline.yaml fuzzing section + options",
+                               "frames": "lane 0 of ACT's mutated batch, read between iterations (mutation_engine.mutate wrapper)"}}
         if run.method != "fuzz":
             return S.FuzzingOut(availability="unsupported", summary=None, timeline=[], strategies=[],
                                 counterexamples=[], **base)
         raw = self.records.artifact(run_id, "fuzzing.json") if run.status == "completed" else None
+        wn = S.wire_number
+
+        def frame_out(fr: dict[str, Any]) -> S.FuzzFrameOut:
+            return S.FuzzFrameOut.model_validate({**fr, "input": [wn(x) for x in fr["input"]],
+                                                  "seed_input": [wn(x) for x in fr["seed_input"]]})
+
         if raw is None:
             live = [S.FuzzPointOut.model_validate(e["payload"]) for e in self.records.events(run_id)
                     if e["kind"] == "fuzz.progress"]
+            with self._lock:
+                latest = self._live_frames.get(run_id)
             return S.FuzzingOut(availability="pending" if run.status in ("queued", "running") else "not_recorded",
-                                summary=None, timeline=live, strategies=[], counterexamples=[], **base)
-        wn = S.wire_number
+                                summary=None, timeline=live, strategies=[], counterexamples=[],
+                                frames=[frame_out(latest)] if latest else [], **base)
         ces = [S.FuzzCounterexampleOut(**{**c, "severity": wn(c["severity"]), "input": [wn(x) for x in c["input"]],
                                           "output": [wn(x) for x in c["output"]],
                                           "seed_input": [wn(x) for x in c["seed_input"]],
@@ -328,7 +413,8 @@ class Workbench:
         return S.FuzzingOut(availability="available", summary=summary,
                             timeline=[S.FuzzPointOut.model_validate(p) for p in raw["timeline"]],
                             strategies=[S.FuzzStrategyOut.model_validate(s) for s in raw["strategies"]],
-                            counterexamples=ces, seeds=seeds, **base)
+                            counterexamples=ces, seeds=seeds,
+                            frames=[frame_out(fr) for fr in raw.get("frames", [])], **base)
 
     def is_terminal(self, run_id: str) -> bool:
         return self.get_run(run_id).status in ("completed", "failed")

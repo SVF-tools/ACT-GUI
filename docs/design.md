@@ -50,6 +50,7 @@ Start with a small real-data inspection slice. Propagation requirements live in 
 - Keep node identity separate from batch lane indices. Bounds retain scope, direction, computed/inherited origin, method, and provenance.
 - Geometry states its coordinates, representation, projection, and guarantee. Samples are not sound outer approximations; a local visualization does not establish a global verdict.
 - Fix model/spec/config snapshots for a run. Changes create another run.
+- Models come from two places: the pinned catalog (`fixtures/catalog.json`, ACT files by commit + sha256, with recorded native verdicts) and model sources (a VNN-COMP ONNX + VNN-LIB instance, or an ONNX image classifier with a chosen test image and eps). engine_bridge builds a source into an ACT net through ACT's own front end and `save_net_to_file`; the workbench stores it content-addressed (`<kind>-<sha12>`, `ACT_GUI_MODELS`, default next to the records root) with its build parameters. A different image or eps is a different model snapshot, never an edit of an existing one. Built models have no recorded native verdicts.
 - Publish scientific state only after ACT commits it. Snapshots and ordered events support reconnect/replay with explicit duplicate, gap, and rollback handling.
 - Replay reconstructs recorded display state, not solver memory. Missing historical bounds are not_recorded.
 - Commands check capabilities, expected_revision, and idempotency. Distinguish accepted from applied. Enable pause/step/split only when ACT supports the stated semantics.

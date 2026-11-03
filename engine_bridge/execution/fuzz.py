@@ -7,7 +7,9 @@ between iterations and never decides a violation itself.
 
 ACTFuzzer exposes no progress hook, so the adapter replaces the instance's
 `_print_progress` (called after every iteration when report_interval == 1).
-That private seam is pinned to the baseline in engine_session capabilities.
+To show mutated inputs it also wraps the instance's `mutation_engine.mutate`,
+keeping a reference to the latest (seeds, mutated batch) and returning ACT's
+result unchanged. Both seams are pinned to the baseline in engine_session capabilities.
 """
 from __future__ import annotations
 
@@ -20,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from engine_bridge.contracts import (
-    BridgeError, FuzzCounterexample, FuzzOutcome, FuzzProgress, FuzzSeed, FuzzStrategyStats,
+    BridgeError, FuzzCounterexample, FuzzFrame, FuzzOutcome, FuzzProgress, FuzzSeed, FuzzStrategyStats,
 )
 from engine_bridge.engine_session import act_imports
 from engine_bridge.model_spec.describe import load_net
@@ -30,6 +32,7 @@ SEED_LIMIT = 20
 TIMELINE_LIMIT = 600
 TIMELINE_EVERY_S = 0.2
 PROGRESS_EVERY_S = 0.5
+FRAME_LIMIT = 16  # recorded mutated-input frames; each holds two full inputs
 
 
 def _floats(t: Any) -> tuple[float, ...]:
@@ -38,7 +41,8 @@ def _floats(t: Any) -> tuple[float, ...]:
 
 def run_fuzzing(model_path: Path, time_budget_s: float, max_iterations: int, rng_seed: int = 0,
                 stop_on_first: bool = False,
-                on_progress: Callable[[FuzzProgress], None] | None = None) -> FuzzOutcome:
+                on_progress: Callable[[FuzzProgress], None] | None = None,
+                on_frame: Callable[[FuzzFrame], None] | None = None) -> FuzzOutcome:
     if not (0 < time_budget_s <= 3600):
         raise BridgeError("invalid_budget", "time_budget_s must be in (0, 3600]")
     if not (1 <= max_iterations <= 10_000_000):
@@ -73,13 +77,14 @@ def run_fuzzing(model_path: Path, time_budget_s: float, max_iterations: int, rng
                     output_dir=Path(tmp), report_interval=1, verbose=0, trace_level=0,
                 )
                 fuzzer = ACTFuzzer(wrapped_model=model, initial_seeds=seeds, config=cfg)
-                return _fuzz(fuzzer, cfg, rng_seed, rows, on_progress)
+                return _fuzz(fuzzer, cfg, rng_seed, rows, on_progress, on_frame)
         finally:
             VerifiableModel.set_strict_mode(strict)
 
 
 def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
-          on_progress: Callable[[FuzzProgress], None] | None) -> FuzzOutcome:
+          on_progress: Callable[[FuzzProgress], None] | None,
+          on_frame: Callable[[FuzzFrame], None] | None) -> FuzzOutcome:
     import torch
 
     def forward(x: Any) -> Any:
@@ -93,8 +98,37 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
     violations = dict.fromkeys(weights, 0)
     found: list[tuple[int, float, str | None]] = []
     timeline: list[FuzzProgress] = []
+    frames: list[FuzzFrame] = []
+    batch: dict[str, Any] = {}
     done = ces_seen = 0
     last_point = last_emit = -math.inf
+
+    engine = fuzzer.mutation_engine
+    act_mutate = engine.mutate
+
+    def mutate(seeds: Any) -> Any:
+        out = act_mutate(seeds)
+        batch["seeds"], batch["inputs"] = seeds, out  # references only; ACT's tensors are not modified
+        return out
+
+    engine.mutate = mutate  # instance seam, see module docstring
+
+    def frame(iteration: int, violation: bool) -> FuzzFrame | None:
+        if not batch:
+            return None
+        s, x = batch["seeds"], batch["inputs"]
+        strategy = engine.last_strategy
+        return FuzzFrame(iteration=iteration, elapsed_s=round(time.time() - fuzzer.start_time, 4),
+                         strategy=str(strategy) if strategy is not None else None,
+                         seed_row=int(s.original_index[0]), depth=int(s.depth[0]) + 1, violation=violation,
+                         input=_floats(x[0]), seed_input=_floats(s.original_tensor[0]))
+
+    def keep_frame(fr: FuzzFrame) -> None:
+        frames.append(fr)
+        if len(frames) > FRAME_LIMIT:  # thin evenly, keeping the ends and violating frames
+            frames[:] = [f for i, f in enumerate(frames) if i % 2 == 0 or f.violation or i == len(frames) - 1]
+            if len(frames) > FRAME_LIMIT:
+                del frames[1:-1:2]
 
     def point(iteration: int) -> FuzzProgress:
         return FuzzProgress(iteration=iteration, elapsed_s=round(time.time() - fuzzer.start_time, 4),
@@ -112,9 +146,10 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
             elapsed = time.time() - fuzzer.start_time
             found.extend((iteration, elapsed, name) for _ in range(min(new, COUNTEREXAMPLE_LIMIT - len(found))))
             first_ce = ces_seen == 0 and new > 0
+            hit = new > 0
             done, ces_seen = iteration, len(fuzzer.counterexamples)
         else:
-            first_ce = False
+            first_ce = hit = False
         now = time.monotonic()
         if final or first_ce or now - last_point >= TIMELINE_EVERY_S:
             p = point(iteration)
@@ -122,9 +157,15 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
             timeline.append(p)
             if len(timeline) > TIMELINE_LIMIT:
                 del timeline[1:-1:2]
-            if on_progress and (final or first_ce or now - last_emit >= PROGRESS_EVERY_S):
+            if final or first_ce or now - last_emit >= PROGRESS_EVERY_S:
                 last_emit = now
-                on_progress(p)
+                fr = frame(iteration, hit) if not frames or frames[-1].iteration != iteration else None
+                if fr is not None:
+                    keep_frame(fr)
+                    if on_frame:
+                        on_frame(fr)
+                if on_progress:
+                    on_progress(p)
 
     fuzzer._print_progress = observe  # baseline seam, see module docstring
     report = fuzzer.fuzz()
@@ -160,7 +201,7 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
         seeds_explored=int(report.seeds_explored), total_mutations=int(report.total_mutations),
         counterexample_count=n, never_activated_count=int(report.num_of_never_activated_neurons),
         never_activated_sample=tuple(f"{layer}[{idx}]" for layer, idx in report.never_activated_neurons),
-        counterexamples=ces, seeds=seeds, timeline=tuple(timeline),
+        counterexamples=ces, seeds=seeds, frames=tuple(frames), timeline=tuple(timeline),
         strategies=tuple(FuzzStrategyStats(name=k, weight=weights.get(k, 0.0), selected=selected[k],
                                            violations=violations[k]) for k in selected),
         config=config, rng_seed=rng_seed, device=str(fuzzer.device),

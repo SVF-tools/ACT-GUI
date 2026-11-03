@@ -9,7 +9,7 @@ a finite float, or one of the strings "Infinity", "-Infinity", "NaN".
 from __future__ import annotations
 
 import math
-from typing import Literal, Union
+from typing import Annotated, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -18,6 +18,8 @@ Scalar = Union[str, int, float, bool, None]
 Availability = Literal["available", "pending", "not_recorded", "unsupported"]
 Verdict = Literal["certified", "falsified", "unknown", "timeout", "error"]
 Method = Literal["interval", "bab", "fuzz"]
+# Abstract domain of method "interval" (ACT verify_once): IntervalTF, DualSolver, or HybridzTF + HZSolver.
+Domain = Literal["interval", "dual", "hybridz"]
 RunState = Literal["queued", "running", "completed", "failed"]
 
 
@@ -87,6 +89,67 @@ class ModelSummary(Wire):
     sha256: str
     methods: list[Method]
     native: dict[str, NativeResult]
+    source: Literal["catalog", "vnnlib", "torch"] = "catalog"
+    params: dict[str, Scalar] = {}  # how a vnnlib/torch model was built (benchmark, files, dataset, index, eps, ...)
+
+
+class VnnlibInstanceOut(Wire):
+    onnx: str
+    vnnlib: str
+
+
+class VnnlibBenchmarkOut(Wire):
+    benchmark: str
+    instances: list[VnnlibInstanceOut]
+
+
+class ClassifierSourceOut(Wire):
+    source_id: str
+    dataset: str
+    onnx: str
+    description: str
+
+
+class SourcesOut(Wire):
+    vnnlib: list[VnnlibBenchmarkOut]
+    classifiers: list[ClassifierSourceOut]
+    vnnlib_root: str
+
+
+class SampleOut(Wire):
+    dataset: str
+    index: int
+    size: int
+    label: int
+    shape: list[int]
+    pixels: list[float]  # CHW in [0, 1]
+
+
+class LoadVnnlibRequest(Wire):
+    kind: Literal["vnnlib"]
+    benchmark: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.-]+$")
+    onnx: str = Field(min_length=1, max_length=512, pattern=r"^[A-Za-z0-9_./-]+$")
+    vnnlib: str = Field(min_length=1, max_length=512, pattern=r"^[A-Za-z0-9_./-]+$")
+
+    @model_validator(mode="after")
+    def _relative_paths(self) -> "LoadVnnlibRequest":
+        if any(p.startswith("/") or ".." in p.split("/") for p in (self.onnx, self.vnnlib)):
+            raise ValueError("onnx and vnnlib must be paths inside the benchmark directory")
+        return self
+
+
+class LoadTorchRequest(Wire):
+    kind: Literal["torch"]
+    source_id: str = Field(min_length=1, max_length=64)
+    index: int = Field(ge=0, le=1_000_000)
+    eps: float = Field(ge=0, le=1)
+
+
+LoadModelRequest = Annotated[Union[LoadVnnlibRequest, LoadTorchRequest], Field(discriminator="kind")]
+
+
+class LoadModelBody(Wire):
+    source: LoadModelRequest
 
 
 class ParamOut(Wire):
@@ -111,6 +174,9 @@ class InputSpecOut(Wire):
     kind: str
     lb: list[WireNumber]
     ub: list[WireNumber]
+    shape: list[int]  # lb/ub tensor shape as ACT stores it (images: N, C, H, W)
+    center: list[WireNumber] | None  # unperturbed input, when the spec records one
+    dataset: str | None  # dataset name from the INPUT layer, e.g. "mnist", "cifar10"
 
 
 class OutputSpecOut(Wire):
@@ -120,6 +186,7 @@ class OutputSpecOut(Wire):
     matrix: list[list[float]] | None
     thresholds: list[WireNumber] | None
     text: str
+    true_class: int | None  # y_true of a robustness assertion (TOP1_ROBUST etc.)
 
 
 class ModelDescriptionOut(Wire):
@@ -146,11 +213,14 @@ class RunRequest(Wire):
     time_budget_s: float = Field(default=30.0, gt=0, le=600)
     client_request_id: str | None = Field(default=None, min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.:-]+$")
     fuzz: FuzzOptions | None = None
+    domain: Domain | None = None  # method "interval" only; the service defaults it to "interval"
 
     @model_validator(mode="after")
-    def _fuzz_options_only_for_fuzz(self) -> "RunRequest":
+    def _options_match_method(self) -> "RunRequest":
         if self.fuzz is not None and self.method != "fuzz":
             raise ValueError("fuzz options are only valid with method 'fuzz'")
+        if self.domain is not None and self.method != "interval":
+            raise ValueError("domain is only valid with method 'interval'")
         return self
 
 
@@ -168,6 +238,7 @@ class RunOut(Wire):
     run_id: str
     model_id: str
     method: Method
+    domain: Domain | None  # abstract domain of a verify_once run; None for bab/fuzz
     time_budget_s: float
     client_request_id: str | None
     status: RunState
@@ -277,8 +348,21 @@ class FuzzSummaryOut(Wire):
     device: str
 
 
+class FuzzFrameOut(Wire):
+    """Lane 0 of the batch ACTFuzzer mutated in one iteration. Display only; not a counterexample unless violation."""
+    iteration: int
+    elapsed_s: float
+    strategy: str | None
+    seed_row: int
+    depth: int
+    violation: bool
+    input: list[WireNumber]
+    seed_input: list[WireNumber]
+
+
 class FuzzingOut(Wire):
-    """ACTFuzzer record of a run. While running, timeline comes from committed fuzz.progress events."""
+    """ACTFuzzer record of a run. While running, timeline comes from committed fuzz.progress events
+    and frames holds only the latest mutated input the worker reported (kept in memory, not recorded)."""
     run_id: str
     availability: Availability
     status: RunState
@@ -288,6 +372,7 @@ class FuzzingOut(Wire):
     strategies: list[FuzzStrategyOut]
     counterexamples: list[FuzzCounterexampleOut]
     seeds: list[FuzzSeedOut] = []
+    frames: list[FuzzFrameOut] = []  # recorded filmstrip when completed; [latest] while running
     config: dict[str, Scalar]
     provenance: dict[str, str]
 
@@ -363,5 +448,5 @@ class SolverStatusOut(Wire):
 WIRE_MODELS: tuple[type[BaseModel], ...] = (
     ErrorResponse, HealthOut, EngineInfoOut, ModelSummary, ModelDescriptionOut, RunRequest, RunOut, RunList,
     LayerStatesOut, RunEvent, CoverageOut, FuzzingOut, ExplainRequest, ExplainResponse, ProviderList, SolverLicenseUpload,
-    SolverStatusOut,
+    SolverStatusOut, SourcesOut, SampleOut, LoadModelBody,
 )

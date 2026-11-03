@@ -83,10 +83,11 @@ Recorded 2026-11-03 against ACT `deff2fb0c031` (branch CLIMB, tracked tree clean
 | --- | --- | --- |
 | BASE-01 | First version | Baseline pinned in `fixtures/catalog.json`. Gap list: no BaB observer (ACT-03), no observable run handles or controls (ACT-02/05), no projection export (ACT-04). Layer reads (ACT-01) already work through public `analyze`. |
 | BASE-02 | First version | uv venv on the ACT env, npm/Vite/React/TS, `scripts/dev.sh` on loopback, Pydantic→TS generation with drift check. No CI yet. |
-| BASE-03 | First version | `scripts/record_fixtures.py` records 4 ACT example nets by path + sha256 + native verdicts (ACT files are not copied; ACT is AGPL-3.0). |
+| BASE-03 | First version | `scripts/record_fixtures.py` records 8 ACT nets by path + sha256 + native verdicts (ACT files are not copied; ACT is AGPL-3.0): 4 ACT example nets, plus MNIST (6x100 MLP at eps 0.03 and a falsifiable eps 0.15 variant, conv-small) and CIFAR-10 (conv-med) nets that `scripts/gen_image_nets.py` converts from BaVerLy ONNX models in the ACT checkout through ACT's front end (L-inf box around test image 0, TOP1_ROBUST). Still a fixed catalog: no upload or arbitrary-path loading (MSB `loadModel`). |
 | ES-01 | First version | Probe with capabilities, missing-ACT and version-mismatch diagnostics. ES-02 (explicit handles) not started; each call loads the model. |
 | MSB-01..03 | First version | JSON ACT nets with box INPUT_SPEC and ASSERT; parity tests vs native DAG/spec. Other spec kinds raise `unsupported_spec`. No A review yet. |
-| EXE-01 | First version | `verify_once` and `verify_bab_batched` (same entry as ACT's pipeline CLI); verdicts match recorded native results. EXE-02/03 blocked on ACT-02/05. |
+| MSB-04, MSV-04 | First version | Model sources: VNN-LIB instances (ACT `create_specs_from_paths`) and ONNX image classifiers with a chosen MNIST/CIFAR-10 test image and eps; built nets stored content-addressed with their parameters; Load model panel. ACT torchvision-zoo models are not offered (untrained, 3x224x224 inputs exceed the bridge's spec limits). The BaVerLy CIFAR-10 model reaches 36% clean accuracy on raw pixels (no tried normalization exceeds 44%); ACT's interval BIAS transfer function does not accept 4-D constants, so no normalization layer is prepended. |
+| EXE-01 | First version | `verify_once` (interval / dual / hybridz domain, selectable per run) and `verify_bab_batched` (same entry as ACT's pipeline CLI); verdicts match recorded native results. EXE-02/03 blocked on ACT-02/05. |
 | INSP-01 | First version | Interval after-states per layer, recorded by the run worker; "before" = predecessor's after. No paging (>65536 values rejected). INSP-02/03 not started. |
 | EVT-01 | First version | Coverage audit: summary-only BaB metadata. EVT-02/03 blocked on ACT-03. |
 | VER-01/02 | First version | Wire schemas + generated types; non-blocking start, worker process, failure states, native parity flag. |
@@ -95,7 +96,7 @@ Recorded 2026-11-03 against ACT `deff2fb0c031` (branch CLIMB, tracked tree clean
 | REC-01 | First version | Manifest, hashed artifacts, sealed records, hash-checked reads, zip export without absolute paths. |
 | REC-02/03 | Partial | Atomic writes, torn-tail recovery, interrupted-run marking, event replay. No commit batches (needs EVT-02). REC-04 export only, no import. |
 | WS-01/02 | First version | Selection reducer + latest-request guard (vitest). WS-03 not started. |
-| MSV-01 | First version | Model list, SVG DAG, spec and layer detail on real data. MSV-02 renderer evaluation and MSV-03 drafts not started. |
+| MSV-01 | First version | Model list, SVG DAG, spec and layer detail on real data; image-shaped specs render as images with sampled perturbations. MSV-02 renderer evaluation and MSV-03 drafts not started. |
 | ANA-01 | First version | Stepper over recorded layer states, before/after bars, value selection. ANA-02: interval-box 2-D projection only. ANA-03 not started. |
 | BAB-01..03 | Not started | Blocked on committed node events (ACT-03); the BaB tab shows coverage and the summary only. |
 | AI-01 | First version | Frozen context, typed evidence, deterministic fake provider, cited ids must resolve. AI-02 needs a real provider (not configured). |

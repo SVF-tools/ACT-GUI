@@ -4,14 +4,14 @@ A visualization and interaction interface for the [ACT](https://github.com/SVF-t
 
 This repository contains the GUI product. ACT remains a separate computation engine. React/TypeScript and FastAPI/Pydantic are implementation technologies within the workbench.
 
-**Status:** first runnable version (2026-11-03). The workbench loads real ACT networks, runs real ACT verification (interval and BaB) and ACT's fuzzer (ACTFuzzer) in a worker process, records runs, and lets you browse layer-wise interval bounds in the browser. Node-level BaB history, controls, geometry beyond interval boxes, and a real AI provider are not implemented; see [plan status](docs/plan.md#first-version-status).
+**Status:** first runnable version (2026-11-03). The workbench loads real ACT networks, runs real ACT verification (`verify_once` in the interval, dual, or HybridZ domain, and BaB) and ACT's fuzzer (ACTFuzzer) in a worker process, records runs, and lets you browse layer-wise interval bounds in the browser. Node-level BaB history, controls, geometry beyond interval boxes, and a real AI provider are not implemented; see [plan status](docs/plan.md#first-version-status).
 
 ```text
 ACT-GUI/
   visual_bench/       # Workbench: server.py, schemas.py, app.tsx, seven modules, generated/wire.ts
   engine_bridge/      # ACT integration: contracts.py and five modules (only place that imports ACT)
   fixtures/catalog.json  # Real ACT models pinned by ACT commit + sha256, with native results
-  scripts/            # dev.sh, record_fixtures.py, gen_types.mjs
+  scripts/            # dev.sh, gen_image_nets.py, record_fixtures.py, gen_types.mjs
   docs/               # README.md, design.md, plan.md
 ```
 
@@ -52,6 +52,8 @@ docker compose -f compose.yaml -f compose.gpu.yaml up -d      # NVIDIA GPU (ACT_
 
 The image serves the built browser app, the API, and SSE from one origin on `127.0.0.1:${ACT_GUI_PORT:-8080}`; records and uploaded licenses persist in the `act-gui-data` volume. `scripts/docker_build.sh` reads the ACT commit from `fixtures/catalog.json` and fetches it from `$ACT_SOURCE` (a local checkout by default, or a git URL). The catalog models are generated, git-ignored ACT files, so the script also copies them from `$ACT_NETS_FROM` (default `$ACT_ROOT`) and fails unless each matches its pinned sha256. If port 8080 is taken, set `ACT_GUI_PORT`.
 
+The **Load model** panel builds models from ACT's git-ignored `data/` (VNN-LIB benchmarks, MNIST/CIFAR-10 test sets) and `literature/` (ONNX classifiers) directories, which the image does not contain. Mount them read-only with `-f compose.actdata.yaml` (`ACT_DATA_FROM` defaults to `$ACT_ROOT`); without them the panel lists no sources and the catalog still works. Loaded models persist in the `act-gui-data` volume (`/data/models`); in development they go to `var/models/` (`ACT_GUI_MODELS` overrides).
+
 Gurobi is optional; the image contains gurobipy (`GUROBIPY_VERSION`) but never a license. Either upload your `gurobi.lic` in the **Engine** tab, or mount it with `GUROBI_LICENSE_FILE=/path/to/gurobi.lic` in `.env` and `-f compose.gurobi.yaml`. The Engine tab shows Gurobi's own license check. WLS and token-server licenses work in containers; host-bound (named-user/academic) licenses usually do not. The current interval and BaB methods do not call Gurobi.
 
 Checks:
@@ -61,5 +63,6 @@ Checks:
 npm test                        # selection/stale-response tests (vitest)
 npm run typecheck               # tsc
 npm run check:types             # generated wire.ts matches visual_bench/schemas.py
+.venv/bin/python scripts/gen_image_nets.py    # (re)generate the MNIST/CIFAR-10 catalog nets into ACT's examples/nets/
 .venv/bin/python scripts/record_fixtures.py   # re-record fixtures/catalog.json from native ACT calls
 ```

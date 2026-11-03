@@ -20,12 +20,14 @@ def interval_layer_states(model_path: Path) -> LayerStates:
     with act_imports():
         from act.back_end.analyze import analyze
         from act.back_end.core import ConSet, Fact
-        from act.back_end.transfer_functions import ensure_active_tf
+        from act.back_end.transfer_functions import set_solver_mode, set_transfer_function_mode
         from act.back_end.verifier import (
             _setup_verify_context, add_all_input_specs, find_entry_layer_id, get_input_ids,
         )
 
-        ensure_active_tf("interval")
+        # Explicit, not ensure_active_tf: a hybridz run in this process must not leak its TF into interval states.
+        set_solver_mode(None)
+        set_transfer_function_mode("interval")
         spec_layers, seed_bounds, batch = _setup_verify_context(net)
         if batch != 1:
             raise BridgeError("unsupported_batch", f"Layer inspection supports one input lane; spec has {batch}")

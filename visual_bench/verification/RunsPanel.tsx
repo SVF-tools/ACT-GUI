@@ -4,8 +4,13 @@ import type { RunOut, RunRequest } from "../generated/wire";
 import { useQuery } from "../workspace/useQuery";
 
 type Method = RunRequest["method"];
+type Domain = NonNullable<RunRequest["domain"]>;
 const METHOD_LABEL: Record<Method, string> = {
-  interval: "interval (verify_once)", bab: "BaB (verify_bab_batched)", fuzz: "fuzz (ACTFuzzer)",
+  interval: "verify (verify_once)", bab: "BaB (verify_bab_batched)", fuzz: "fuzz (ACTFuzzer)",
+};
+// Abstract domains of verify_once; ACT selects them with its solver / transfer-function modes.
+const DOMAIN_LABEL: Record<Domain, string> = {
+  interval: "interval (IntervalTF)", dual: "dual (DualSolver)", hybridz: "hybridz (HybridzTF + HZSolver)",
 };
 
 // The method is owned by the center mode tabs: switching the mode switches it, and choosing it here switches the mode.
@@ -16,6 +21,7 @@ export function RunsPanel({ modelId, method, onMethod, onChanged, onSelect }: {
   const methods = models.status === "ok" ? models.data.find((m) => m.model_id === modelId)?.methods ?? [] : [];
   const supported = methods.includes(method);
   const [budget, setBudget] = useState(30);
+  const [domain, setDomain] = useState<Domain>("interval");
   const [iterations, setIterations] = useState(100000);
   const [rngSeed, setRngSeed] = useState(0);
   const [stopOnFirst, setStopOnFirst] = useState(false);
@@ -27,7 +33,10 @@ export function RunsPanel({ modelId, method, onMethod, onChanged, onSelect }: {
     setErr(null);
     try {
       const fuzz = method === "fuzz" ? { max_iterations: iterations, rng_seed: rngSeed, stop_on_first: stopOnFirst } : null;
-      const run = await api.startRun({ model_id: modelId, method, time_budget_s: budget, client_request_id: crypto.randomUUID(), fuzz });
+      const run = await api.startRun({
+        model_id: modelId, method, time_budget_s: budget, client_request_id: crypto.randomUUID(), fuzz,
+        domain: method === "interval" ? domain : null,
+      });
       onChanged();
       onSelect(run.run_id);
     } catch (e) {
@@ -39,7 +48,7 @@ export function RunsPanel({ modelId, method, onMethod, onChanged, onSelect }: {
 
   return (
     <section className="panel runs">
-      <h2>Verification runs <small>{METHOD_LABEL[method]}</small></h2>
+      <h2>Verification runs <small>{METHOD_LABEL[method]}{method === "interval" ? ` · ${domain}` : ""}</small></h2>
       <div className="form">
         <label>Method
           <select value={method} onChange={(e) => onMethod(e.target.value as Method)}>
@@ -48,6 +57,13 @@ export function RunsPanel({ modelId, method, onMethod, onChanged, onSelect }: {
             ))}
           </select>
         </label>
+        {method === "interval" && (
+          <label>Abstract domain
+            <select value={domain} onChange={(e) => setDomain(e.target.value as Domain)}>
+              {(Object.keys(DOMAIN_LABEL) as Domain[]).map((d) => <option key={d} value={d}>{DOMAIN_LABEL[d]}</option>)}
+            </select>
+          </label>
+        )}
         <label>Budget (s)
           <input type="number" min={1} max={600} value={budget} onChange={(e) => setBudget(Number(e.target.value))} />
         </label>
@@ -107,7 +123,7 @@ function RunItem({ run, active, onSelect }: { run: RunOut; active: boolean; onSe
   return (
     <li>
       <button className={active ? "item active" : "item"} onClick={() => onSelect(run.run_id)}>
-        <span className="title">{run.run_id} <span className="muted">{run.method}</span></span>
+        <span className="title">{run.run_id} <span className="muted">{run.method}{run.domain ? ` · ${run.domain}` : ""}</span></span>
         <span className="chips">
           <span className={`chip s-${run.status}`}>{run.status}</span>
           {verdict && <span className={`chip v-${verdict}`} title="ACT verdict">{verdict}</span>}

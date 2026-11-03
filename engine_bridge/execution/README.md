@@ -1,6 +1,6 @@
 # Execution Adapter
 
-**Status:** first version: `verify.py` (EXE-01 interval + BaB), `fuzz.py` (EXE-04 ACTFuzzer); EXE-02/03 blocked on ACT-02/05. **Owner:** B; A owns ACT operation semantics.
+**Status:** first version: `verify.py` (EXE-01 `verify_once` in the interval / dual / hybridz domain, + BaB), `fuzz.py` (EXE-04 ACTFuzzer); EXE-02/03 blocked on ACT-02/05. **Owner:** B; A owns ACT operation semantics.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 ## 1. Subproblems and Objective
@@ -52,7 +52,9 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 | EXE-03 | Implement capability-gated safe controls | EXE-02, EVT-02, ACT-05 | Only ACT-implemented pause/step/split/cancel operations are enabled; stale targets and failed preconditions have actual rejection receipts. |
 | EXE-04 | Adapt ACT's inference-based fuzzer | EXE-01 | `run_fuzzing` rebuilds the net with ACT's `ACTToTorch`, seeds ACTFuzzer with the net's INPUT rows, and reports ACT's `FuzzingReport`; counterexamples are only those ACT's PropertyChecker accepted. Verdict is `falsified` iff ACT reported a counterexample, otherwise `unknown` (fuzzing never certifies). Progress (iteration, coverage, counterexample count, corpus) is read between iterations. `test_bridge.py`: a counterexample on `unsafe_linear` lies inside the input box; 200 iterations on `bab_deep_mlp` (BaB-certified) report none. |
 
-**EXE-04 notes.** ACTFuzzer has no public progress hook in the baseline, so `fuzz.py` replaces the fuzzer instance's `_print_progress` (called after every iteration with `report_interval=1`); this private seam is recorded as the `fuzz.actfuzzer` capability source and must be rechecked when the pinned ACT commit changes. A public observer in ACTFuzzer would remove it. Seeds for `random`, NumPy, and torch are set from `rng_seed`; a time-bounded run still varies in iteration count. Mutation weights and other settings come from ACT's `act/config/pipeline.yaml`.
+**EXE-01 domains.** `run_verification(..., method="interval", domain=...)` runs `verify_once` in one of ACT's abstract domains: `interval` (IntervalTF), `dual` (`set_solver_mode("dual")`, DualSolver), or `hybridz` (solver and TF mode `hybridz`, HybridzTF + HZSolver with the run budget as its MILP time limit). Selection mirrors `act/config/pipeline_cli.py` and always sets both ACT globals, so a previous run in the same process cannot leak. Layer inspection explicitly resets to the interval domain. BaB keeps its existing bounding path; domain selection for BaB is not exposed.
+
+**EXE-04 notes.** Mutated-input frames (`FuzzFrame`, `on_frame`) come from a second instance seam: `fuzz.py` wraps the fuzzer's `mutation_engine.mutate`, keeps references to the latest seeds and mutated batch, and returns ACT's tensor unchanged; frames are display data, never a verdict. ACTFuzzer has no public progress hook in the baseline, so `fuzz.py` replaces the fuzzer instance's `_print_progress` (called after every iteration with `report_interval=1`); this private seam is recorded as the `fuzz.actfuzzer` capability source and must be rechecked when the pinned ACT commit changes. A public observer in ACTFuzzer would remove it. Seeds for `random`, NumPy, and torch are set from `rng_seed`; a time-bounded run still varies in iteration count. Mutation weights and other settings come from ACT's `act/config/pipeline.yaml`.
 
 Owner: **B**. A reviews scientific semantics; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.
 

@@ -75,7 +75,9 @@ def _describe_assert(layer: Any) -> OutputSpec:
             "  (ACT certifies when the upper bound of C@y is below the threshold)"
     else:
         text = f"{kind} with {rows} constraint row(s)"
-    return OutputSpec(layer.id, kind, rows, matrix, thresholds, text)
+    y_true = p.get("y_true")
+    true_class = int(y_true.reshape(-1)[0].item()) if isinstance(y_true, torch.Tensor) and y_true.numel() == 1 else None
+    return OutputSpec(layer.id, kind, rows, matrix, thresholds, text, true_class)
 
 
 def describe_model(path: Path) -> ModelDescription:
@@ -85,6 +87,8 @@ def describe_model(path: Path) -> ModelDescription:
     layers = []
     input_specs = []
     output_spec = None
+    dataset = next((str(L.params["dataset_name"]) for L in net.layers
+                    if L.kind == "INPUT" and L.params.get("dataset_name")), None)
     for layer in net.layers:
         layers.append(LayerDescription(
             layer_id=int(layer.id), kind=str(layer.kind),
@@ -97,7 +101,10 @@ def describe_model(path: Path) -> ModelDescription:
         if layer.kind == "INPUT_SPEC":
             lb, ub = layer.params.get("lb"), layer.params.get("ub")
             if isinstance(lb, torch.Tensor) and isinstance(ub, torch.Tensor) and lb.numel() <= _MAX_SPEC_VALUES:
-                input_specs.append(InputSpec(int(layer.id), str(layer.params.get("kind")), _flat(lb), _flat(ub)))
+                center = layer.params.get("center")
+                center_vals = _flat(center) if isinstance(center, torch.Tensor) and center.numel() == lb.numel() else None
+                input_specs.append(InputSpec(int(layer.id), str(layer.params.get("kind")), _flat(lb), _flat(ub),
+                                             tuple(int(s) for s in lb.shape), center_vals, dataset))
             else:
                 raise BridgeError("unsupported_spec", f"INPUT_SPEC layer {layer.id} has no box lb/ub this bridge can describe.")
         if layer.kind == "ASSERT":

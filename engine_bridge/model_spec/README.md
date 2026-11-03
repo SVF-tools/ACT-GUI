@@ -1,6 +1,6 @@
 # Model and Specification Adapter
 
-**Status:** first version: `describe.py` (MSB-01..03 for JSON nets with box INPUT_SPEC); parity tests in `../test_bridge.py`; A review pending. **Owner:** B; A reviews scientific mapping.
+**Status:** first version: `describe.py` (MSB-01..03 for JSON nets with box INPUT_SPEC), `sources.py` (MSB-04); parity tests in `../test_bridge.py`; A review pending. **Owner:** B; A reviews scientific mapping.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 ## 1. Subproblems and Objective
@@ -50,6 +50,7 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 | MSB-01 | Define neutral descriptions against a real sample | ES-01, BASE-03 | Field map covers DAG, layer/tensor identity, shapes, provenance, and required spec semantics; A reviews it. |
 | MSB-02 | Implement model loading and mapping | MSB-01, ES-02 | Repeated reads of one snapshot preserve IDs and match native ACT connectivity/shape; no mutable tensor escapes. |
 | MSB-03 | Implement spec loading and validation | MSB-02 | Real input-domain/output-constraint mapping matches ACT; invalid variables and unsupported representations have explicit errors. |
+| MSB-04 | Build nets from model sources | MSB-03 | `sources.py`: VNN-LIB instances listed from `ACT_ROOT/data/vnnlib/*/instances.csv` and built with ACT's `create_specs_from_paths` (first query); ONNX image classifiers (BaVerLy MNIST/CIFAR-10, EMSOFT MNIST 4x256) built as an L-inf box of radius eps around a chosen MNIST/CIFAR-10 test image with a TOP1_ROBUST assertion, via `convert_onnx_to_pytorch`, `VerifiableModel`, `TorchToACT`. Parity tests: the VNN-LIB box/property equals ACT's spec creation, the classifier box equals clip(image ± eps) with the dataset label, and the builder reproduces a pinned catalog net byte for byte. |
 
 Owner: **B**. A reviews scientific semantics; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.
 

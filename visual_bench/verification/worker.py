@@ -3,7 +3,8 @@
 Invoked by the workbench as:
     python -m visual_bench.verification.worker <request.json> <output.json> <progress_fd>
 ACT writes diagnostics to stdout/stderr, so results go to <output.json>, never stdout.
-Fuzzing progress goes as JSON lines to the inherited pipe <progress_fd>.
+Fuzzing progress goes as JSON lines to the inherited pipe <progress_fd>: {"progress": FuzzProgress}
+or {"frame": FuzzFrame} (the latest mutated input, shown live and not recorded as an event).
 """
 from __future__ import annotations
 
@@ -17,25 +18,32 @@ from typing import IO, Any
 
 
 def _run(req: dict[str, Any], progress: IO[str]) -> dict[str, Any]:
-    from engine_bridge.contracts import FuzzProgress
+    from engine_bridge.contracts import FuzzFrame, FuzzProgress
     from engine_bridge.events import bab_summary
     from engine_bridge.execution import run_fuzzing, run_verification
 
     model = Path(req["model_path"])
     if req["method"] != "fuzz":
-        outcome = run_verification(model, req["method"], float(req["time_budget_s"]))
+        outcome = run_verification(model, req["method"], float(req["time_budget_s"]),
+                                   domain=req.get("domain") or "interval")
         out: dict[str, Any] = {"outcome": dataclasses.asdict(outcome)}
         if outcome.method == "bab":
             out["bab_summary"] = bab_summary(outcome.metadata)
         return out
 
-    def emit(p: FuzzProgress) -> None:
-        progress.write(json.dumps(dataclasses.asdict(p)) + "\n")
+    def send(kind: str, item: Any) -> None:
+        progress.write(json.dumps({kind: dataclasses.asdict(item)}) + "\n")
         progress.flush()
+
+    def emit(p: FuzzProgress) -> None:
+        send("progress", p)
+
+    def emit_frame(fr: FuzzFrame) -> None:
+        send("frame", fr)
 
     opts = req["fuzz"]
     fz = run_fuzzing(model, float(req["time_budget_s"]), int(opts["max_iterations"]), rng_seed=int(opts["rng_seed"]),
-                     stop_on_first=bool(opts["stop_on_first"]), on_progress=emit)
+                     stop_on_first=bool(opts["stop_on_first"]), on_progress=emit, on_frame=emit_frame)
     first = fz.counterexamples[0].input if fz.counterexamples else None
     summary = {k: getattr(fz, k) for k in ("iterations", "counterexample_count", "neuron_coverage",
                                            "seeds_explored", "rng_seed")}

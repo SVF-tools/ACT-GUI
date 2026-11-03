@@ -5,6 +5,7 @@ import { AnalysisView } from "./analysis/AnalysisView";
 import { AssistantView } from "./assistant/AssistantView";
 import { BabView } from "./bab/BabView";
 import { ModelGraph } from "./model_spec/ModelGraph";
+import { LoadPanel } from "./model_spec/LoadPanel";
 import { ModelList } from "./model_spec/ModelList";
 import { SpecPanel } from "./model_spec/SpecPanel";
 import { RecordsView } from "./records/RecordsView";
@@ -36,7 +37,10 @@ export function App() {
   const [tab, setTab] = useState<Tab>("Assistant");
   const [runsVersion, setRunsVersion] = useState(0);
   const [licenseVersion, setLicenseVersion] = useState(0);
+  const [modelsVersion, setModelsVersion] = useState(0);
+  const models = useQuery("models", api.models, modelsVersion);
   const model = useQuery(sel.modelId, () => api.model(sel.modelId!));
+  const current = models.status === "ok" ? models.data.find((m) => m.model_id === sel.modelId) ?? null : null;
 
   return (
     <div className="shell">
@@ -56,7 +60,9 @@ export function App() {
         <ThemeToggle />
       </header>
       <aside className="sidebar">
-        <ModelList selected={sel.modelId} onSelect={(id) => dispatch({ type: "selectModel", modelId: id })} />
+        <LoadPanel current={current}
+          onLoaded={(m) => { setModelsVersion((v) => v + 1); dispatch({ type: "selectModel", modelId: m.model_id }); }} />
+        <ModelList models={models} selected={sel.modelId} onSelect={(id) => dispatch({ type: "selectModel", modelId: id })} />
       </aside>
       <main className="center">
         {model.status === "idle" && <Empty title="Select a model" text="Models are real ACT networks pinned by commit and sha256." />}

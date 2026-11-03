@@ -1,8 +1,8 @@
 // Typed browser client for the workbench service. Types are generated from Pydantic.
 import type {
   CoverageOut, EngineInfoOut, ErrorResponse, ExplainRequest, ExplainResponse, FuzzingOut, LayerStatesOut,
-  ModelDescriptionOut, ModelSummary, ProviderList, RunEvent, RunList, RunOut, RunRequest, SolverLicenseUpload,
-  SolverStatusOut,
+  LoadModelBody, ModelDescriptionOut, ModelSummary, ProviderList, RunEvent, RunList, RunOut, RunRequest, SampleOut,
+  SolverLicenseUpload, SolverStatusOut, SourcesOut,
 } from "./generated/wire";
 
 /** Mirrors schemas.WireNumber: finite float or an explicit non-finite marker. */
@@ -28,6 +28,10 @@ export const api = {
   engine: () => call<EngineInfoOut>("/api/engine"),
   models: () => call<ModelSummary[]>("/api/models"),
   model: (id: string) => call<ModelDescriptionOut>(`/api/models/${encodeURIComponent(id)}`),
+  loadModel: (body: LoadModelBody) => call<ModelSummary>("/api/models", { method: "POST", body: JSON.stringify(body) }),
+  sources: () => call<SourcesOut>("/api/sources"),
+  sample: (dataset: string, index: number) =>
+    call<SampleOut>(`/api/sources/sample?dataset=${encodeURIComponent(dataset)}&index=${index}`),
   runs: () => call<RunList>("/api/runs"),
   run: (id: string) => call<RunOut>(`/api/runs/${id}`),
   startRun: (req: RunRequest) => call<RunOut>("/api/runs", { method: "POST", body: JSON.stringify(req) }),

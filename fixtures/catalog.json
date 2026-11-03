@@ -32,7 +32,7 @@
         },
         "bab": {
           "status": "CERTIFIED",
-          "elapsed_s": 1.605,
+          "elapsed_s": 1.516,
           "nodes": 3
         }
       }
@@ -54,7 +54,7 @@
         },
         "bab": {
           "status": "FALSIFIED",
-          "elapsed_s": 0.054,
+          "elapsed_s": 0.052,
           "nodes": 1
         }
       }
@@ -92,8 +92,96 @@
       "native": {
         "interval": {
           "status": "UNKNOWN",
-          "elapsed_s": 0.068,
+          "elapsed_s": 0.066,
           "nodes": null
+        }
+      }
+    },
+    {
+      "id": "mnist_relu_6_100",
+      "act_path": "act/back_end/examples/nets/gui_mnist_relu_6_100.json",
+      "sha256": "9698b0c8b8adbac835a568a174e557948133b28b3593e0aa4785e67381d81a61",
+      "methods": [
+        "interval",
+        "bab"
+      ],
+      "description": "MNIST 6x100 ReLU MLP (BaVerLy), Linf eps=0.03 box around test image 0, top-1 robustness",
+      "native": {
+        "interval": {
+          "status": "UNKNOWN",
+          "elapsed_s": 0.047,
+          "nodes": null
+        },
+        "bab": {
+          "status": "CERTIFIED",
+          "elapsed_s": 16.274,
+          "nodes": 1
+        }
+      }
+    },
+    {
+      "id": "mnist_relu_6_100_eps015",
+      "act_path": "act/back_end/examples/nets/gui_mnist_relu_6_100_eps015.json",
+      "sha256": "1aa85e4af9e5b4d910021951abf063f50725b94458b1400d140a0db73922a76e",
+      "methods": [
+        "interval",
+        "bab"
+      ],
+      "description": "Same MNIST MLP with a wide Linf eps=0.15 box; ACTFuzzer finds misclassified images",
+      "native": {
+        "interval": {
+          "status": "UNKNOWN",
+          "elapsed_s": 0.13,
+          "nodes": null
+        },
+        "bab": {
+          "status": "UNKNOWN",
+          "elapsed_s": 15.326,
+          "nodes": 0
+        }
+      }
+    },
+    {
+      "id": "mnist_conv_small",
+      "act_path": "act/back_end/examples/nets/gui_mnist_conv_small.json",
+      "sha256": "2a2afae0a32cb9f555139c2c975b7c462e3662d0a72add29701a4aa908dab8c7",
+      "methods": [
+        "interval",
+        "bab"
+      ],
+      "description": "MNIST conv-small ReLU CNN (BaVerLy), Linf eps=0.05 box around test image 0, top-1 robustness",
+      "native": {
+        "interval": {
+          "status": "UNKNOWN",
+          "elapsed_s": 0.152,
+          "nodes": null
+        },
+        "bab": {
+          "status": "CERTIFIED",
+          "elapsed_s": 16.129,
+          "nodes": 1
+        }
+      }
+    },
+    {
+      "id": "cifar10_conv_med",
+      "act_path": "act/back_end/examples/nets/gui_cifar10_conv_med.json",
+      "sha256": "342c954c151123e4bdc47161db6ab294c6c2d88737c3340586fc000d360636b0",
+      "methods": [
+        "interval",
+        "bab"
+      ],
+      "description": "CIFAR-10 conv-med ReLU CNN (BaVerLy), Linf eps=2/255 box around test image 0, top-1 robustness",
+      "native": {
+        "interval": {
+          "status": "UNKNOWN",
+          "elapsed_s": 0.175,
+          "nodes": null
+        },
+        "bab": {
+          "status": "CERTIFIED",
+          "elapsed_s": 18.81,
+          "nodes": 1
         }
       }
     }

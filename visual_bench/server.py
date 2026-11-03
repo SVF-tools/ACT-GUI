@@ -52,6 +52,19 @@ def create_app(records_root: Path | None = None, secrets_root: Path | None = Non
     def models() -> list[S.ModelSummary]:
         return wb.models()
 
+    @app.post("/api/models", response_model=S.ModelSummary, status_code=201)
+    def load_model(body: S.LoadModelBody) -> JSONResponse:
+        summary, created = wb.load_model(body.source)
+        return JSONResponse(summary.model_dump(), status_code=201 if created else 200)
+
+    @app.get("/api/sources", response_model=S.SourcesOut)
+    def sources() -> S.SourcesOut:
+        return wb.sources()
+
+    @app.get("/api/sources/sample", response_model=S.SampleOut)
+    def sample(dataset: str, index: int) -> S.SampleOut:
+        return wb.sample(dataset, index)
+
     @app.get("/api/models/{model_id}", response_model=S.ModelDescriptionOut)
     def model(model_id: str) -> S.ModelDescriptionOut:
         return wb.describe(model_id)

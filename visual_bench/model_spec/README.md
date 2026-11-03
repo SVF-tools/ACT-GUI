@@ -1,6 +1,6 @@
 # Model and Specification View
 
-**Status:** first version: `ModelList.tsx`, `ModelGraph.tsx` (in-house SVG DAG), `SpecPanel.tsx` (MSV-01); MSV-02/03 not started. **Owner:** C; B integrates data; A reviews variable and constraint semantics.
+**Status:** first version: `ModelList.tsx`, `ModelGraph.tsx` (in-house SVG DAG), `SpecPanel.tsx` (MSV-01), `LoadPanel.tsx` (MSV-04); MSV-02/03 not started. Image-shaped input specs (N x C x H x W, C = 1 or 3) render through `InputDomain.tsx`: clean input (spec center), lower/upper bound images, a heat map of the allowed change per value, and display-only perturbations sampled inside the box (random corner, uniform, lb, ub) with an amplified difference view (`workspace/pixels.tsx`, shared with the Fuzzing counterexample view). TOP1_ROBUST properties show the required class with dataset labels (MNIST digits, CIFAR-10 names); numeric bounds and ACT's constraint text stay available under disclosures. **Owner:** C; B integrates data; A reviews variable and constraint semantics.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 ## 1. Subproblems and Objective
@@ -50,6 +50,7 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 | MSV-01 | Deliver real description list/detail UI | VER-01, WS-02 | A real sample shows correct layer shapes, tensor edges, and specification variables with loading/error states. |
 | MSV-02 | Evaluate and wrap the network renderer | MSV-01 | Show stable IDs, external selection, node callbacks, resize, worker/assets, and browser findings; document a fallback if the candidate fails. |
 | MSV-03 | Validate specification drafts | MSV-01, MSB-03 | Invalid variable mappings are explained; a valid change creates a new reference and cannot mutate an existing run. |
+| MSV-04 | Load models from VNN-LIB and torch sources | MSB-04, MSV-01 | `LoadPanel.tsx` in the sidebar: VNN-LIB tab (benchmark, instance) and Torch tab (classifier, test-image index with preview and label, eps slider). `POST /api/models` builds through the bridge and returns the content-addressed model (201 new, 200 existing); loaded models appear under "Loaded" with their parameters, and selecting one prefills the form so a new image/eps rebuilds a new snapshot. Flat VNN-LIB image vectors of known datasets are drawn as H x W x C (cora_2024 convention). |
 
 Owner: **C**. A reviews scientific semantics; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.
 

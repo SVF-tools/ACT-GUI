@@ -1,16 +1,18 @@
 // ACTFuzzer run view (VER-06): live progress, coverage/violation timeline, inputs, counterexamples, strategies.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, fmt, followRun, num } from "../api";
-import type { FuzzCounterexampleOut, FuzzPointOut, FuzzingOut, ModelDescriptionOut } from "../generated/wire";
+import type { FuzzCounterexampleOut, FuzzFrameOut, FuzzPointOut, FuzzingOut, ModelDescriptionOut } from "../generated/wire";
 import { Empty } from "../workspace/Empty";
 import { useQuery } from "../workspace/useQuery";
+import { classLabel, imageShape, PerturbCompare, Pixels, specImageShape, type Shape } from "../workspace/pixels";
 
 export function FuzzView({ runId, version, model }: { runId: string | null; version: number; model: ModelDescriptionOut | null }) {
   const [tick, setTick] = useState(0);
   const [shown, setShown] = useState<FuzzingOut | null>(null);
+  const [frameSel, setFrameSel] = useState<number | null>(null); // null follows the latest frame
   const q = useQuery(runId ? `${runId}:${version}:${tick}` : null, () => api.fuzzing(runId!));
   useEffect(() => { if (q.status === "ok") setShown(q.data); }, [q]);
-  useEffect(() => setShown(null), [runId]);
+  useEffect(() => { setShown(null); setFrameSel(null); }, [runId]);
   const live = shown !== null && shown.run_id === runId && (shown.status === "queued" || shown.status === "running");
   useEffect(() => {
     if (!live || !runId) return;
@@ -25,6 +27,7 @@ export function FuzzView({ runId, version, model }: { runId: string | null; vers
   const last = f.timeline.at(-1) ?? null;
   const s = f.summary;
   const ces = s?.counterexample_count ?? last?.counterexamples ?? 0;
+  const frames = f.frames ?? [];
   return (
     <div className="fuzz">
       <Banner f={f} ces={ces} />
@@ -39,7 +42,13 @@ export function FuzzView({ runId, version, model }: { runId: string | null; vers
         <span>rng seed</span><b>{f.options?.rng_seed ?? "—"}{s ? ` · device ${s.device}` : ""}</b>
       </div>
       <h3>Progress <small>{live ? "live from committed fuzz.progress events" : "recorded timeline"}</small></h3>
-      <Timeline points={f.timeline} firstCe={f.counterexamples[0]?.iteration ?? null} />
+      <div className="fuzzlive">
+        <div className="fuzzlive-chart">
+          <Timeline points={f.timeline} firstCe={f.counterexamples[0]?.iteration ?? null}
+            marker={frames.length ? frames[Math.min(frameSel ?? Infinity, frames.length - 1)]!.iteration : null} />
+        </div>
+        <Mutations frames={frames} live={live} model={model} sel={frameSel} onSel={setFrameSel} />
+      </div>
       {f.availability === "available" && <Inputs f={f} model={model} />}
       {f.counterexamples.length > 0 && <Counterexamples items={f.counterexamples} total={ces} model={model} />}
       {f.strategies.length > 0 && <Strategies f={f} />}
@@ -64,7 +73,7 @@ function Banner({ f, ces }: { f: FuzzingOut; ces: number }) {
 
 const W = 400, H = 150, PL = 34, PR = 34, PT = 8, PB = 22;
 
-function Timeline({ points, firstCe }: { points: FuzzPointOut[]; firstCe: number | null }) {
+function Timeline({ points, firstCe, marker }: { points: FuzzPointOut[]; firstCe: number | null; marker: number | null }) {
   if (points.length === 0) return <div className="note">Waiting for the first progress report…</div>;
   const maxIt = Math.max(1, ...points.map((p) => p.iteration));
   const maxCe = Math.max(1, ...points.map((p) => p.counterexamples));
@@ -96,10 +105,73 @@ function Timeline({ points, firstCe }: { points: FuzzPointOut[]; firstCe: number
         <text className="plabel" x={PL} y={H - 6}>0</text>
         <text className="plabel" x={W - PR} y={H - 6} textAnchor="end">{maxIt} iterations</text>
         {firstCe !== null && <line className="firstce" x1={x(firstCe)} y1={PT} x2={x(firstCe)} y2={H - PB}><title>first counterexample at iteration {firstCe}</title></line>}
+        {marker !== null && <line className="framemark" x1={x(marker)} y1={PT} x2={x(marker)} y2={H - PB}><title>shown mutated input: iteration {marker}</title></line>}
         <polyline className="cov" points={cov} />
         <polyline className="ces" points={steps.join(" ")} />
       </svg>
     </>
+  );
+}
+
+const PLAY_MS = 700;
+
+// The mutated input beside the progress chart: the latest frame while running, a playable filmstrip afterwards.
+function Mutations({ frames, live, model, sel, onSel }: {
+  frames: FuzzFrameOut[]; live: boolean; model: ModelDescriptionOut | null; sel: number | null; onSel: (i: number | null) => void;
+}) {
+  const [playing, setPlaying] = useState(false);
+  const n = frames.length;
+  const idx = Math.min(sel ?? n - 1, n - 1);
+  useEffect(() => {
+    if (!playing || n < 2) return;
+    const t = setInterval(() => onSel((idx + 1) % n), PLAY_MS);
+    return () => clearInterval(t);
+  }, [playing, idx, n, onSel]);
+  useEffect(() => { if (live) setPlaying(false); }, [live]);
+
+  const fr = frames[idx];
+  if (!fr) {
+    return (
+      <div className="mutpanel">
+        <div className="note">{live ? "Waiting for the first mutated input…" : "No mutated-input frames in this record (written before they were captured). Re-run to see them."}</div>
+      </div>
+    );
+  }
+  const x = fr.input.map(num), seed = fr.seed_input.map(num);
+  const delta = x.map((v, i) => v - seed[i]!);
+  const linf = delta.reduce((m, d) => Math.max(m, Math.abs(d)), 0);
+  const d = x.length, shape = modelShape(model, d), box = inputBox(model, d);
+  const [lo, hi] = box ? finiteRange([...box.lb, ...box.ub]) : finiteRange([...x, ...seed]);
+  return (
+    <div className="mutpanel">
+      <div className="muthead">
+        <b>Mutated input</b>
+        {live ? <span className="chip s-running">live · latest</span> : <span className="muted">frame {idx + 1} / {n}</span>}
+        {fr.violation && <span className="chip bad">counterexample</span>}
+      </div>
+      {shape ? (
+        <div className="mutimgs">
+          <Pixels xs={x} shape={shape} lo={lo} hi={hi} label="mutated" size="big" />
+          <div className="mutside">
+            <Pixels xs={seed} shape={shape} lo={lo} hi={hi} label={`seed row ${fr.seed_row}`} />
+            <Pixels xs={delta} shape={shape} lo={-linf} hi={linf} mode="signed" label="δ (red +, blue −)" />
+          </div>
+        </div>
+      ) : <DeltaBars delta={delta} box={box} />}
+      <div className="mutmeta mono muted">
+        <span>it {fr.iteration} · {fmt(fr.elapsed_s, 2)} s</span>
+        <span>{fr.strategy ?? "—"} · depth {fr.depth}</span>
+        <span>‖δ‖∞ {fmt(linf, 4)}</span>
+      </div>
+      {!live && n > 1 && (
+        <div className="mutctl">
+          <button className="secondary" onClick={() => setPlaying(!playing)}>{playing ? "Pause" : "Play"}</button>
+          <input type="range" min={0} max={n - 1} value={idx} aria-label="mutated input frame"
+            onChange={(e) => { setPlaying(false); onSel(Number(e.target.value)); }} />
+        </div>
+      )}
+      <div className="note">Lane 0 of the batch ACT mutated, sampled with the progress reports; δ is relative to its INPUT row.</div>
+    </div>
   );
 }
 
@@ -126,16 +198,13 @@ function Strategies({ f }: { f: FuzzingOut }) {
 
 const MAX_DIMS = 64;
 const GALLERY = 8;
-type Shape = { c: number; h: number; w: number };
 type Box = { lb: number[]; ub: number[] } | null;
 
-// Flattened inputs that factor as C x S x S (C = 1 or 3, S >= 8) are drawn as images (CHW, as ACT stores them).
-function imageShape(d: number): Shape | null {
-  for (const c of [1, 3]) {
-    const s = Math.round(Math.sqrt(d / c));
-    if (s >= 8 && c * s * s === d) return { c, h: s, w: s };
-  }
-  return null;
+// The spec's tensor shape when it matches the input length, else a C x S x S guess from the length alone.
+function modelShape(model: ModelDescriptionOut | null, d: number): Shape | null {
+  const spec = model?.input_specs[0];
+  const s = spec ? specImageShape(spec.shape, spec.dataset) : null;
+  return s && s.c * s.h * s.w === d ? s : imageShape(d);
 }
 
 function inputBox(model: ModelDescriptionOut | null, d: number): Box {
@@ -172,39 +241,6 @@ function analyze(ce: FuzzCounterexampleOut): Ce {
            misclassified: ce.true_class !== null && pred !== ce.true_class };
 }
 
-function Pixels({ xs, shape, lo, hi, signed = false, label, big = false }: {
-  xs: number[]; shape: Shape; lo: number; hi: number; signed?: boolean; label: string; big?: boolean;
-}) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const ctx = ref.current?.getContext("2d");
-    if (!ctx) return;
-    const { c, h, w } = shape, n = h * w, img = ctx.createImageData(w, h);
-    const span = hi - lo || 1, m = Math.max(Math.abs(lo), Math.abs(hi)) || 1;
-    const ch = (k: number, p: number) => 255 * Math.max(0, Math.min(1, (xs[k * n + p]! - lo) / span));
-    for (let p = 0; p < n; p++) {
-      let rgb: [number, number, number];
-      if (signed) {
-        let v = 0;
-        for (let k = 0; k < c; k++) v += xs[k * n + p]!;
-        const t = Math.min(1, Math.abs(v / c) / m) * 255;
-        rgb = v >= 0 ? [255, 255 - t, 255 - t] : [255 - t, 255 - t, 255];
-      } else {
-        const r = ch(0, p);
-        rgb = c === 3 ? [r, ch(1, p), ch(2, p)] : [r, r, r];
-      }
-      img.data.set([...rgb, 255], p * 4);
-    }
-    ctx.putImageData(img, 0, 0);
-  }, [xs, shape, lo, hi, signed]);
-  return (
-    <figure className={big ? "pix big" : "pix"}>
-      <canvas ref={ref} width={shape.w} height={shape.h} />
-      <figcaption>{label}</figcaption>
-    </figure>
-  );
-}
-
 // Signed perturbation per input dimension, scaled by the input box width when the box is known.
 function DeltaBars({ delta, box }: { delta: number[]; box: Box }) {
   const n = Math.min(delta.length, MAX_DIMS);
@@ -227,7 +263,7 @@ function Inputs({ f, model }: { f: FuzzingOut; model: ModelDescriptionOut | null
   const seeds = f.seeds ?? [];
   const d = seeds[0]?.input.length ?? f.counterexamples[0]?.input.length ?? model?.input_dim ?? 0;
   const box = inputBox(model, d);
-  const shape = imageShape(d);
+  const shape = modelShape(model, d);
   const perRow = new Map<number, number>(), expected = new Map<number, number>();
   for (const c of f.counterexamples) {
     perRow.set(c.spec_row, (perRow.get(c.spec_row) ?? 0) + 1);
@@ -274,11 +310,12 @@ function Counterexamples({ items, total, model }: { items: FuzzCounterexampleOut
   const [all, setAll] = useState(false);
   const list = useMemo(() => items.map(analyze), [items]);
   const a = list[Math.min(sel, list.length - 1)]!;
-  const d = a.x.length, box = inputBox(model, d), shape = imageShape(d);
+  const d = a.x.length, box = inputBox(model, d), shape = modelShape(model, d);
+  const ds = model?.input_specs[0]?.dataset ?? null;
   const [lo, hi] = box ? finiteRange([...box.lb, ...box.ub]) : finiteRange(list.flatMap((c) => [...c.x, ...c.seed]));
   const groups = new Map<string, number>();
   for (const c of list) {
-    const k = c.ce.true_class !== null ? `class ${c.ce.true_class} → ${c.pred}` : `${c.ce.kind} · spec row ${c.ce.spec_row}`;
+    const k = c.ce.true_class !== null ? `${classLabel(ds, c.ce.true_class)} → ${classLabel(ds, c.pred)}` : `${c.ce.kind} · spec row ${c.ce.spec_row}`;
     groups.set(k, (groups.get(k) ?? 0) + 1);
   }
   const mis = list.filter((c) => c.misclassified).length;
@@ -299,12 +336,12 @@ function Counterexamples({ items, total, model }: { items: FuzzCounterexampleOut
               <span className="pixrow">
                 <Pixels xs={c.seed} shape={shape} lo={lo} hi={hi} label="seed" />
                 <Pixels xs={c.x} shape={shape} lo={lo} hi={hi} label="mutated" />
-                <Pixels xs={c.delta} shape={shape} lo={-c.linf} hi={c.linf} signed label="δ" />
+                <Pixels xs={c.delta} shape={shape} lo={-c.linf} hi={c.linf} mode="signed" label="δ" />
               </span>
             ) : <DeltaBars delta={c.delta} box={box} />}
             <span className="ceclass">
               {c.ce.true_class !== null ? (
-                <>class <b>{c.ce.true_class}</b> → <b className={c.misclassified ? "state bad" : ""}>{c.pred}</b>
+                <><b>{classLabel(ds, c.ce.true_class)}</b> → <b className={c.misclassified ? "state bad" : ""}>{classLabel(ds, c.pred)}</b>
                   {c.misclassified && <span className="chip bad">misclassified</span>}</>
               ) : <>{c.ce.kind} · row {c.ce.spec_row}</>}
             </span>
@@ -324,6 +361,7 @@ function CounterexampleDetail({ a, model, box, shape, lo, hi }: {
   a: Ce; model: ModelDescriptionOut | null; box: Box; shape: Shape | null; lo: number; hi: number;
 }) {
   const { ce, x: xs, seed } = a;
+  const ds = model?.input_specs[0]?.dataset ?? null;
   const shown = Math.min(xs.length, MAX_DIMS);
   const top = a.delta.map((v, i) => [i, v] as const).filter(([, v]) => Math.abs(v) > 1e-9)
     .sort((p, q) => Math.abs(q[1]) - Math.abs(p[1])).slice(0, 5);
@@ -337,7 +375,7 @@ function CounterexampleDetail({ a, model, box, shape, lo, hi }: {
         <span>outcome</span>
         <b>
           {ce.true_class !== null
-            ? <>expected class {ce.true_class}, seed predicts {a.seedPred ?? "?"}, mutated predicts <span className={a.misclassified ? "state bad" : ""}>{a.pred}</span></>
+            ? <>expected {classLabel(ds, ce.true_class)}, seed predicts {a.seedPred === null ? "?" : classLabel(ds, a.seedPred)}, mutated predicts <span className={a.misclassified ? "state bad" : ""}>{classLabel(ds, a.pred)}</span></>
             : <>{ce.kind} violated on spec row {ce.spec_row}</>}
         </b>
         <span>severity</span><b>{fmt(num(ce.severity))} <span className="muted">(ACT's signed violation margin)</span></b>
@@ -346,11 +384,7 @@ function CounterexampleDetail({ a, model, box, shape, lo, hi }: {
       </div>
       <h4>Input: seed vs mutated</h4>
       {shape ? (
-        <div className="pixrow">
-          <Pixels xs={seed} shape={shape} lo={lo} hi={hi} label="seed" big />
-          <Pixels xs={xs} shape={shape} lo={lo} hi={hi} label="mutated (counterexample)" big />
-          <Pixels xs={a.delta} shape={shape} lo={-a.linf} hi={a.linf} signed label="δ = mutated − seed" big />
-        </div>
+        <PerturbCompare base={seed} perturbed={xs} shape={shape} lo={lo} hi={hi} baseLabel="seed" perturbedLabel="mutated (counterexample)" />
       ) : (
         <>
           <div className="legend">
