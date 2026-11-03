@@ -24,15 +24,15 @@ export function ModelGraph({ model, selectedLayer, onSelectLayer }: {
   model: ModelDescriptionOut; selectedLayer: number | null; onSelectLayer: (id: number) => void;
 }) {
   const pos = layout(model);
-  // Top-down: depth along y (the center column is taller than it is wide), siblings along x.
-  const W = 150, H = 44, GX = 18, GY = 22;
+  // Left to right: depth along x, siblings stacked along y.
+  const W = 150, H = 44, GX = 36, GY = 14;
   const maxDepth = Math.max(...[...pos.values()].map((p) => p.depth));
   const maxRow = Math.max(...[...pos.values()].map((p) => p.row));
-  const width = (maxRow + 1) * (W + GX) + GX;
-  const height = (maxDepth + 1) * (H + GY) + GY;
+  const width = (maxDepth + 1) * (W + GX) + GX;
+  const height = (maxRow + 1) * (H + GY) + GY;
   const xy = (id: number) => {
     const p = pos.get(id)!;
-    return { x: GX + p.row * (W + GX), y: GY + p.depth * (H + GY) };
+    return { x: GX + p.depth * (W + GX), y: GY + p.row * (H + GY) };
   };
   return (
     <div className="graphwrap">
@@ -45,7 +45,7 @@ export function ModelGraph({ model, selectedLayer, onSelectLayer }: {
         {model.layers.flatMap((l) => l.preds.map((p) => {
           const a = xy(p), b = xy(l.layer_id);
           return <path key={`${p}-${l.layer_id}`} className="edge" markerEnd="url(#arrow)"
-            d={`M${a.x + W / 2},${a.y + H} C${a.x + W / 2},${a.y + H + GY / 2} ${b.x + W / 2},${b.y - GY / 2} ${b.x + W / 2},${b.y}`} />;
+            d={`M${a.x + W},${a.y + H / 2} C${a.x + W + GX / 2},${a.y + H / 2} ${b.x - GX / 2},${b.y + H / 2} ${b.x},${b.y + H / 2}`} />;
         }))}
         {model.layers.map((l) => {
           const { x, y } = xy(l.layer_id);

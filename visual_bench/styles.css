@@ -67,7 +67,9 @@ textarea { width: 100%; resize: vertical; }
 button { cursor: pointer; } button:disabled { opacity: .5; cursor: not-allowed; }
 .primary, a.button { background: var(--accent); color: var(--on-accent); border: 0; border-radius: 6px; padding: 8px 12px; font-weight: 600; text-decoration: none; display: inline-block; }
 
-.graphwrap { overflow: auto; display: flex; justify-content: center; }
+/* margin:auto centers a narrow graph yet keeps a wide one scrollable from its first layer. */
+.graphwrap { overflow: auto; } .graphwrap .graph { display: block; margin: 0 auto; }
+.modes { padding: 0; } .modes .tabs { padding: 0 6px; } .modebody { padding: 12px; }
 .graph .edge { fill: none; stroke: var(--edge); stroke-width: 1.5; } .arrowhead { fill: var(--edge); }
 .node { cursor: pointer; } .node rect { fill: var(--panel2); stroke: var(--line); stroke-width: 1.5; }
 .node:hover rect { stroke: var(--line-hover); } .node.selected rect { stroke: var(--accent); stroke-width: 2.5; }
@@ -135,6 +137,27 @@ button { cursor: pointer; } button:disabled { opacity: .5; cursor: not-allowed; 
 .tblwrap { overflow-x: auto; }
 .tbl tr.rowlink { cursor: pointer; } .tbl tr.rowlink:hover { background: var(--panel2); }
 .tbl tr.rowsel { background: var(--panel2); box-shadow: inset 3px 0 0 var(--bad); }
+.fuzz h4 { margin: 12px 0 6px; font-size: 13px; }
+.findings { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.chip.bad { border-color: var(--bad); color: var(--bad); }
+.cegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.cecard { display: flex; flex-direction: column; gap: 6px; text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-size: 12px; }
+.cecard:hover { border-color: var(--line-hover); } .cecard.active { border-color: var(--bad); box-shadow: inset 3px 0 0 var(--bad); }
+.cehead { display: flex; justify-content: space-between; gap: 6px; } .cehead .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cemeta { display: flex; justify-content: space-between; gap: 6px; flex-wrap: wrap; font-size: 11px; }
+.more { margin-top: 8px; font-size: 12px; padding: 4px 10px; }
+.ceclass { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.spark { background: var(--well); border-radius: 4px; } .spark .axis { stroke: var(--axis); }
+.spark .up { fill: var(--bad); } .spark .down { fill: var(--accent); }
+.pixrow { display: flex; gap: 6px; flex-wrap: wrap; }
+.pix { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.pix canvas { width: 52px; height: 52px; image-rendering: pixelated; border-radius: 3px; border: 1px solid var(--line); }
+.pix.big canvas { width: 140px; height: 140px; } .pix figcaption { font-size: 10px; color: var(--muted); }
+.barrow.outrow { grid-template-columns: 28px 1fr 150px 48px; } .barrow.outrow.pred { background: var(--panel2); }
+.bar.shift { background: var(--bad); opacity: .3; } .outrow .tags { display: flex; gap: 3px; }
+.netrow { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; align-items: start; }
+.insptop { flex: 1 1 50%; min-height: 0; display: flex; flex-direction: column; }
+.insphistory { flex: 1 1 50%; min-height: 0; overflow: auto; border-top: 1px solid var(--line); padding: 12px; }
 
 @media (max-width: 1100px) {
   .shell { grid-template-columns: 260px minmax(0, 1fr); grid-template-areas: "top top" "side center" "insp insp"; grid-template-rows: auto minmax(0, 1fr) auto; height: auto; min-height: 100vh; }
@@ -144,8 +167,8 @@ button { cursor: pointer; } button:disabled { opacity: .5; cursor: not-allowed; 
   .shell { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "side" "center" "insp"; }
   .sidebar, .center, .inspector { min-width: 0; }
   .sidebar { border-right: 0; }
-  .split { grid-template-columns: 1fr; }
-  .barrow { grid-template-columns: 24px 1fr 110px; }
+  .split, .netrow { grid-template-columns: 1fr; }
+  .barrow { grid-template-columns: 24px 1fr 110px; } .barrow.outrow { grid-template-columns: 24px 1fr 110px 40px; }
 }
 
 /* Gurobi license panel (verification/GurobiLicensePanel.tsx) */

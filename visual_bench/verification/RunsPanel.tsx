@@ -8,42 +8,28 @@ const METHOD_LABEL: Record<Method, string> = {
   interval: "interval (verify_once)", bab: "BaB (verify_bab_batched)", fuzz: "fuzz (ACTFuzzer)",
 };
 
-export function RunsPanel({ modelId, selectedRun, version, onChanged, onSelect, onStarted }: {
-  modelId: string; selectedRun: string | null; version: number; onChanged: () => void; onSelect: (runId: string) => void;
-  onStarted: (method: Method) => void;
+// The method is owned by the center mode tabs: switching the mode switches it, and choosing it here switches the mode.
+export function RunsPanel({ modelId, method, onMethod, onChanged, onSelect }: {
+  modelId: string; method: Method; onMethod: (m: Method) => void; onChanged: () => void; onSelect: (runId: string) => void;
 }) {
   const models = useQuery("models", api.models);
-  const runs = useQuery(`runs:${version}`, api.runs);
   const methods = models.status === "ok" ? models.data.find((m) => m.model_id === modelId)?.methods ?? [] : [];
-  const [method, setMethod] = useState<Method>("bab");
+  const supported = methods.includes(method);
   const [budget, setBudget] = useState(30);
   const [iterations, setIterations] = useState(100000);
   const [rngSeed, setRngSeed] = useState(0);
   const [stopOnFirst, setStopOnFirst] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const effective = methods.includes(method) ? method : methods[0] ?? "interval";
-  const mine = runs.status === "ok" ? runs.data.runs.filter((r) => r.model_id === modelId) : [];
-
-  // Follow active runs over SSE; refresh the list when a committed event arrives.
-  const activeIds = mine.filter((r) => r.status === "queued" || r.status === "running").map((r) => r.run_id).join(",");
-  useEffect(() => {
-    if (!activeIds) return;
-    const stops = activeIds.split(",").map((id) => followRun(id, (ev) => {
-      if (ev.kind === "run.completed" || ev.kind === "run.failed") onChanged();
-    }));
-    return () => stops.forEach((s) => s());
-  }, [activeIds, onChanged]);
 
   async function start() {
     setBusy(true);
     setErr(null);
     try {
-      const fuzz = effective === "fuzz" ? { max_iterations: iterations, rng_seed: rngSeed, stop_on_first: stopOnFirst } : null;
-      const run = await api.startRun({ model_id: modelId, method: effective, time_budget_s: budget, client_request_id: crypto.randomUUID(), fuzz });
+      const fuzz = method === "fuzz" ? { max_iterations: iterations, rng_seed: rngSeed, stop_on_first: stopOnFirst } : null;
+      const run = await api.startRun({ model_id: modelId, method, time_budget_s: budget, client_request_id: crypto.randomUUID(), fuzz });
       onChanged();
       onSelect(run.run_id);
-      onStarted(effective);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -52,18 +38,20 @@ export function RunsPanel({ modelId, selectedRun, version, onChanged, onSelect, 
   }
 
   return (
-    <section className="panel">
-      <h2>Verification runs</h2>
+    <section className="panel runs">
+      <h2>Verification runs <small>{METHOD_LABEL[method]}</small></h2>
       <div className="form">
         <label>Method
-          <select value={effective} onChange={(e) => setMethod(e.target.value as Method)}>
-            {methods.map((m) => <option key={m} value={m}>{METHOD_LABEL[m]}</option>)}
+          <select value={method} onChange={(e) => onMethod(e.target.value as Method)}>
+            {(Object.keys(METHOD_LABEL) as Method[]).map((m) => (
+              <option key={m} value={m} disabled={!methods.includes(m)}>{METHOD_LABEL[m]}</option>
+            ))}
           </select>
         </label>
         <label>Budget (s)
           <input type="number" min={1} max={600} value={budget} onChange={(e) => setBudget(Number(e.target.value))} />
         </label>
-        {effective === "fuzz" && (
+        {method === "fuzz" && (
           <>
             <label>Max iterations
               <input type="number" min={1} max={1000000} value={iterations} onChange={(e) => setIterations(Number(e.target.value))} />
@@ -76,14 +64,41 @@ export function RunsPanel({ modelId, selectedRun, version, onChanged, onSelect, 
             </label>
           </>
         )}
-        <button className="primary" disabled={busy || methods.length === 0} onClick={start}>{busy ? "Starting…" : "Run ACT"}</button>
+        <button className="primary" disabled={busy || !supported} onClick={start}>{busy ? "Starting…" : "Run ACT"}</button>
       </div>
+      {!supported && models.status === "ok" && <div className="note">This model does not support {METHOD_LABEL[method]}.</div>}
       {err && <div className="error">{err}</div>}
+    </section>
+  );
+}
+
+// Past runs of the selected model for the current method; it also follows active runs so the list refreshes on commit.
+export function RunHistory({ modelId, method, selectedRun, version, onChanged, onSelect }: {
+  modelId: string; method: Method; selectedRun: string | null; version: number; onChanged: () => void;
+  onSelect: (runId: string) => void;
+}) {
+  const runs = useQuery(`runs:${version}`, api.runs);
+  const all = runs.status === "ok" ? runs.data.runs.filter((r) => r.model_id === modelId) : [];
+  const mine = all.filter((r) => r.method === method);
+
+  // Every method, so a run started in another mode still lands.
+  const activeIds = all.filter((r) => r.status === "queued" || r.status === "running").map((r) => r.run_id).join(",");
+  useEffect(() => {
+    if (!activeIds) return;
+    const stops = activeIds.split(",").map((id) => followRun(id, (ev) => {
+      if (ev.kind === "run.completed" || ev.kind === "run.failed") onChanged();
+    }));
+    return () => stops.forEach((s) => s());
+  }, [activeIds, onChanged]);
+
+  return (
+    <>
+      <h2>Run history <small>{modelId} · {METHOD_LABEL[method]} · {mine.length}</small></h2>
       <ul className="list">
-        {mine.length === 0 && <li className="note">No runs yet for this model.</li>}
+        {mine.length === 0 && <li className="note">No {method} runs yet for this model{all.length ? ` (${all.length} with other methods)` : ""}.</li>}
         {mine.map((r) => <RunItem key={r.run_id} run={r} active={r.run_id === selectedRun} onSelect={onSelect} />)}
       </ul>
-    </section>
+    </>
   );
 }
 
