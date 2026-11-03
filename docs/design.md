@@ -57,7 +57,7 @@ Start with a small real-data inspection slice. Propagation requirements live in 
 
 ## 5. First AI-native Workflow
 
-Select a node → ask a question → freeze context → query ACT records → answer with evidence → navigate to the cited object.
+Select a node → ask a question → freeze context → query ACT records → answer with evidence → navigate to the cited object. The first target is a layer/stage of a completed run, which needs no committed BaB events; committed BaB nodes follow once ACT exposes them.
 
 AI context includes the selected network/spec/run/node/layer/revision. Answers distinguish engine observations, interpretations, and hypotheses, and state when evidence is missing.
 
@@ -71,14 +71,24 @@ Evidence is data, not authority to change tool permissions. Model retries must n
 
 The first release targets browser access on Windows, macOS, and Linux without client-side Python, Node, ACT, or solver installation. Local computation still requires a compatible ACT environment. GUI platform support and native engine compatibility are separate claims.
 
-Browser and service processes may run separately during development. Distribution provides one origin for assets, workers, API, and SSE. Development services bind to loopback by default. Remote single-user deployment uses HTTPS and an established access-authentication mechanism; multi-tenancy is outside the initial scope.
+During development, contributors open the workbench in a local browser at a documented localhost URL; the browser dev server and the FastAPI service may run as separate processes. Distribution provides one origin for assets, workers, API, and SSE. Development services bind to loopback by default. Remote single-user deployment uses HTTPS and an established access-authentication mechanism; multi-tenancy is outside the initial scope.
 
 Maintainers deploy the computation service. Distinguish uploading a client file from selecting a server artifact; client absolute paths are not server paths. Desktop packaging and first-launch offline access can be added when required.
+
+**Container distribution (2026-11-03).** The one-origin build ships as one Docker image run by Docker Compose, so a user needs only Docker (plus the NVIDIA Container Toolkit for GPU) and a browser:
+
+- One image, one service. A Node build stage produces the browser assets; the runtime stage holds Python 3.12, the GUI's ACT runtime dependencies, the pinned ACT checkout, and the workbench, and FastAPI serves assets, API, and SSE from one origin. The Vite dev server is not in the image; development keeps `scripts/dev.sh`.
+- GPU. The image carries the CUDA 12.8 torch wheel, which also runs on CPU. `compose.yaml` runs on CPU; adding `compose.gpu.yaml` reserves the NVIDIA GPUs and sets `ACT_GUI_DEVICE=cuda`. The run result records the torch device ACT actually used, so a GPU claim is evidence, not configuration.
+- ACT source. The image contains a shallow git checkout of exactly the commit pinned in `fixtures/catalog.json`, so the engine probe reports a real commit and a clean tree. `scripts/docker_build.sh` stages it from a local ACT checkout or a git URL. ACT is AGPL-3.0: a published image must have the pinned commit available as source (pushed upstream) before release.
+- Gurobi is optional and user-licensed. gurobipy is installed (version is a build argument) but no license is ever built into the image. A user supplies one either by mounting a license file (`compose.gurobi.yaml`, `GRB_LICENSE_FILE`) or by uploading it through the workbench, which stores it server-side with owner-only permissions next to the records and passes it to each run worker. An uploaded license takes precedence over a mounted one; the content is never returned by the API. The service reports Gurobi's own license check result; host-bound licenses generally fail inside containers, while WLS and token-server licenses work. The current interval and BaB paths use ACT's TorchLPSolver, so a license changes no current verdict.
+- Loopback by default. Compose publishes the port on `127.0.0.1` only. Remote access still requires the HTTPS and authentication front end described above (DIST-01).
 
 ## 7. Technology Decisions and Open Items
 
 FastAPI/Pydantic and React/TypeScript are the baseline. Evaluate and introduce layout, network/BaB rendering, and plotting dependencies when their features start.
 
 Dockview, Model Explorer, React Flow/ELK, and Plotly are candidates, not installed or validated capabilities. ACT observer/control APIs, the model provider, supported browser versions, and performance thresholds require implementation-time validation.
+
+First-version implementation decisions (2026-11-03): development uses the Vite dev server with a `^/api/` proxy to FastAPI (a bare `/api` prefix also matched the module `/api.ts`); each run executes in a separate Python worker process launched by the workbench and writes its result to a file, because ACT prints to stdout; records are per-run directories with an immutable manifest, an append-only event log, and sha256-sealed artifacts; non-finite numbers cross the wire as the strings `"Infinity"`, `"-Infinity"`, `"NaN"`; browser types are generated with json-schema-to-typescript from `models_json_schema` over `visual_bench/schemas.py`; the network view is a small in-house SVG DAG until MSV-02 evaluates renderers. Container distribution and Gurobi license handling follow section 6 (DIST-02, ES-04, VER-05).
 
 Record decision changes here first. Extract ADRs when independent maintenance becomes useful.
