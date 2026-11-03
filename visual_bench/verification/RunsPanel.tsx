@@ -112,16 +112,19 @@ export function RunHistory({ modelId, method, selectedRun, version, onChanged, o
       <h2>Run history <small>{modelId} · {METHOD_LABEL[method]} · {mine.length}</small></h2>
       <ul className="list">
         {mine.length === 0 && <li className="note">No {method} runs yet for this model{all.length ? ` (${all.length} with other methods)` : ""}.</li>}
-        {mine.map((r) => <RunItem key={r.run_id} run={r} active={r.run_id === selectedRun} onSelect={onSelect} />)}
+        {mine.map((r) => <RunItem key={r.run_id} run={r} active={r.run_id === selectedRun} onSelect={onSelect} onChanged={onChanged} />)}
       </ul>
     </>
   );
 }
 
-function RunItem({ run, active, onSelect }: { run: RunOut; active: boolean; onSelect: (id: string) => void }) {
+function RunItem({ run, active, onSelect, onChanged }: {
+  run: RunOut; active: boolean; onSelect: (id: string) => void; onChanged: () => void;
+}) {
   const verdict = run.result?.verdict;
+  const live = run.status === "queued" || run.status === "running";
   return (
-    <li>
+    <li className={live ? "runitem live" : "runitem"}>
       <button className={active ? "item active" : "item"} onClick={() => onSelect(run.run_id)}>
         <span className="title">{run.run_id} <span className="muted">{run.method}{run.domain ? ` · ${run.domain}` : ""}</span></span>
         <span className="chips">
@@ -134,6 +137,30 @@ function RunItem({ run, active, onSelect }: { run: RunOut; active: boolean; onSe
         </span>
         {run.error && <span className="sub err">{run.error.code}: {run.error.message}</span>}
       </button>
+      {live && <StopButton runId={run.run_id} method={run.method} onStopped={onChanged} />}
     </li>
+  );
+}
+
+/** Stop a queued or running run: fuzzing ends after its current iteration and keeps what ACT found; verify/BaB are ended. */
+export function StopButton({ runId, method, onStopped }: { runId: string; method: Method; onStopped: () => void }) {
+  const [state, setState] = useState<"idle" | "stopping" | "error">("idle");
+  const [err, setErr] = useState("");
+  async function stop() {
+    setState("stopping");
+    try {
+      await api.stopRun(runId);
+      onStopped();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+      setState("error");
+    }
+  }
+  return (
+    <button className="danger" disabled={state === "stopping"} onClick={stop}
+      title={err || (method === "fuzz" ? "ACTFuzzer stops after the current iteration; counterexamples found so far are kept"
+        : "Ends the worker; ACT returns no result for this run")}>
+      {state === "stopping" ? "Stopping…" : state === "error" ? "Stop failed, retry" : "Stop"}
+    </button>
   );
 }

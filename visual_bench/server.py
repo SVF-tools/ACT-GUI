@@ -94,6 +94,20 @@ def create_app(records_root: Path | None = None, secrets_root: Path | None = Non
     def fuzzing(run_id: str) -> S.FuzzingOut:
         return wb.fuzzing(run_id)
 
+    @app.post("/api/runs/{run_id}/stop", response_model=S.RunOut)
+    def stop_run(run_id: str) -> S.RunOut:
+        return wb.stop_run(run_id)
+
+    @app.post("/api/runs/{run_id}/saved-counterexamples", response_model=S.SavedCounterexampleOut, status_code=201)
+    def save_counterexample(run_id: str, req: S.SaveCounterexampleRequest) -> JSONResponse:
+        saved, created = wb.save_counterexample(run_id, req.index)
+        return JSONResponse(saved.model_dump(), status_code=201 if created else 200)
+
+    @app.get("/api/runs/{run_id}/saved-counterexamples/{index}/vnnlib")
+    def saved_assignment(run_id: str, index: int) -> Response:
+        return Response(wb.saved_assignment(run_id, index), media_type="text/plain; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="{run_id}-ce{index}.counterexample"'})
+
     @app.get("/api/runs/{run_id}/events")
     async def events(run_id: str, request: Request, after: int = 0) -> StreamingResponse:
         """SSE: replay committed events after seq 'after' (or Last-Event-ID), then follow until terminal."""

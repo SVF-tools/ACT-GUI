@@ -42,7 +42,10 @@ def _floats(t: Any) -> tuple[float, ...]:
 def run_fuzzing(model_path: Path, time_budget_s: float, max_iterations: int, rng_seed: int = 0,
                 stop_on_first: bool = False,
                 on_progress: Callable[[FuzzProgress], None] | None = None,
-                on_frame: Callable[[FuzzFrame], None] | None = None) -> FuzzOutcome:
+                on_frame: Callable[[FuzzFrame], None] | None = None,
+                should_stop: Callable[[], bool] | None = None) -> FuzzOutcome:
+    """should_stop is polled after every iteration; once true, ACTFuzzer's own timeout check ends the
+    loop at the next iteration and the report covers the iterations run (FuzzOutcome.stopped)."""
     if not (0 < time_budget_s <= 3600):
         raise BridgeError("invalid_budget", "time_budget_s must be in (0, 3600]")
     if not (1 <= max_iterations <= 10_000_000):
@@ -77,14 +80,15 @@ def run_fuzzing(model_path: Path, time_budget_s: float, max_iterations: int, rng
                     output_dir=Path(tmp), report_interval=1, verbose=0, trace_level=0,
                 )
                 fuzzer = ACTFuzzer(wrapped_model=model, initial_seeds=seeds, config=cfg)
-                return _fuzz(fuzzer, cfg, rng_seed, rows, on_progress, on_frame)
+                return _fuzz(fuzzer, cfg, rng_seed, rows, on_progress, on_frame, should_stop)
         finally:
             VerifiableModel.set_strict_mode(strict)
 
 
 def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
           on_progress: Callable[[FuzzProgress], None] | None,
-          on_frame: Callable[[FuzzFrame], None] | None) -> FuzzOutcome:
+          on_frame: Callable[[FuzzFrame], None] | None,
+          should_stop: Callable[[], bool] | None = None) -> FuzzOutcome:
     import torch
 
     def forward(x: Any) -> Any:
@@ -101,6 +105,7 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
     frames: list[FuzzFrame] = []
     batch: dict[str, Any] = {}
     done = ces_seen = 0
+    stopped = False
     last_point = last_emit = -math.inf
 
     engine = fuzzer.mutation_engine
@@ -113,15 +118,30 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
 
     engine.mutate = mutate  # instance seam, see module docstring
 
+    def to_ce(i: int, ce: Any, at: tuple[int, float, str | None], seed_out: Any) -> FuzzCounterexample:
+        return FuzzCounterexample(
+            index=i, iteration=at[0], elapsed_s=round(at[1], 4), strategy=at[2],
+            kind=str(getattr(ce.kind, "value", ce.kind)), spec_row=int(ce.spec_row), severity=float(ce.severity),
+            true_class=ce.true_class, input=_floats(ce.input), output=_floats(ce.output),
+            seed_input=_floats(ce.seed_input), seed_output=_floats(seed_out),
+        )
+
     def frame(iteration: int, violation: bool) -> FuzzFrame | None:
         if not batch:
             return None
         s, x = batch["seeds"], batch["inputs"]
         strategy = engine.last_strategy
-        return FuzzFrame(iteration=iteration, elapsed_s=round(time.time() - fuzzer.start_time, 4),
-                         strategy=str(strategy) if strategy is not None else None,
+        name = str(strategy) if strategy is not None else None
+        elapsed = time.time() - fuzzer.start_time
+        hit = None
+        if violation and fuzzer.counterexamples:
+            i = len(fuzzer.counterexamples) - 1
+            ce = fuzzer.counterexamples[i]
+            hit = to_ce(i, ce, found[i] if i < len(found) else (iteration, elapsed, name),
+                        forward(ce.seed_input.unsqueeze(0))[0])
+        return FuzzFrame(iteration=iteration, elapsed_s=round(elapsed, 4), strategy=name,
                          seed_row=int(s.original_index[0]), depth=int(s.depth[0]) + 1, violation=violation,
-                         input=_floats(x[0]), seed_input=_floats(s.original_tensor[0]))
+                         input=_floats(x[0]), seed_input=_floats(s.original_tensor[0]), counterexample=hit)
 
     def keep_frame(fr: FuzzFrame) -> None:
         frames.append(fr)
@@ -136,7 +156,10 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
                             counterexamples=len(fuzzer.counterexamples), corpus=len(fuzzer.seed_corpus))
 
     def observe(iteration: int, final: bool = False) -> None:
-        nonlocal done, ces_seen, last_point, last_emit
+        nonlocal done, ces_seen, last_point, last_emit, stopped
+        if not stopped and should_stop is not None and should_stop():
+            stopped = True
+            fuzzer.config.timeout_seconds = 0.0  # ACT's loop checks its timeout before every iteration
         if iteration > done:
             strategy = fuzzer.mutation_engine.last_strategy
             name = str(strategy) if strategy is not None else "unknown"
@@ -176,15 +199,7 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
     seed_rows = rows[:SEED_LIMIT]
     seeds = tuple(FuzzSeed(row=i, input=_floats(x), output=_floats(y))
                   for i, (x, y) in enumerate(zip(seed_rows, forward(seed_rows), strict=True)))
-    ces = tuple(
-        FuzzCounterexample(
-            index=i, iteration=found[i][0], elapsed_s=round(found[i][1], 4), strategy=found[i][2],
-            kind=str(getattr(ce.kind, "value", ce.kind)), spec_row=int(ce.spec_row), severity=float(ce.severity),
-            true_class=ce.true_class, input=_floats(ce.input), output=_floats(ce.output),
-            seed_input=_floats(ce.seed_input), seed_output=_floats(seed_outs[i]),
-        )
-        for i, ce in enumerate(kept)
-    )
+    ces = tuple(to_ce(i, ce, found[i], seed_outs[i]) for i, ce in enumerate(kept))
     n = len(report.counterexamples)
     config: dict[str, object] = {
         "max_iterations": cfg.max_iterations, "timeout_seconds": cfg.timeout_seconds,
@@ -204,5 +219,5 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
         counterexamples=ces, seeds=seeds, frames=tuple(frames), timeline=tuple(timeline),
         strategies=tuple(FuzzStrategyStats(name=k, weight=weights.get(k, 0.0), selected=selected[k],
                                            violations=violations[k]) for k in selected),
-        config=config, rng_seed=rng_seed, device=str(fuzzer.device),
+        config=config, rng_seed=rng_seed, device=str(fuzzer.device), stopped=stopped,
     )

@@ -55,7 +55,17 @@ export function Pixels({ xs, shape, lo, hi, mode = "image", label, size = "small
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const ctx = ref.current?.getContext("2d");
-    if (!ctx) return;
+    if (ctx) paint(ctx, xs, shape, lo, hi, mode);
+  }, [xs, shape, lo, hi, mode]);
+  return (
+    <figure className={`pix ${size}`} title={title}>
+      <canvas ref={ref} width={shape.w} height={shape.h} />
+      <figcaption>{label}</figcaption>
+    </figure>
+  );
+}
+
+function paint(ctx: CanvasRenderingContext2D, xs: number[], shape: Shape, lo: number, hi: number, mode: PixelMode) {
     const { c, h, w } = shape, n = h * w, img = ctx.createImageData(w, h);
     const at = (k: number, p: number) => xs[shape.hwc ? p * c + k : k * n + p]!;
     const span = hi - lo || 1, m = Math.max(Math.abs(lo), Math.abs(hi)) || 1;
@@ -76,13 +86,29 @@ export function Pixels({ xs, shape, lo, hi, mode = "image", label, size = "small
       img.data.set([rgb[0], rgb[1], rgb[2], 255], p * 4);
     }
     ctx.putImageData(img, 0, 0);
-  }, [xs, shape, lo, hi, mode]);
-  return (
-    <figure className={`pix ${size}`} title={title}>
-      <canvas ref={ref} width={shape.w} height={shape.h} />
-      <figcaption>{label}</figcaption>
-    </figure>
-  );
+}
+
+/**
+ * The input as a PNG at its native resolution (one pixel per value, RGB for 3 channels).
+ * Values in [0, 1] map to 0..255 directly; other inputs use [lo, hi], as displayed.
+ */
+export function imagePng(xs: number[], shape: Shape, lo: number, hi: number): Promise<Blob> {
+  const unit = xs.every((v) => v >= 0 && v <= 1);
+  const canvas = document.createElement("canvas");
+  canvas.width = shape.w;
+  canvas.height = shape.h;
+  paint(canvas.getContext("2d")!, xs, shape, unit ? 0 : lo, unit ? 1 : hi, "image");
+  return new Promise((ok, fail) => canvas.toBlob((b) => (b ? ok(b) : fail(new Error("PNG encoding failed"))), "image/png"));
+}
+
+/** Save a blob through the browser's download prompt. */
+export function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /**

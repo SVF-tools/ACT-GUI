@@ -91,6 +91,65 @@ def test_fuzz_run_streams_progress_and_records_act_counterexamples(client: TestC
     assert "fuzzing.json" in json.loads((tmp_path / "records" / run_id / "artifacts.json").read_text())
 
 
+def test_saved_counterexample_is_idempotent_and_exports_vnnlib2_assignment(client: TestClient):
+    body = {"model_id": "unsafe_linear", "method": "fuzz", "time_budget_s": 10,
+            "fuzz": {"max_iterations": 50, "rng_seed": 7}}
+    run_id = client.post("/api/runs", json=body).json()["run_id"]
+    follow_to_end(client, run_id)
+    ce = client.get(f"/api/runs/{run_id}/fuzzing").json()["counterexamples"][0]
+    url = f"/api/runs/{run_id}/saved-counterexamples"
+    first, again = client.post(url, json={"index": ce["index"]}), client.post(url, json={"index": ce["index"]})
+    assert (first.status_code, again.status_code) == (201, 200) and first.json() == again.json()
+    assert client.post(url, json={"index": 999}).json()["error"]["code"] == "counterexample_not_found"
+    saved = client.get(f"/api/runs/{run_id}/fuzzing").json()["saved"]
+    assert [s["counterexample"] for s in saved] == [ce]
+
+    resp = client.get(f"{url}/{ce['index']}/vnnlib")
+    assert resp.status_code == 200 and f"{run_id}-ce{ce['index']}.counterexample" in resp.headers["content-disposition"]
+    # VNN-COMP result: "sat", then per variable "<name> <type> [<dims>]" and its values in row-major order.
+    lines = resp.text.splitlines()
+    shape = client.get("/api/models/unsafe_linear").json()["input_specs"][0]["shape"]
+    nx, ny = len(ce["input"]), len(ce["output"])
+    assert lines[0] == "sat" and lines[1] == f"X float64 [{','.join(map(str, shape))}]"
+    assert [float(v) for v in lines[2:2 + nx]] == ce["input"]
+    assert lines[2 + nx] == f"Y float64 [1,{ny}]" and [float(v) for v in lines[3 + nx:]] == ce["output"]
+    assert client.get(f"{url}/12345/vnnlib").status_code == 404
+    bundle = zipfile.ZipFile(io.BytesIO(client.get(f"/api/runs/{run_id}/export").content))
+    assert f"{run_id}/saved_counterexamples.json" in bundle.namelist()
+
+
+def test_stop_ends_fuzz_run_with_act_report_of_iterations_run(tmp_path: Path):
+    app = create_app(tmp_path / "records")
+    client = TestClient(app)
+    body = {"model_id": "bab_deep_mlp", "method": "fuzz", "time_budget_s": 120,
+            "fuzz": {"max_iterations": 1_000_000, "rng_seed": 0}}
+    run_id = client.post("/api/runs", json=body).json()["run_id"]
+    # Wait on the record store's commit signal for ACT's first progress report (an SSE stream the test
+    # closes early would keep the TestClient waiting until the run ends).
+    records = app.state.workbench.records
+    seq = 0
+    while True:
+        evs = records.wait_for_events(run_id, seq, 60.0)
+        assert evs, "no fuzz progress within 60 s"
+        if any(e["kind"] == "fuzz.progress" for e in evs):
+            break
+        seq = evs[-1]["seq"]
+    assert client.post(f"/api/runs/{run_id}/stop").json()["status"] == "running"
+    kinds = [e["kind"] for e in follow_to_end(client, run_id)]
+    assert "run.stop_requested" in kinds and kinds[-1] == "run.completed"
+    fz = client.get(f"/api/runs/{run_id}/fuzzing").json()
+    assert fz["summary"]["stopped"] is True and fz["summary"]["iterations"] < 1_000_000
+    assert client.post(f"/api/runs/{run_id}/stop").json()["status"] == "completed"  # no-op once terminal
+
+
+def test_stop_ends_a_verification_worker_without_a_verdict(client: TestClient):
+    run_id = client.post("/api/runs", json={"model_id": "bab_deep_mlp", "method": "bab", "time_budget_s": 60}).json()["run_id"]
+    client.post(f"/api/runs/{run_id}/stop")  # before the worker can import ACT, so it never reports a result
+    follow_to_end(client, run_id)
+    run = client.get(f"/api/runs/{run_id}").json()
+    assert run["status"] == "failed" and run["error"]["code"] == "stopped" and run["result"] is None
+
+
 def test_fuzz_options_require_fuzz_method_and_other_runs_have_no_fuzzing(client: TestClient):
     bad = client.post("/api/runs", json={"model_id": "range_check", "method": "interval", "fuzz": {}})
     assert bad.status_code == 422 and bad.json()["error"]["code"] == "invalid_request"

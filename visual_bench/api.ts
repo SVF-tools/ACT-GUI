@@ -2,6 +2,7 @@
 import type {
   CoverageOut, EngineInfoOut, ErrorResponse, ExplainRequest, ExplainResponse, FuzzingOut, LayerStatesOut,
   LoadModelBody, ModelDescriptionOut, ModelSummary, ProviderList, RunEvent, RunList, RunOut, RunRequest, SampleOut,
+  SavedCounterexampleOut,
   SolverLicenseUpload, SolverStatusOut, SourcesOut,
 } from "./generated/wire";
 
@@ -38,6 +39,10 @@ export const api = {
   layers: (id: string) => call<LayerStatesOut>(`/api/runs/${id}/layers`),
   coverage: (id: string) => call<CoverageOut>(`/api/runs/${id}/coverage`),
   fuzzing: (id: string) => call<FuzzingOut>(`/api/runs/${id}/fuzzing`),
+  stopRun: (id: string) => call<RunOut>(`/api/runs/${id}/stop`, { method: "POST" }),
+  saveCounterexample: (id: string, index: number) =>
+    call<SavedCounterexampleOut>(`/api/runs/${id}/saved-counterexamples`, { method: "POST", body: JSON.stringify({ index }) }),
+  savedCounterexampleUrl: (id: string, index: number) => `/api/runs/${id}/saved-counterexamples/${index}/vnnlib`,
   providers: () => call<ProviderList>("/api/assistant/providers"),
   explain: (req: ExplainRequest) => call<ExplainResponse>("/api/assistant/explain", { method: "POST", body: JSON.stringify(req) }),
   exportUrl: (id: string) => `/api/runs/${id}/export`,

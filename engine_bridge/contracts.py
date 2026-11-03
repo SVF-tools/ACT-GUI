@@ -227,6 +227,8 @@ class FuzzFrame:
     violation: bool  # the iteration added a counterexample to ACT's list
     input: tuple[float, ...]  # flattened mutated input that ACT ran through the model
     seed_input: tuple[float, ...]  # flattened original INPUT row (FuzzingSeed.original_tensor)
+    # Newest counterexample ACT reported in this iteration (violation only); it need not be lane 0.
+    counterexample: FuzzCounterexample | None = None
 
 
 @dataclass(frozen=True)
@@ -251,6 +253,7 @@ class FuzzOutcome:
     config: dict[str, object]  # effective ACT FuzzingConfig scalars
     rng_seed: int
     device: str
+    stopped: bool = False  # ended early on a caller stop request; the report covers the iterations run
 
 
 LicenseState = Literal["licensed", "restricted", "invalid", "not_installed"]

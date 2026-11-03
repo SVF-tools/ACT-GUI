@@ -1,10 +1,12 @@
-// ACTFuzzer run view (VER-06): live progress, coverage/violation timeline, inputs, counterexamples, strategies.
+// ACTFuzzer run view (VER-06): live progress, coverage/violation timeline, inputs, counterexamples, strategies,
+// saving counterexamples on the run record and exporting saved ones (VNN-LIB 2.0 assignment, image .png).
 import { useEffect, useMemo, useState } from "react";
 import { api, fmt, followRun, num } from "../api";
-import type { FuzzCounterexampleOut, FuzzFrameOut, FuzzPointOut, FuzzingOut, ModelDescriptionOut } from "../generated/wire";
+import type { FuzzCounterexampleOut, FuzzFrameOut, FuzzPointOut, FuzzingOut, ModelDescriptionOut, SavedCounterexampleOut } from "../generated/wire";
 import { Empty } from "../workspace/Empty";
 import { useQuery } from "../workspace/useQuery";
-import { classLabel, imageShape, PerturbCompare, Pixels, specImageShape, type Shape } from "../workspace/pixels";
+import { classLabel, downloadBlob, imagePng, imageShape, PerturbCompare, Pixels, specImageShape, type Shape } from "../workspace/pixels";
+import { StopButton } from "./RunsPanel";
 
 export function FuzzView({ runId, version, model }: { runId: string | null; version: number; model: ModelDescriptionOut | null }) {
   const [tick, setTick] = useState(0);
@@ -28,9 +30,13 @@ export function FuzzView({ runId, version, model }: { runId: string | null; vers
   const s = f.summary;
   const ces = s?.counterexample_count ?? last?.counterexamples ?? 0;
   const frames = f.frames ?? [];
+  const refresh = () => setTick((t) => t + 1);
+  const savedItems = f.saved ?? [];
+  const saved = new Set(savedItems.map((s) => s.counterexample.index));
+  const onSave = async (index: number) => { await api.saveCounterexample(f.run_id, index); refresh(); };
   return (
     <div className="fuzz">
-      <Banner f={f} ces={ces} />
+      <Banner f={f} ces={ces} onStopped={refresh} />
       <div className="kv">
         <span>iterations</span><b>{s?.iterations ?? last?.iteration ?? 0}{f.options ? ` / ${f.options.max_iterations}` : ""}</b>
         <span>elapsed</span><b>{fmt(s?.elapsed_s ?? last?.elapsed_s ?? 0, 2)} s{s && s.elapsed_s > 0 ? ` · ${(s.iterations / s.elapsed_s).toFixed(1)} it/s` : ""}</b>
@@ -47,10 +53,13 @@ export function FuzzView({ runId, version, model }: { runId: string | null; vers
           <Timeline points={f.timeline} firstCe={f.counterexamples[0]?.iteration ?? null}
             marker={frames.length ? frames[Math.min(frameSel ?? Infinity, frames.length - 1)]!.iteration : null} />
         </div>
-        <Mutations frames={frames} live={live} model={model} sel={frameSel} onSel={setFrameSel} />
+        <Mutations frames={frames} live={live} model={model} sel={frameSel} onSel={setFrameSel} saved={saved} onSave={onSave} />
       </div>
+      {savedItems.length > 0 && <Saved runId={f.run_id} items={savedItems} model={model} />}
       {f.availability === "available" && <Inputs f={f} model={model} />}
-      {f.counterexamples.length > 0 && <Counterexamples items={f.counterexamples} total={ces} model={model} />}
+      {f.counterexamples.length > 0 && (
+        <Counterexamples items={f.counterexamples} total={ces} model={model} saved={saved} onSave={onSave} live={live} />
+      )}
       {f.strategies.length > 0 && <Strategies f={f} />}
       {Object.keys(f.config).length > 0 && (
         <p className="note">ACT config: {Object.entries(f.config).map(([k, v]) => `${k}=${String(v)}`).join(" · ")}</p>
@@ -60,13 +69,21 @@ export function FuzzView({ runId, version, model }: { runId: string | null; vers
   );
 }
 
-function Banner({ f, ces }: { f: FuzzingOut; ces: number }) {
+function Banner({ f, ces, onStopped }: { f: FuzzingOut; ces: number; onStopped: () => void }) {
   if (f.status === "failed") return <div className="banner bad"><b>Run failed.</b> The partial timeline below is what ACT reported before the failure.</div>;
   if (f.availability === "pending") {
-    return <div className="banner"><b>Fuzzing…</b> {ces ? `${ces} counterexample(s) found so far.` : "No counterexample yet."}</div>;
+    return (
+      <div className="banner bannerrow">
+        <span><b>Fuzzing…</b> {ces ? `${ces} counterexample(s) found so far.` : "No counterexample yet."}</span>
+        {(f.status === "queued" || f.status === "running") && <StopButton runId={f.run_id} method="fuzz" onStopped={onStopped} />}
+      </div>
+    );
   }
+  const stopped = f.summary?.stopped
+    ? <> Stopped by the user after {f.summary.iterations} iteration(s); ACT's report covers those iterations only.</> : null;
+  if (stopped && ces === 0) return <div className="banner warn"><b>Stopped, no counterexample found.</b>{stopped} Fuzzing is heuristic: this is not a proof.</div>;
   if (ces > 0) {
-    return <div className="banner bad"><b>Property violated (falsified).</b> ACT's PropertyChecker accepted {ces} concrete input(s) inside the input spec whose outputs violate the property.</div>;
+    return <div className="banner bad"><b>Property violated (falsified).</b> ACT's PropertyChecker accepted {ces} concrete input(s) inside the input spec whose outputs violate the property.{stopped}</div>;
   }
   return <div className="banner warn"><b>No counterexample found.</b> Fuzzing is heuristic: this is not a proof. Use interval or BaB to certify.</div>;
 }
@@ -116,8 +133,9 @@ function Timeline({ points, firstCe, marker }: { points: FuzzPointOut[]; firstCe
 const PLAY_MS = 700;
 
 // The mutated input beside the progress chart: the latest frame while running, a playable filmstrip afterwards.
-function Mutations({ frames, live, model, sel, onSel }: {
+function Mutations({ frames, live, model, sel, onSel, saved, onSave }: {
   frames: FuzzFrameOut[]; live: boolean; model: ModelDescriptionOut | null; sel: number | null; onSel: (i: number | null) => void;
+  saved: Set<number>; onSave: (index: number) => Promise<void>;
 }) {
   const [playing, setPlaying] = useState(false);
   const n = frames.length;
@@ -148,6 +166,7 @@ function Mutations({ frames, live, model, sel, onSel }: {
         <b>Mutated input</b>
         {live ? <span className="chip s-running">live · latest</span> : <span className="muted">frame {idx + 1} / {n}</span>}
         {fr.violation && <span className="chip bad">counterexample</span>}
+        {fr.counterexample && <SaveButton index={fr.counterexample.index} saved={saved.has(fr.counterexample.index)} onSave={onSave} />}
       </div>
       {shape ? (
         <div className="mutimgs">
@@ -305,7 +324,10 @@ function Inputs({ f, model }: { f: FuzzingOut; model: ModelDescriptionOut | null
   );
 }
 
-function Counterexamples({ items, total, model }: { items: FuzzCounterexampleOut[]; total: number; model: ModelDescriptionOut | null }) {
+function Counterexamples({ items, total, model, saved, onSave, live }: {
+  items: FuzzCounterexampleOut[]; total: number; model: ModelDescriptionOut | null;
+  saved: Set<number>; onSave: (index: number) => Promise<void>; live: boolean;
+}) {
   const [sel, setSel] = useState(0);
   const [all, setAll] = useState(false);
   const list = useMemo(() => items.map(analyze), [items]);
@@ -322,7 +344,7 @@ function Counterexamples({ items, total, model }: { items: FuzzCounterexampleOut
   const linfs = list.map((c) => c.linf).sort((x, y) => x - y);
   return (
     <>
-      <h3>Counterexamples <small>{items.length < total ? `first ${items.length} of ${total}` : `${total}`} · mutated inputs ACT's PropertyChecker accepted</small></h3>
+      <h3>Counterexamples <small>{live ? `${items.length} seen live of ${total}` : items.length < total ? `first ${items.length} of ${total}` : `${total}`} · mutated inputs ACT's PropertyChecker accepted</small></h3>
       <div className="findings">
         {list.some((c) => c.ce.true_class !== null) && <span className={mis ? "chip warn" : "chip"}>{mis} of {list.length} misclassified</span>}
         {[...groups].map(([k, n]) => <span key={k} className="chip">{k} ×{n}</span>)}
@@ -331,7 +353,7 @@ function Counterexamples({ items, total, model }: { items: FuzzCounterexampleOut
       <div className="cegrid">
         {(all ? list : list.slice(0, GALLERY)).map((c, i) => (
           <button key={c.ce.index} className={i === sel ? "cecard active" : "cecard"} onClick={() => setSel(i)}>
-            <span className="cehead"><b>#{c.ce.index + 1}</b><span className="muted">it {c.ce.iteration} · {c.ce.strategy ?? "—"}</span></span>
+            <span className="cehead"><b>#{c.ce.index + 1}</b><span className="muted">it {c.ce.iteration} · {c.ce.strategy ?? "—"}</span>{saved.has(c.ce.index) && <span className="chip good">saved</span>}</span>
             {shape ? (
               <span className="pixrow">
                 <Pixels xs={c.seed} shape={shape} lo={lo} hi={hi} label="seed" />
@@ -352,13 +374,14 @@ function Counterexamples({ items, total, model }: { items: FuzzCounterexampleOut
       {list.length > GALLERY && (
         <button className="secondary more" onClick={() => setAll(!all)}>{all ? `Show first ${GALLERY}` : `Show all ${list.length}`}</button>
       )}
-      <CounterexampleDetail a={a} model={model} box={box} shape={shape} lo={lo} hi={hi} />
+      <CounterexampleDetail a={a} model={model} box={box} shape={shape} lo={lo} hi={hi} saved={saved.has(a.ce.index)} onSave={onSave} />
     </>
   );
 }
 
-function CounterexampleDetail({ a, model, box, shape, lo, hi }: {
+function CounterexampleDetail({ a, model, box, shape, lo, hi, saved, onSave }: {
   a: Ce; model: ModelDescriptionOut | null; box: Box; shape: Shape | null; lo: number; hi: number;
+  saved: boolean; onSave: (index: number) => Promise<void>;
 }) {
   const { ce, x: xs, seed } = a;
   const ds = model?.input_specs[0]?.dataset ?? null;
@@ -370,6 +393,7 @@ function CounterexampleDetail({ a, model, box, shape, lo, hi }: {
       <div className="note">
         Counterexample #{ce.index + 1} from seed row {ce.spec_row}, found at iteration {ce.iteration} ({fmt(ce.elapsed_s, 3)} s) by {ce.strategy ?? "an unknown strategy"}.
         {model?.output_spec ? ` Property: ${model.output_spec.text}` : ""}
+        {" "}<SaveButton index={ce.index} saved={saved} onSave={onSave} />
       </div>
       <div className="kv">
         <span>outcome</span>
@@ -457,6 +481,79 @@ function OutputCompare({ a }: { a: Ce }) {
       </div>
       {ys.length > n && <div className="note">Showing {n} of {ys.length} outputs.</div>}
       {!ss && <div className="note">Seed output not recorded for this run (older record).</div>}
+    </>
+  );
+}
+
+// Saves ACT's counterexample #index on the run record (idempotent on the server).
+function SaveButton({ index, saved, onSave }: { index: number; saved: boolean; onSave: (index: number) => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  if (saved) return <span className="chip good" title="saved on this run's record; export it under Saved counterexamples">saved #{index + 1}</span>;
+  async function save() {
+    setBusy(true);
+    setErr(null);
+    try {
+      await onSave(index);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <>
+      <button className="secondary small" disabled={busy} onClick={save}>{busy ? "Saving…" : `Save counterexample #${index + 1}`}</button>
+      {err && <span className="state bad">{err}</span>}
+    </>
+  );
+}
+
+// Counterexamples the user saved on this run, each exportable as a VNN-COMP counterexample file and, for images, a PNG.
+function Saved({ runId, items, model }: { runId: string; items: SavedCounterexampleOut[]; model: ModelDescriptionOut | null }) {
+  const list = useMemo(() => items.map((s) => ({ s, a: analyze(s.counterexample) })), [items]);
+  const d = list[0]!.a.x.length, box = inputBox(model, d), shape = modelShape(model, d);
+  const ds = model?.input_specs[0]?.dataset ?? null;
+  const [lo, hi] = box ? finiteRange([...box.lb, ...box.ub]) : finiteRange(list.flatMap(({ a }) => [...a.x, ...a.seed]));
+  const [err, setErr] = useState<string | null>(null);
+  async function png(a: Ce) {
+    setErr(null);
+    try {
+      downloadBlob(await imagePng(a.x, shape!, lo, hi), `${runId}-ce${a.ce.index}.png`);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }
+  return (
+    <>
+      <h3>Saved counterexamples <small>{items.length} on this run's record · export ACT's counterexample input</small></h3>
+      <div className="cegrid">
+        {list.map(({ s, a }) => (
+          <div key={a.ce.index} className="cecard saved">
+            <span className="cehead"><b>#{a.ce.index + 1}</b><span className="muted">it {a.ce.iteration} · {a.ce.strategy ?? "—"}</span></span>
+            {shape ? (
+              <span className="pixrow">
+                <Pixels xs={a.seed} shape={shape} lo={lo} hi={hi} label="seed" />
+                <Pixels xs={a.x} shape={shape} lo={lo} hi={hi} label="mutated" />
+                <Pixels xs={a.delta} shape={shape} lo={-a.linf} hi={a.linf} mode="signed" label="δ" />
+              </span>
+            ) : <DeltaBars delta={a.delta} box={box} />}
+            <span className="ceclass">
+              {a.ce.true_class !== null
+                ? <><b>{classLabel(ds, a.ce.true_class)}</b> → <b className={a.misclassified ? "state bad" : ""}>{classLabel(ds, a.pred)}</b></>
+                : <>{a.ce.kind} · row {a.ce.spec_row}</>}
+            </span>
+            <span className="cemeta mono muted"><span>‖δ‖∞ {fmt(a.linf, 3)}</span><span>saved {new Date(s.saved_at).toLocaleString()}</span></span>
+            <span className="ceactions">
+              <a className="button secondary small" href={api.savedCounterexampleUrl(runId, a.ce.index)} download
+                title="VNN-COMP result: sat + VNN-LIB 2.0 command-line assignment of X (input) and Y (output), float64">Export counterexample (VNN-LIB 2.0)</a>
+              {shape && <button className="secondary small" onClick={() => png(a)}
+                title={`${shape.w}×${shape.h} PNG of the mutated input at native resolution`}>Export image (.png)</button>}
+            </span>
+          </div>
+        ))}
+      </div>
+      {err && <div className="error">{err}</div>}
     </>
   );
 }

@@ -247,7 +247,16 @@ def test_fuzzing_reports_act_counterexample_inside_the_input_box():
     # Frames: the mutated batch of the violating iteration is ACT's counterexample input.
     assert live and live[-1] == out.frames[-1] and out.frames[-1].violation
     assert out.frames[-1].input == ce.input and out.frames[-1].seed_input == out.seeds[0].input
+    hit = out.frames[-1].counterexample  # ACT's own counterexample rides on the violating frame
+    assert hit is not None and (hit.index, hit.iteration, hit.input, hit.seed_input) == (0, ce.iteration, ce.input, ce.seed_input)
+    assert not out.stopped
     assert all(lo <= x <= hi for f in out.frames for x, lo, hi in zip(f.input, box.lb, box.ub, strict=True))
+
+
+def test_fuzzing_stop_request_ends_act_loop_with_a_report():
+    out = run_fuzzing(model_path("bab_deep_mlp"), 60.0, 200, rng_seed=0, should_stop=lambda: True)
+    assert out.stopped and out.verdict == "unknown"
+    assert 1 <= out.iterations < 200 and out.timeline[-1].iteration == out.iterations
 
 
 def test_fuzzing_never_falsifies_a_property_act_certifies():

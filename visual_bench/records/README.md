@@ -1,6 +1,6 @@
 # Records and Replay
 
-**Status:** first version: `store.py`, `RecordsView.tsx` (REC-01; REC-02/03 partial: lifecycle events, recovery, replay; REC-04 export only). **Owner:** B; D/C integrate figure and data export.
+**Status:** first version: `store.py`, `RecordsView.tsx` (REC-01; REC-02/03 partial: lifecycle events, recovery, replay; REC-04 export only). User annotations (`saved_counterexamples.json`, VER-07) live beside a record: written atomically, mutable after sealing, never hashed into `artifacts.json`, and included in the export bundle. **Owner:** B; D/C integrate figure and data export.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 ## 1. Subproblems and Objective

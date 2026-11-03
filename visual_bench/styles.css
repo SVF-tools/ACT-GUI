@@ -66,6 +66,15 @@ select, input, textarea { background: var(--panel2); border: 1px solid var(--lin
 textarea { width: 100%; resize: vertical; }
 button { cursor: pointer; } button:disabled { opacity: .5; cursor: not-allowed; }
 .primary, a.button { background: var(--accent); color: var(--on-accent); border: 0; border-radius: 6px; padding: 8px 12px; font-weight: 600; text-decoration: none; display: inline-block; }
+.secondary { background: var(--panel2); color: inherit; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+a.button.secondary { background: var(--panel2); color: inherit; border: 1px solid var(--line); font-weight: 400; }
+.secondary:hover:not(:disabled) { border-color: var(--accent); }
+.small, a.button.small { font-size: 12px; padding: 3px 8px; }
+.danger { background: transparent; color: var(--bad); border: 1px solid var(--bad); border-radius: 6px; padding: 3px 10px; font-weight: 600; }
+.danger:hover:not(:disabled) { background: var(--error-bg); }
+.runitem.live { display: flex; gap: 6px; align-items: stretch; } .runitem.live .item { flex: 1; min-width: 0; }
+.bannerrow { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.ceactions { display: flex; gap: 6px; flex-wrap: wrap; } .cecard.saved { border-color: var(--good); }
 
 /* margin:auto centers a narrow graph yet keeps a wide one scrollable from its first layer. */
 .graphwrap { overflow: auto; } .graphwrap .graph { display: block; margin: 0 auto; }

@@ -6,6 +6,7 @@ Layout per run (var/records/<run_id>/):
   result.json     final ACT result (written once, then hashed)
   layers.json     interval layer states computed by the worker for the run snapshot
   artifacts.json  sha256 of each artifact; written last, so its presence marks a complete record
+  saved_counterexamples.json  user annotation: counterexamples the user saved (mutable, not sealed)
 
 Writes go to a temp file then os.replace, so a crash never leaves a partial
 artifact visible. Paths inside a record are relative; no client paths are stored.
@@ -25,6 +26,8 @@ from typing import Any
 
 _RUN_ID = re.compile(r"^run-[0-9a-f]{12}$")
 ARTIFACTS = ("manifest.json", "result.json", "layers.json", "fuzzing.json")
+# User annotations may be written before or after sealing; they never change a sealed artifact.
+ANNOTATIONS = ("saved_counterexamples.json",)
 
 
 def now_iso() -> str:
@@ -89,6 +92,11 @@ class RecordStore:
             raise ValueError(name)
         self._atomic_write(self.run_dir(run_id) / name, json.dumps(obj, sort_keys=True).encode())
 
+    def write_annotation(self, run_id: str, name: str, obj: Any) -> None:
+        if name not in ANNOTATIONS:
+            raise ValueError(name)
+        self._atomic_write(self.run_dir(run_id) / name, json.dumps(obj, indent=2, sort_keys=True).encode())
+
     def seal(self, run_id: str) -> dict[str, str]:
         d = self.run_dir(run_id)
         hashes = {n: _sha256((d / n).read_bytes()) for n in ARTIFACTS if (d / n).is_file()}
@@ -136,6 +144,12 @@ class RecordStore:
             return None
         return json.loads(data)
 
+    def annotation(self, run_id: str, name: str) -> Any | None:
+        if name not in ANNOTATIONS:
+            raise ValueError(name)
+        p = self.run_dir(run_id) / name
+        return json.loads(p.read_text()) if p.is_file() else None
+
     def hashes(self, run_id: str) -> dict[str, str] | None:
         p = self.run_dir(run_id) / "artifacts.json"
         return json.loads(p.read_text()) if p.is_file() else None
@@ -147,7 +161,7 @@ class RecordStore:
             raise FileNotFoundError("record is not sealed")
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-            for name in (*ARTIFACTS, "events.jsonl", "artifacts.json"):
+            for name in (*ARTIFACTS, "events.jsonl", "artifacts.json", *ANNOTATIONS):
                 if (d / name).is_file():
                     z.write(d / name, arcname=f"{run_id}/{name}")
         return buf.getvalue()

@@ -9,7 +9,9 @@
 from __future__ import annotations
 
 import json
+import math
 import os
+import signal
 import subprocess
 import sys
 import tempfile
@@ -33,6 +35,9 @@ from visual_bench.verification.solver_license import GurobiLicense
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKER_GRACE_S = 120.0
+STOP_GRACE_S = 10.0  # a stopped fuzz worker finishes its current iteration within this, else it is killed
+LIVE_HIT_LIMIT = 200  # ACT counterexamples kept in memory per running fuzz run (from violating frames)
+SAVED = "saved_counterexamples.json"
 # Every catalog net is a JSON ACT net that ACTToTorch rebuilds, so ACTFuzzer applies to all of them.
 WORKBENCH_METHODS: tuple[S.Method, ...] = ("fuzz",)
 
@@ -62,6 +67,9 @@ class Workbench:
         self._lock = threading.Lock()
         self._active: dict[str, threading.Thread] = {}
         self._live_frames: dict[str, dict[str, Any]] = {}  # latest mutated input per running fuzz run; not recorded
+        self._live_hits: dict[str, dict[int, dict[str, Any]]] = {}  # ACT counterexamples seen live, by index
+        self._procs: dict[str, subprocess.Popen[bytes]] = {}
+        self._stop: dict[str, threading.Event] = {}
         self._recover_interrupted()
 
     # -- engine ------------------------------------------------------------
@@ -229,6 +237,7 @@ class Workbench:
             self.records.append_event(run_id, "run.queued", "queued", {"method": req.method})
             t = threading.Thread(target=self._supervise, args=(run_id, path, req, env), daemon=True, name=run_id)
             self._active[run_id] = t
+            self._stop[run_id] = threading.Event()
             t.start()
         return self.get_run(run_id), True
 
@@ -260,6 +269,11 @@ class Workbench:
                     finally:
                         os.close(write_fd)
                     self.records.append_event(run_id, "run.started", "running", {"pid": proc.pid})
+                    with self._lock:
+                        self._procs[run_id] = proc
+                        stop_requested = self._stop[run_id].is_set()
+                    if stop_requested:  # stop arrived before the worker existed
+                        self._signal_stop(proc, req.method)
                     killed = threading.Event()
 
                     def kill() -> None:
@@ -275,11 +289,17 @@ class Workbench:
                                 if "frame" in msg:
                                     with self._lock:
                                         self._live_frames[run_id] = msg["frame"]
+                                        ce = msg["frame"].get("counterexample")
+                                        hits = self._live_hits.setdefault(run_id, {})
+                                        if ce is not None and len(hits) < LIVE_HIT_LIMIT:
+                                            hits[ce["index"]] = ce
                                 else:
                                     self.records.append_event(run_id, "fuzz.progress", "running", msg["progress"])
                         proc.wait()
                     finally:
                         timer.cancel()
+                if self._stop[run_id].is_set() and (proc.returncode != 0 or not out_file.is_file()):
+                    raise AppError(409, "stopped", "Stopped by the user before ACT returned a result.")
                 if killed.is_set():
                     raise AppError(504, "worker_timeout", "Worker exceeded its budget plus grace period and was killed.")
                 if proc.returncode != 0 or not out_file.is_file():
@@ -297,6 +317,31 @@ class Workbench:
             with self._lock:
                 self._active.pop(run_id, None)
                 self._live_frames.pop(run_id, None)
+                self._live_hits.pop(run_id, None)
+                self._procs.pop(run_id, None)
+                self._stop.pop(run_id, None)
+
+    @staticmethod
+    def _signal_stop(proc: subprocess.Popen[bytes], method: str) -> None:
+        if method == "fuzz":  # the worker ends ACTFuzzer after the current iteration and reports it
+            proc.send_signal(signal.SIGTERM)
+            threading.Timer(STOP_GRACE_S, proc.kill).start()
+        else:  # verify_once / BaB expose no stop hook: end the worker
+            proc.kill()
+
+    def stop_run(self, run_id: str) -> S.RunOut:
+        """Request a stop; idempotent, and a no-op on a terminal run."""
+        run = self.get_run(run_id)
+        with self._lock:
+            ev = self._stop.get(run_id)
+            if ev is None or ev.is_set() or run.status in ("completed", "failed"):
+                return run
+            ev.set()
+            proc = self._procs.get(run_id)
+        self.records.append_event(run_id, "run.stop_requested", run.status, {})
+        if proc is not None:
+            self._signal_stop(proc, run.method)
+        return self.get_run(run_id)
 
     def _commit_result(self, run_id: str, out: dict[str, Any]) -> None:
         o = out["outcome"]
@@ -387,28 +432,29 @@ class Workbench:
                                 counterexamples=[], **base)
         raw = self.records.artifact(run_id, "fuzzing.json") if run.status == "completed" else None
         wn = S.wire_number
+        base["saved"] = [S.SavedCounterexampleOut(saved_at=e["saved_at"], counterexample=_ce_out(e["counterexample"]))
+                         for e in self.records.annotation(run_id, SAVED) or []]
 
         def frame_out(fr: dict[str, Any]) -> S.FuzzFrameOut:
+            ce = fr.get("counterexample")
             return S.FuzzFrameOut.model_validate({**fr, "input": [wn(x) for x in fr["input"]],
-                                                  "seed_input": [wn(x) for x in fr["seed_input"]]})
+                                                  "seed_input": [wn(x) for x in fr["seed_input"]],
+                                                  "counterexample": _ce_out(ce) if ce else None})
 
         if raw is None:
             live = [S.FuzzPointOut.model_validate(e["payload"]) for e in self.records.events(run_id)
                     if e["kind"] == "fuzz.progress"]
             with self._lock:
                 latest = self._live_frames.get(run_id)
+                hits = sorted(self._live_hits.get(run_id, {}).values(), key=lambda c: c["index"])
+            # While running, counterexamples are the ones ACT reported in violating frames so far.
             return S.FuzzingOut(availability="pending" if run.status in ("queued", "running") else "not_recorded",
-                                summary=None, timeline=live, strategies=[], counterexamples=[],
+                                summary=None, timeline=live, strategies=[], counterexamples=[_ce_out(c) for c in hits],
                                 frames=[frame_out(latest)] if latest else [], **base)
-        ces = [S.FuzzCounterexampleOut(**{**c, "severity": wn(c["severity"]), "input": [wn(x) for x in c["input"]],
-                                          "output": [wn(x) for x in c["output"]],
-                                          "seed_input": [wn(x) for x in c["seed_input"]],
-                                          "seed_output": None if c.get("seed_output") is None else
-                                          [wn(x) for x in c["seed_output"]]})
-               for c in raw["counterexamples"]]
+        ces = [_ce_out(c) for c in raw["counterexamples"]]
         seeds = [S.FuzzSeedOut(row=s["row"], input=[wn(x) for x in s["input"]], output=[wn(x) for x in s["output"]])
                  for s in raw.get("seeds", [])]
-        summary = S.FuzzSummaryOut.model_validate({k: raw[k] for k in S.FuzzSummaryOut.model_fields})
+        summary = S.FuzzSummaryOut.model_validate({k: raw[k] for k in S.FuzzSummaryOut.model_fields if k in raw})
         base["config"] = raw["config"]
         return S.FuzzingOut(availability="available", summary=summary,
                             timeline=[S.FuzzPointOut.model_validate(p) for p in raw["timeline"]],
@@ -416,5 +462,63 @@ class Workbench:
                             counterexamples=ces, seeds=seeds,
                             frames=[frame_out(fr) for fr in raw.get("frames", [])], **base)
 
+    # -- saved counterexamples (user annotations on a fuzz run) ---------------
+    def _find_counterexample(self, run_id: str, index: int) -> dict[str, Any] | None:
+        raw = self.records.artifact(run_id, "fuzzing.json")
+        if raw is not None:
+            found = [c for c in raw["counterexamples"] if c["index"] == index]
+            found += [f["counterexample"] for f in raw.get("frames", [])
+                      if f.get("counterexample") and f["counterexample"]["index"] == index]
+            return found[0] if found else None
+        return self._live_hits.get(run_id, {}).get(index)
+
+    def save_counterexample(self, run_id: str, index: int) -> tuple[S.SavedCounterexampleOut, bool]:
+        """Save ACT's counterexample #index on the run record; saving it again returns the saved entry."""
+        if self.get_run(run_id).method != "fuzz":
+            raise AppError(422, "unsupported_method", "Only fuzz runs record counterexamples to save.")
+        with self._lock:
+            saved = self.records.annotation(run_id, SAVED) or []
+            entry = next((e for e in saved if e["counterexample"]["index"] == index), None)
+            created = entry is None
+            if entry is None:
+                ce = self._find_counterexample(run_id, index)
+                if ce is None:
+                    raise AppError(404, "counterexample_not_found",
+                                   f"ACT reported no counterexample #{index} in this run's record or live state")
+                entry = {"saved_at": now_iso(), "counterexample": ce}
+                self.records.write_annotation(run_id, SAVED, [*saved, entry])
+        return S.SavedCounterexampleOut(saved_at=entry["saved_at"], counterexample=_ce_out(entry["counterexample"])), created
+
+    def saved_assignment(self, run_id: str, index: int) -> str:
+        """A saved counterexample as a VNN-COMP result: "sat" plus the VNN-LIB 2.0 command-line assignment.
+
+        VNN-LIB 2.0 (Sec. 5.3.1): per declared variable, "<name> <type> [<dims>]" then one value per line in
+        row-major order. Variables are the conventional X (input, shaped like the input spec) and Y (output,
+        [1, n]); the element type is float64 because ACT computed and checked the counterexample in float64.
+        """
+        run = self.get_run(run_id)
+        saved = self.records.annotation(run_id, SAVED) or []
+        entry = next((e for e in saved if e["counterexample"]["index"] == index), None)
+        if entry is None:
+            raise AppError(404, "counterexample_not_saved", f"Counterexample #{index} is not saved on {run_id}")
+        x, y = entry["counterexample"]["input"], entry["counterexample"]["output"]
+        specs = self.describe(run.model_id).input_specs
+        shape = specs[0].shape if specs and math.prod(specs[0].shape) == len(x) else [1, len(x)]
+        lines = ["sat", _assignment_header("X", shape), *map(repr, x), _assignment_header("Y", [1, len(y)]), *map(repr, y)]
+        return "\n".join(lines) + "\n"
+
     def is_terminal(self, run_id: str) -> bool:
         return self.get_run(run_id).status in ("completed", "failed")
+
+
+def _assignment_header(name: str, shape: list[int]) -> str:
+    return f"{name} float64 [{','.join(str(d) for d in shape)}]"
+
+
+def _ce_out(c: dict[str, Any]) -> S.FuzzCounterexampleOut:
+    wn = S.wire_number
+    return S.FuzzCounterexampleOut(**{**c, "severity": wn(c["severity"]), "input": [wn(x) for x in c["input"]],
+                                      "output": [wn(x) for x in c["output"]],
+                                      "seed_input": [wn(x) for x in c["seed_input"]],
+                                      "seed_output": None if c.get("seed_output") is None else
+                                      [wn(x) for x in c["seed_output"]]})

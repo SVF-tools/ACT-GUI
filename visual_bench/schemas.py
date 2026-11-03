@@ -276,7 +276,8 @@ class LayerStatesOut(Wire):
     provenance: dict[str, str]
 
 
-RunEventKind = Literal["run.queued", "run.started", "run.completed", "run.failed", "bab.summary", "fuzz.progress"]
+RunEventKind = Literal["run.queued", "run.started", "run.stop_requested", "run.completed", "run.failed", "bab.summary",
+                       "fuzz.progress"]
 
 
 class RunEvent(Wire):
@@ -346,6 +347,7 @@ class FuzzSummaryOut(Wire):
     never_activated_sample: list[str]
     rng_seed: int
     device: str
+    stopped: bool = False  # ended early on a user stop request
 
 
 class FuzzFrameOut(Wire):
@@ -358,6 +360,17 @@ class FuzzFrameOut(Wire):
     violation: bool
     input: list[WireNumber]
     seed_input: list[WireNumber]
+    counterexample: FuzzCounterexampleOut | None = None  # ACT's newest counterexample of a violating iteration
+
+
+class SavedCounterexampleOut(Wire):
+    """An ACT counterexample the user saved on its run record (user annotation; ACT decided the violation)."""
+    saved_at: str
+    counterexample: FuzzCounterexampleOut
+
+
+class SaveCounterexampleRequest(Wire):
+    index: int = Field(ge=0)  # ACT discovery index (FuzzCounterexampleOut.index)
 
 
 class FuzzingOut(Wire):
@@ -373,6 +386,7 @@ class FuzzingOut(Wire):
     counterexamples: list[FuzzCounterexampleOut]
     seeds: list[FuzzSeedOut] = []
     frames: list[FuzzFrameOut] = []  # recorded filmstrip when completed; [latest] while running
+    saved: list[SavedCounterexampleOut] = []  # counterexamples the user saved, in save order
     config: dict[str, Scalar]
     provenance: dict[str, str]
 
@@ -448,5 +462,5 @@ class SolverStatusOut(Wire):
 WIRE_MODELS: tuple[type[BaseModel], ...] = (
     ErrorResponse, HealthOut, EngineInfoOut, ModelSummary, ModelDescriptionOut, RunRequest, RunOut, RunList,
     LayerStatesOut, RunEvent, CoverageOut, FuzzingOut, ExplainRequest, ExplainResponse, ProviderList, SolverLicenseUpload,
-    SolverStatusOut, SourcesOut, SampleOut, LoadModelBody,
+    SolverStatusOut, SourcesOut, SampleOut, LoadModelBody, SaveCounterexampleRequest, SavedCounterexampleOut,
 )

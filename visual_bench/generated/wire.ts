@@ -98,11 +98,14 @@ export type NeverActivatedCount = number
 export type NeverActivatedSample = string[]
 export type RngSeed1 = number
 export type SeedsExplored = number
+export type Stopped = boolean
 export type TotalMutations = number
 export type Availability1 = ("available" | "pending" | "not_recorded" | "unsupported")
 export type Counterexamples1 = FuzzCounterexampleOut[]
 export type Frames = FuzzFrameOut[]
 export type RunId3 = string
+export type SavedAt = string
+export type Saved = SavedCounterexampleOut[]
 export type Seeds = FuzzSeedOut[]
 export type Status = ("queued" | "running" | "completed" | "failed")
 export type Strategies = FuzzStrategyOut[]
@@ -177,7 +180,7 @@ export type Name3 = string
 export type Note = string
 export type Providers = ProviderOut[]
 export type At = string
-export type Kind10 = ("run.queued" | "run.started" | "run.completed" | "run.failed" | "bab.summary" | "fuzz.progress")
+export type Kind10 = ("run.queued" | "run.started" | "run.stop_requested" | "run.completed" | "run.failed" | "bab.summary" | "fuzz.progress")
 export type RunId5 = string
 export type Seq = number
 export type Status3 = ("queued" | "running" | "completed" | "failed")
@@ -215,6 +218,7 @@ export type Label1 = number
 export type Pixels = number[]
 export type Shape3 = number[]
 export type Size = number
+export type Index3 = number
 export type Content = string
 export type LicenseFingerprint = (string | null)
 export type LicenseSource = ("uploaded" | "environment" | "none")
@@ -273,6 +277,8 @@ RunOut?: RunOut
 RunRequest?: RunRequest
 RunResultOut?: RunResultOut
 SampleOut?: SampleOut
+SaveCounterexampleRequest?: SaveCounterexampleRequest
+SavedCounterexampleOut?: SavedCounterexampleOut
 SelectionContext?: SelectionContext
 SolverLicenseUpload?: SolverLicenseUpload
 SolverStatusOut?: SolverStatusOut
@@ -430,6 +436,7 @@ true_class: TrueClass
  * via the `definition` "FuzzFrameOut".
  */
 export interface FuzzFrameOut {
+counterexample?: (FuzzCounterexampleOut | null)
 depth: Depth
 elapsed_s: ElapsedS1
 input: Input1
@@ -496,6 +503,7 @@ never_activated_count: NeverActivatedCount
 never_activated_sample: NeverActivatedSample
 rng_seed: RngSeed1
 seeds_explored: SeedsExplored
+stopped?: Stopped
 total_mutations: TotalMutations
 }
 /**
@@ -513,6 +521,7 @@ frames?: Frames
 options: (FuzzOptions | null)
 provenance: Provenance
 run_id: RunId3
+saved?: Saved
 seeds?: Seeds
 status: Status
 strategies: Strategies
@@ -524,6 +533,16 @@ export interface Config {
 }
 export interface Provenance {
 [k: string]: string
+}
+/**
+ * An ACT counterexample the user saved on its run record (user annotation; ACT decided the violation).
+ * 
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "SavedCounterexampleOut".
+ */
+export interface SavedCounterexampleOut {
+counterexample: FuzzCounterexampleOut
+saved_at: SavedAt
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -781,6 +800,13 @@ label: Label1
 pixels: Pixels
 shape: Shape3
 size: Size
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "SaveCounterexampleRequest".
+ */
+export interface SaveCounterexampleRequest {
+index: Index3
 }
 /**
  * Text of a solver license file (e.g. gurobi.lic). Stored server-side; never returned.
