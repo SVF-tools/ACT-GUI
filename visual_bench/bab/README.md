@@ -1,85 +1,80 @@
 # BaB Explorer
 
-**Status:** not started beyond `BabView.tsx`, which shows observation coverage and ACT's final BaB summary; BAB-01..03 need committed node events (ACT-03). **Owner:** C; D may support rendering; A reviews search semantics.
-Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
+Current responsibility: report what BaB observation data exists for a run and display ACT's final BaB summary. The current `BabView.tsx` is coverage and summary only. Node tables, search trees, node selection, and node controls are not implemented because the pinned ACT baseline emits no committed node events. This module must not infer a tree, control nodes, or treat coverage as a verdict. See the [parent scope](../README.md), [repository rules](../../AGENTS.md), and the [development task guide](../../README.md#choose-a-development-task).
 
+## Change Guide
 
-## Current Files and Usage
-
-| File | Layer | Responsibility |
+| Goal | Edit here | Conditional / reused path |
 | --- | --- | --- |
-| `schemas.py` | Wire | `CoverageOut`. |
-| `service.py` | Service | `BabService.coverage(run_id)`: observation coverage from `engine_bridge.events` plus ACT's final BaB summary when recorded. |
-| `routes.py` | HTTP | `GET /api/runs/{id}/coverage`. |
-| `api.ts`, `hooks.ts` | Browser data | Coverage query keyed under the run (`keys.coverage`). |
-| `BabView.tsx` | View | Coverage and final summary (BaB mode). |
+| Relabel or rearrange current summary fields | [BabView.tsx](BabView.tsx) | Reuse the coverage query; no new observer or verification change. |
+| Expose another ACT final-summary field | [bridge events](../../engine_bridge/events/README.md#change-guide), then the view | Inspect worker/RunOut mapping; generic summary dictionaries may already carry the field. |
+| Change coverage availability or its wire shape | [service.py](service.py), [schemas.py](schemas.py), view and affected tests | Change [routes.py](routes.py), [api.ts](api.ts), [hooks.ts](hooks.ts) only for endpoint/query changes. Run `npm run gen:types` for schema edits. |
+| Build node history or controls | First satisfy ACT-03 or ACT-05 in the backlog | There is no current tree-query/command path to extend. Coordinate events and verification before adding a view. |
 
-Tests: covered through `../verification/test_verification.py` (`bab.summary` event) and `../assistant/test_assistant.py` (coverage evidence).
+[workspace](../workspace/README.md#change-guide) supplies selection; [verification](../verification/README.md#change-guide) supplies run results; [assistant](../assistant/README.md#change-guide) consumes coverage evidence. These are handoffs, not automatic edit targets.
 
 ## Flow Diagram
 
-Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
-
 ```mermaid
 flowchart TB
-  classDef ext stroke-dasharray: 4 3
-  BV["BabView.tsx"]
-  H["hooks.ts, api.ts"]
-  R["routes.py<br/>/api/runs/id/coverage"]
-  S["service.py<br/>BabService"]
-  VER["verification<br/>RunService"]:::ext
-  AS["assistant<br/>explain.py"]:::ext
-  EB["engine_bridge<br/>events"]:::ext
-  BV --> H
-  H -- "HTTP" --> R
-  R --> S
-  S -- "run, recorded bab_summary" --> VER
-  S -- "observation_coverage" --> EB
-  AS -- "coverage evidence" --> S
-  Plan["planned BAB-01..03:<br/>search tree from committed node events"] -. "needs ACT-03" .-> S
+  U["User opens BaB mode"] --> V["BabView.tsx"]
+  V -- "runId" --> H["hooks.ts + api.ts"]
+  H -- "GET /api/runs/{id}/coverage" --> R["routes.py"]
+  R --> S["BabService.coverage"]
+  S -- "run result and status" --> VS["verification RunService"]
+  S -- "coverage capability" --> E["engine_bridge.events"]
+  VS --> S
+  E --> S
+  S --> H --> V
+  V --> O["user-visible coverage and final summary"]
 ```
 
-## 1. Subproblems and Objective
-
-Expose search structure, selected paths, node state, and branching rationale.
-
-| Subproblem | Responsibility |
+| Block | Implementation and contract |
 | --- | --- |
-| Scale | Global summaries, selected paths, local subtrees, paging, and aggregation instead of rendering every node by default. |
-| Relationships | Distinguish split edges from merge/reuse provenance; not every relationship is a single-parent tree edge. |
-| Inspection and actions | Node details, bound provenance, and branching rationale; delegate actions to verification. |
+| Query | `useCoverage` in [hooks.ts](hooks.ts), keyed to the selected run. |
+| HTTP | `coverage` in [routes.py](routes.py), `GET /api/runs/{run_id}/coverage`. |
+| Service | `BabService.coverage` in [service.py](service.py). Returns node and wave availability, final summary availability, reason, and summary data. |
+| Engine coverage | `observation_coverage` in `engine_bridge/events`. It describes the baseline's observation capability, not search results. |
+| View | `BabView` renders coverage and the ACT summary as summary-only data. |
+| Neighbor handoff | `verification` owns run results and commands. `workspace` owns selection. `assistant` reads coverage as evidence. See the [parent flow diagram](../README.md#flow-diagram). |
 
-## 2. Scope and Non-goals
+## Validation
 
-Own the behavior above and its failure/availability states. Deliver it incrementally using the sequence below; the full scope is not a first-slice requirement.
+Run the relevant tests:
 
-Does not mutate the ACT frontier, prune search through graph-node deletion, or infer success from an empty frontier.
+```bash
+.venv/bin/python -m pytest visual_bench/verification/test_verification.py
+.venv/bin/python -m pytest visual_bench/assistant/test_assistant.py
+npm test
+```
 
-## 3. Inputs, Outputs, and State
+Observable behavior: a run with no BaB summary shows the explicit no-summary message, a BaB run shows ACT's final summary, and the UI states that tree and node actions are disabled. These are validation instructions, not a new test result.
 
-- **Inputs:** run/revision, node summaries, relationships, recording coverage, and selected node.
-- **Outputs:** Local search views, details, workspace selections, and requests through the shared command entry point.
-- State, absence, and scientific semantics follow the [architecture](../../docs/design.md). Type names here describe intended contracts, not existing APIs.
+## Reference and Backlog
 
-## 4. Design Patterns and Rationale
+<details>
+<summary>Current files and routes</summary>
 
-**Read-only state projection.** Derive display models from committed snapshots/events; local graph state contains layout and expansion only.
+## Current Files and Routes
 
-**Renderer adapter.** React Flow/ELK are candidates. Encapsulate the mapping between engine node identity and renderer identity.
+| File | Responsibility |
+| --- | --- |
+| [schemas.py](schemas.py) | `CoverageOut` wire payload. |
+| [service.py](service.py) | `BabService.coverage(run_id)`. Combines `engine_bridge.events.observation_coverage()` with the run's recorded `bab_summary`. |
+| [routes.py](routes.py) | `GET /api/runs/{run_id}/coverage`. |
+| [api.ts](api.ts) | Calls the coverage endpoint. |
+| [hooks.ts](hooks.ts) | `useCoverage`, keyed by `keys.coverage(runId)`. |
+| [BabView.tsx](BabView.tsx) | Coverage values, reason, ACT final summary, and the disabled tree placeholder. |
+| [../verification/test_verification.py](../verification/test_verification.py) | `bab.summary` lifecycle coverage. |
+| [../assistant/test_assistant.py](../assistant/test_assistant.py) | Coverage evidence used by explanations. |
 
-Use small interfaces, pure functions, or ordinary classes. A pattern name alone does not justify adding a framework.
 
-## 5. Dependencies and Implementation Placement
+</details>
 
-verification supplies queries/event projections; workspace owns selection. Coordinate with analysis through public interfaces rather than internal state.
+<details>
+<summary>Task acceptance, rationale, and planned capabilities</summary>
 
-Start with a graph view model and one panel. Never write layout coordinates back into engine state.
-
-Add code and focused tests in this module as implementation proceeds. Keep language/runtime boundaries explicit. No installation or test commands exist yet.
-
-## 6. Implementation Plan
-
-All tasks are **Planned**. IDs identify reviewable implementation slices; dependencies are completion prerequisites, not code-import instructions. Fixture-based work may proceed earlier against an agreed contract, but it does not satisfy real-integration acceptance.
+## Tasks and Acceptance
 
 | ID | Deliverable | Depends on | Completion evidence |
 | --- | --- | --- | --- |
@@ -87,64 +82,13 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 | BAB-02 | Add bounded local graph navigation | BAB-01, PERF-01 | Expand/page a subtree while preserving selected path and positions; large fixtures stay within a measured view budget. |
 | BAB-03 | Add supported node actions | BAB-02, VER-04 | An action creates one shared command and shows accepted/applied/rejected independently of graph appearance. |
 
-Owner: **C**. A reviews scientific semantics; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.
+Current status: BAB-01 through BAB-03 are not started. The current tab covers the summary-only first-version behavior.
 
-Missing ACT interfaces require linked ACT issues/changes owned by A. Record the required capability and engine PR before marking the corresponding GUI integration task complete.
 
-## 7. Acceptance and Tests
+Future graph state must be a read-only projection of committed snapshots and events. Layout and expansion state must remain separate from engine node identity. Preserve split, merge, and reuse relation kinds. Never infer success from an empty frontier or visible-node counts.
 
-- Node identity survives batch-lane reordering.
-- Computed and inherited bounds have distinguishable provenance.
-- Retries/rollback do not leave ghost nodes; exceeding the view budget triggers aggregation rather than a frozen page.
+Planned operations are `buildLocalGraph`, `getNodePage`, and `requestNodeAction`. Planned files include `graph_model.ts`, `layout_adapter.ts`, and `bab.test.tsx`. These are not current capabilities.
 
-On completion, provide real samples, commands actually run, results, and unverified items, then update this document's status. See the [development plan](../../docs/plan.md).
+ACT-03 is the missing committed node-event capability. ACT-05 is the missing safe-control capability. Owner: C, with D supporting rendering and A reviewing search semantics. On completion, record real samples, exact commands and results, and limitations.
 
-## 8. Future Extraction Criteria
-
-Split internal files/directories when independent evolution, reuse, or size warrants it. This README owns this module's subproblem and design details; the parent retains summary and navigation.
-
-## 9. Functional Implementation Specification
-
-**Design proposal:** the interfaces and file names below are implementation targets, not existing code or ACT APIs. Add them only with the task that uses them. The task table above owns delivery status.
-
-### Feature Behavior
-
-| Feature | Trigger | Observable result |
-| --- | --- | --- |
-| Browse search | Open a run and select a node or path. | Show aggregate progress, a local subtree, and node details under a fixed revision. |
-| Expand detail | Expand another subtree or inspect provenance. | Page data within a view budget; distinguish split edges from merge/reuse links. |
-| Request a branch action | Choose an available control from node detail. | Route to the shared command gateway and show actual receipt; renderer edits never mutate the search directly. |
-
-### Processing Flow
-
-1. Fetch a revision-bound node page/path and subscribe to committed updates.
-2. Normalize by logical node_id and derive a local graph view model.
-3. Apply layout without changing domain identities; store expansion/position separately.
-4. Publish node selection to workspace; request operations through verification.
-
-### Proposed Public Operations
-
-| Operation | Contract and responsibility |
-| --- | --- |
-| `buildLocalGraph(nodes, relations, selection, budget) → GraphViewModel` | Pure projection; preserve relation kinds. |
-| `getNodePage(runId, revision, cursor, filters) → NodePage` | Application query backed by recorded committed state or ACT inspection. |
-| `requestNodeAction(nodeRef, action) → CommandReceipt` | Delegates to verification with current capability and revision preconditions. |
-
-### Planned Files (design targets)
-
-Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
-
-| File | Responsibility |
-| --- | --- |
-| `BabView.tsx` | Overview, graph, node detail, and action controls. |
-| `graph_model.ts` | Identity-preserving local graph projection. |
-| `layout_adapter.ts` | Candidate React Flow/ELK integration. |
-| `bab.test.tsx` | Selection, pagination, provenance, and capability feedback. |
-
-### State, Failure, and Recovery Rules
-
-When full provenance is unavailable, show supported summaries and the coverage limitation. Do not synthesize missing parents or infer a verdict from visible-node counts.
-
-### Task Completion Record
-
-For each completed task, attach its implementation PR, fixture/input provenance, exact commands and results, any ACT/provider dependency, and remaining capability limitations. Update status here only after the stated evidence exists. Tests mentioned in this document remain planned until then.
+</details>

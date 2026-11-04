@@ -1,43 +1,58 @@
 # ACT-GUI
 
-A visualization and interaction interface for the [ACT](https://github.com/SVF-tools/ACT) engine. Researchers can inspect networks and specifications, observe verification and branch-and-bound (BaB), analyze layer-wise overapproximation, and conduct experiments through direct interaction or AI assistance.
+ACT-GUI is the visualization and interaction workbench for [ACT](https://github.com/SVF-tools/ACT). ACT computes verification results; this repository loads inputs, runs experiments, displays evidence, and saves records.
 
-This repository contains the GUI product. ACT remains a separate computation engine. React/TypeScript and FastAPI/Pydantic are implementation technologies within the workbench.
+**Available:** real model loading, verification, BaB final summaries, live fuzzing, recorded interval-layer views, and record export. **Not available:** node-level BaB history/controls, geometry beyond interval boxes, and a real AI provider. The assistant currently uses a deterministic fake provider.
 
-**Status:** first runnable version (2026-11-03). The workbench loads real ACT networks, runs real ACT verification (`verify_once` in the interval, dual, or HybridZ domain, and BaB) and ACT's fuzzer (ACTFuzzer) in a worker process, records runs, and lets you browse layer-wise interval bounds in the browser. Node-level BaB history, controls, geometry beyond interval boxes, and a real AI provider are not implemented; see [plan status](docs/plan.md#first-version-status).
+## Choose a Development Task
 
-```text
-ACT-GUI/
-  visual_bench/       # Workbench: server.py + workbench.py + app.tsx roots, nine module slices, shared/, generated/wire.ts
-    <module>/         #   schemas.py -> service.py -> routes.py (service) | api.ts -> hooks.ts -> views (browser) | tests
-  engine_bridge/      # ACT integration: contracts.py and five modules (only place that imports ACT)
-  fixtures/catalog.json  # Real ACT models pinned by ACT commit + sha256, with native results
-  scripts/            # dev.sh, gen_image_nets.py, record_fixtures.py, gen_types.mjs
-  docs/               # README.md, design.md, plan.md
-```
+Start with the row matching your intended behavior. Follow its module guide for the concrete files, handoff contracts, and tests; you do not need to read every module.
 
-- [Visual Bench](visual_bench/README.md): views, research context, application operations, records, and AI collaboration.
-- [Engine Bridge](engine_bridge/README.md): ACT integration and compatibility; no verification algorithm implementations.
-- [Documentation scope](docs/README.md): ownership and maintenance of design information.
-- [Architecture](docs/design.md) · [Development plan](docs/plan.md) · [Contributor rules](AGENTS.md).
-
-Top-level boundaries follow product responsibilities. Each module owns its data path end to end (wire schema, service, routes, browser client and TanStack Query hooks, views, tests), so contributors can work on different modules in parallel; see [docs/design.md section 3](docs/design.md#3-runtime-and-implementation-boundaries). Every module README lists its current files, routes, and test command, plus feature plans, dependency-linked tasks, and acceptance evidence.
+| I want to change... | Start here | Cross the boundary only when... |
+| --- | --- | --- |
+| Layout, selection, mode switching, or the guided tour | [workspace](visual_bench/workspace/README.md#change-guide) | A selected object needs new server data, rather than just a new presentation. |
+| Model loading, input images, or specifications | [visual_bench/model_spec](visual_bench/model_spec/README.md#change-guide) | ACT source loading or model descriptions change: [engine_bridge/model_spec](engine_bridge/model_spec/README.md#change-guide). |
+| Run start/stop, time budgets, history, or lifecycle events | [verification](visual_bench/verification/README.md#change-guide) | ACT invocation changes: [execution](engine_bridge/execution/README.md#change-guide). |
+| Fuzz settings, live mutations, or saved counterexamples | [fuzzing](visual_bench/fuzzing/README.md#change-guide) | New ACT data/options are needed, or the shared run lifecycle changes. |
+| Layer bounds or propagation views | [analysis](visual_bench/analysis/README.md#change-guide) | Recorded data is insufficient: [inspection](engine_bridge/inspection/README.md#change-guide). |
+| BaB coverage or final summaries | [bab](visual_bench/bab/README.md#change-guide) | Summary mapping changes: [events](engine_bridge/events/README.md#change-guide). Node history requires new ACT support first. |
+| Explanations and evidence navigation | [assistant](visual_bench/assistant/README.md#change-guide) | An evidence source needs a new application query; do not bypass its service. |
+| Persistence, integrity, replay, or export | [records](visual_bench/records/README.md#change-guide) | A feature needs a new artifact or annotation; keep its meaning in the producing module. |
+| Engine diagnostics or Gurobi licensing | [engine](visual_bench/engine/README.md#change-guide) | The actual engine/license probe changes: [engine_session](engine_bridge/engine_session/README.md#change-guide). |
+| ACT compatibility or scientific result adaptation | [Engine Bridge](engine_bridge/README.md#change-guide) | ACT itself lacks the required algorithm or public capability. |
+| Architecture or implementation planning | [Documentation](docs/README.md#change-guide) | A decision spans modules; local feature evidence stays in its module README. |
 
 ## Flow Diagram
 
-The runtime path of one request, from the browser to ACT. Arrows point from caller to callee. Each box is expanded in its scope's own Flow Diagram: [visual_bench](visual_bench/README.md#flow-diagram) and [engine_bridge](engine_bridge/README.md#flow-diagram).
+This is a responsibility map, not a list of files to edit. Read downward from the goal, then expand only the responsible block.
+
 
 ```mermaid
 flowchart TB
-  User["Researcher"] --> VBB["visual_bench browser<br/>app.tsx, module views, shared/"]
-  VBB -- "HTTP /api, SSE" --> VBS["visual_bench service<br/>server.py, workbench.py, module services"]
-  VBS -- "spawns one per run" --> W["run worker process<br/>verification/worker.py"]
-  VBS --> EB["engine_bridge<br/>five modules, contracts.py"]
-  W --> EB
-  EB --> ACT[("ACT, pinned commit")]
-  VBS -- "manifest, events, sealed artifacts" --> Rec[("var/records")]
-  VBS -- "pinned models" --> Cat["fixtures/catalog.json"]
+  Goal["Development goal"] --> WB["visual_bench<br/>Interaction and application behavior"]
+  WB -->|"Needs ACT data or computation"| EB["engine_bridge<br/>ACT adaptation"]
+  EB -->|"Invokes existing capability"| ACT["ACT<br/>Scientific computation"]
+  ACT -->|"Results and evidence"| EB
+  EB -->|"Neutral contracts"| WB
+  WB -->|"Display and saved records"| Outcome["Observable user result"]
 ```
+
+| Block | Expand next | Boundary to preserve |
+| --- | --- | --- |
+| visual_bench | [Module collaboration map](visual_bench/README.md#flow-diagram) | Owns browser state, service use cases, workers, and records; never imports ACT. |
+| engine_bridge | [Adapter collaboration map](engine_bridge/README.md#flow-diagram) | Owns ACT calls and neutral result conversion; no HTTP, UI state, or run scheduling. |
+| ACT | Separate engine checkout pinned by [catalog](fixtures/catalog.json) | Owns algorithms, bounds, and verdicts. |
+| Observable user result | The selected module's Validation section | Verify the complete behavior, not merely that an endpoint returns 200. |
+
+## Reading and Change Order
+
+1. Choose a task above. The module's **Change Guide** distinguishes required edits, conditional edits, and code the request only passes through.
+2. Follow that module's **Flow Diagram** and block-to-code table. Cross-module handoffs link to the neighboring guide; parent diagrams intentionally omit internal calls.
+3. Check **Validation**, then open the reference/backlog only if you need contract rationale or future tasks. A planned API is not an existing entry point.
+
+When a wire payload changes, edit the owning module's Pydantic schema, run `npm run gen:types`, and include the generated `visual_bench/generated/wire.ts`. Do not hand-edit generated types. A route, worker, or shared transport on the path is not automatically a modification target.
+
+[Architecture and shared invariants](docs/design.md) · [Task index and future integration](docs/plan.md) · [Contributor rules](AGENTS.md)
 
 ## Development
 
@@ -56,7 +71,7 @@ npm install
 
 `dev.sh` starts the FastAPI service on 127.0.0.1:18765 and the Vite dev server on 127.0.0.1:5173, which proxies `/api` to the service. Both bind to loopback only. If the workbench runs on a remote machine, forward the port: `ssh -L 5173:127.0.0.1:5173 <host>` and open the same URL locally. Runs execute on CPU by default (`ACT_GUI_DEVICE=cpu`); records are written to `var/records/` (`ACT_GUI_RECORDS` overrides).
 
-In the browser: pick a model, press **Run ACT**, select the run, then click a layer in the network (drawn left to right) or use the Propagation stepper. The center column switches between the Verification, BaB, and Fuzzing modes, showing one at a time; the right panel holds the Assistant, Records, and Engine tabs, all acting on the same selection. The **Verification runs** panel sits to the right of the network and follows the center mode: Verification runs `interval`, BaB runs `bab`, Fuzzing runs `fuzz`, and choosing a method in its dropdown switches the mode. Past runs of the selected model for that method are listed in **Run history**, the lower half of the right column. To demonstrate fuzzing, switch to **Fuzzing**, set the budget, iteration limit, and seed, and press **Run ACT**: the view follows the run live (coverage and counterexamples over iterations), then shows the seed inputs with ACT's outputs on them, a gallery of mutated counterexample inputs (seed vs mutated vs perturbation, expected vs predicted class for labelled properties), a seed-vs-mutated input and output comparison for the selected one, and the mutation strategies. `unsafe_linear` yields counterexamples immediately; `bab_deep_mlp` and `range_check` yield none, which is consistent with BaB certifying them but is not a proof.
+In the browser, load or select a model, choose Fuzzing, Verification, or BaB, and start a run below the network. The right column contains Assistant, Records, Engine, and run history. Use **Guide** to revisit the introductory tour. Feature-specific behavior and limitations are documented in the module guides above.
 
 ### Run with Docker
 

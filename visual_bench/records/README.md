@@ -1,88 +1,97 @@
 # Records and Replay
 
-**Status:** first version: `store.py`, `RecordsView.tsx` (REC-01; REC-02/03 partial: lifecycle events, recovery, replay; REC-04 export only). User annotations (`saved_counterexamples.json`, VER-07) live beside a record: written atomically, mutable after sealing, never hashed into `artifacts.json`, and included in the export bundle. **Owner:** B; D/C integrate figure and data export.
-Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
+Current responsibility: persist run manifests, ordered lifecycle events, sealed artifacts, mutable user annotations, and zip exports. The first version supports integrity checks, torn-tail recovery, SSE event waiting, and export of sealed records. Run metadata queries are served by verification and reused by the Records tab. Export is this module's own route and must not be conflated with the query endpoint. See the [parent scope](../README.md), [repository rules](../../AGENTS.md), and the [development task guide](../../README.md#choose-a-development-task).
 
+## Change Guide
 
-## Current Files and Usage
-
-| File | Layer | Responsibility |
+| Goal | Edit here | Conditional / reused path |
 | --- | --- | --- |
-| `store.py` | Storage | `RecordStore`: per-run directory with immutable manifest, append-only `events.jsonl`, sha256-sealed artifacts, mutable user annotations, `wait_for_events` for SSE, zip export. |
-| `routes.py` | HTTP | `GET /api/runs/{id}/export` (sealed records only). |
-| `api.ts`, `hooks.ts` | Browser data | Run query shared with verification (`keys.run`), export URL. |
-| `RecordsView.tsx` | View | Records tab: provenance, hashes, export button. |
+| Change provenance/hash display | [RecordsView.tsx](RecordsView.tsx) | Reuse verification's run query. Do not add a second metadata endpoint. |
+| Change sealing, integrity or recovery | [store.py](store.py) and relevant verification/fuzzing tests | Writer services only if the store contract changes. |
+| Change zip contents | RecordStore.export_zip in [store.py](store.py), export coverage tests | [routes.py](routes.py) for HTTP headers/errors only; [api.ts](api.ts) or view only if URL/download interaction changes. |
+| Add a scientific artifact | Producing worker/bridge plus [verification](../verification/README.md#change-guide) artifact write path | Existing generic RecordStore may need no change. [analysis](../analysis/README.md#change-guide) is a reader, not the layers.json writer. |
+| Change saved counterexample annotations | [fuzzing](../fuzzing/README.md#change-guide) service/schema/view | RecordStore annotation methods are reused unless persistence guarantees change. Annotations are not part of the artifact seal. |
 
-Tests: record integrity, torn-tail recovery, and export are exercised by `../verification/test_verification.py` and `../fuzzing/test_fuzzing.py` (saved annotations in the bundle).
+Run metadata belongs to verification's schema/query; an added metadata field requires its owning schema change and `npm run gen:types`. Import and scientific snapshot replay remain planned, not available export features.
 
 ## Flow Diagram
 
-Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
+The query, artifact producer and export routes have different owners. Arrows are labeled with the transferred data or operation.
 
 ```mermaid
 flowchart TB
-  classDef ext stroke-dasharray: 4 3
-  RV["RecordsView.tsx"]
-  H["hooks.ts, api.ts"]
-  R["routes.py<br/>/api/runs/id/export"]
-  St["store.py<br/>RecordStore"]
-  Dir[("var/records/run-id/<br/>manifest, events.jsonl, artifacts,<br/>artifacts.json, annotations")]
-  VER["verification<br/>RunService"]:::ext
-  FZ["fuzzing<br/>FuzzingService"]:::ext
-  AN["analysis<br/>AnalysisService"]:::ext
-  RV --> H
-  H -- "HTTP: run query, export zip" --> R
-  R --> St
-  VER -- "create, append_event, write_artifact, seal" --> St
-  FZ -- "artifact, events, annotations" --> St
-  AN -- "layers.json" --> St
-  St -- "atomic writes, sha256 seal" --> Dir
+  Worker["verification worker"] -->|"Result / layers / fuzzing output"| Run["verification RunService"]
+  Run -->|"Write artifacts, seal, append events"| Store["RecordStore"]
+  Fuzz["fuzzing service"] -->|"Write saved annotations"| Store
+  Store -->|"Hash-checked artifacts"| Readers["analysis / fuzzing services"]
 ```
 
-## 1. Subproblems and Objective
+```mermaid
+flowchart TB
+  View["RecordsView"] -->|"Run metadata query"| Query["verification run API"]
+  Query -->|"RunOut"| View
+  View -->|"Browser follows export URL"| Route["records export route"]
+  Route -->|"export_zip"| Store["RecordStore"]
+  Store -->|"Sealed bundle"| Route
+  Route -->|"application/zip"| Download["Browser download"]
+```
 
-Persist traceable runs and AI actions, supporting queries, replay, and reproducible exports.
+| Block | Code and contract | Neighbor handoff |
+| --- | --- | --- |
+| Run metadata | [hooks.ts](hooks.ts) reuses the run query and [RecordsView.tsx](RecordsView.tsx) renders RunOut | [verification](../verification/README.md#flow-diagram) |
+| Artifact producer | [verification/service.py](../verification/service.py) writes worker results, layers and fuzzing artifacts and seals them | [Run lifecycle](../verification/README.md#flow-diagram) |
+| Annotation writer | [fuzzing/service.py](../fuzzing/service.py) saves user annotations through RecordStore | [Saving counterexamples](../fuzzing/README.md#flow-diagram) |
+| Artifact readers | [analysis/service.py](../analysis/service.py) reads layers; fuzzing reads fuzzing data and annotations | [analysis](../analysis/README.md#flow-diagram), [fuzzing](../fuzzing/README.md#flow-diagram) |
+| Export | [api.ts](api.ts) supplies exportUrl; [routes.py](routes.py) checks existence/seal and calls [store.py](store.py) export_zip | Downloaded zip; no second metadata API |
 
-| Subproblem | Responsibility |
+## Validation
+
+Run the existing record and fuzzing coverage:
+
+```bash
+.venv/bin/python -m pytest visual_bench/verification/test_verification.py
+.venv/bin/python -m pytest visual_bench/fuzzing/test_fuzzing.py
+npm test
+```
+
+Observable behavior: the Records tab shows verification's selected run metadata, the export button requests the records route, incomplete runs report that export requires a sealed record, and the downloaded zip contains only relative run paths plus sealed artifacts, events, hashes, and available annotations. These are validation instructions, not a new test result.
+
+## Reference and Backlog
+
+<details>
+<summary>Current files and routes</summary>
+
+## Current Files and Routes
+
+| File | Responsibility |
 | --- | --- |
-| Commit | Persist snapshots, events, artifacts, and recoverable commit positions without referencing unpublished files. |
-| Coverage | Record which node/layer/revision states are retained; distinguish absent, not recorded, and corrupted data. |
-| Replay | Reconstruct recorded state from snapshots and events; support retrieval after disconnection. |
-| Export | Fix context, numerical data, plot settings, and version provenance; delegate rendering to the owning view. |
+| [store.py](store.py) | `RecordStore`: per-run directories, atomic writes, ordered `events.jsonl`, sealed artifact hashes, mutable annotations, event waiting, and zip export. |
+| [routes.py](routes.py) | `GET /api/runs/{run_id}/export`, owned by records. Returns a zip only for a sealed run. |
+| [api.ts](api.ts) | Export URL helper. Run metadata query is imported from verification's client path. |
+| [hooks.ts](hooks.ts) | Run record query shared with verification and the export action. |
+| [RecordsView.tsx](RecordsView.tsx) | Provenance, hashes, status, native reference, and export button. |
+| [../verification/test_verification.py](../verification/test_verification.py) | Record integrity, recovery, and lifecycle coverage. |
+| [../fuzzing/test_fuzzing.py](../fuzzing/test_fuzzing.py) | Fuzzing artifacts and saved annotation export coverage. |
 
-## 2. Scope and Non-goals
+Record layout under `var/records/<run_id>/`:
 
-Own the behavior above and its failure/availability states. Deliver it incrementally using the sequence below; the full scope is not a first-slice requirement.
+```text
+manifest.json                 immutable request and provenance
+events.jsonl                  ordered lifecycle events
+result.json                   final ACT result
+layers.json                   recorded interval layer states
+fuzzing.json                  fuzzing result when applicable
+artifacts.json                sha256 seal for available artifacts
+saved_counterexamples.json    mutable user annotation, included in export
+```
 
-Does not restore solver memory, recompute missing history, manage browser selection, or decide algorithm state.
 
-## 3. Inputs, Outputs, and State
+</details>
 
-- **Inputs:** Committed verification state/events, inspection artifacts, AI action records, and export requests.
-- **Outputs:** Snapshot/event queries, artifact reads, coverage, run bundles, and fixed data/plot configurations.
-- State, absence, and scientific semantics follow the [architecture](../../docs/design.md). Type names here describe intended contracts, not existing APIs.
+<details>
+<summary>Task acceptance, rationale, and planned capabilities</summary>
 
-## 4. Design Patterns and Rationale
-
-**Repository and atomic commit.** Start with one local store behind small read/write interfaces, not a distributed storage platform.
-
-**Snapshots and appended events.** Persist committed order with idempotent append and explicit gaps. A general event-sourcing framework is unnecessary.
-
-**Immutable artifacts and manifests.** Associate data by IDs/hashes. Use relative artifact references instead of private absolute paths in bundles.
-
-Use small interfaces, pure functions, or ordinary classes. A pattern name alone does not justify adding a framework.
-
-## 5. Dependencies and Implementation Placement
-
-Depend on shared record types and storage interfaces, not ACT, model providers, or rendering components. Inject a renderer into export workflows when needed.
-
-Start with storage.py and the formats actually needed. Do not introduce a database before there is a recording use case.
-
-Add code and focused tests in this module as implementation proceeds. Keep language/runtime boundaries explicit. No installation or test commands exist yet.
-
-## 6. Implementation Plan
-
-All tasks are **Planned**. IDs identify reviewable implementation slices; dependencies are completion prerequisites, not code-import instructions. Fixture-based work may proceed earlier against an agreed contract, but it does not satisfy real-integration acceptance.
+## Tasks and Acceptance
 
 | ID | Deliverable | Depends on | Completion evidence |
 | --- | --- | --- | --- |
@@ -91,68 +100,13 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 | REC-03 | Implement replay, coverage, and resync reads | REC-02 | Snapshot S plus following events reproduces recorded state; missing/expired history is explicitly represented. |
 | REC-04 | Export fixed research data and figure configuration | REC-03, ANA-02 | Export/import preserves numerical data, selected coordinates, guarantees, revision, and plot configuration; invalid bundle paths are rejected. |
 
-Owner: **B**. A reviews scientific semantics; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.
+Current status: REC-01 is implemented. REC-02 and REC-03 are partial through lifecycle events, recovery, and replay. REC-04 has sealed export only, not import. User annotations are written atomically, are not hashed into `artifacts.json`, and are included in exports.
 
-Missing ACT interfaces require linked ACT issues/changes owned by A. Record the required capability and engine PR before marking the corresponding GUI integration task complete.
 
-## 7. Acceptance and Tests
+Keep the first store local and small. Publish artifacts atomically, then write the seal. Event replay reconstructs recorded display state, never solver memory, and never executes imported commands. Missing history is not zero. Orphan artifacts may be cleaned only after committed references are checked.
 
-- After a crash, recover the last committed state without referencing partially written artifacts.
-- Duplicate events do not duplicate records; sequence gaps are explicit.
-- Reject path traversal in bundles, do not treat missing history as zero, and trace exported data to its original source.
+Planned operations are `createRunRecord`, `appendCommit`, `readSnapshot`, `readEvents`, `readArtifact`, and `exportBundle`. Current equivalents live on `RecordStore`. Planned files such as `repository.py`, `commit_log.py`, and `bundle.py` are intentionally folded into `store.py` until later tasks require extraction.
 
-On completion, provide real samples, commands actually run, results, and unverified items, then update this document's status. See the [development plan](../../docs/plan.md).
+Owner: B, with D and C integrating figure and data export. On completion, record exact commands and results, provenance, and limitations.
 
-## 8. Future Extraction Criteria
-
-Split internal files/directories when independent evolution, reuse, or size warrants it. This README owns this module's subproblem and design details; the parent retains summary and navigation.
-
-## 9. Functional Implementation Specification
-
-**Design proposal:** the interfaces and file names below are implementation targets, not existing code or ACT APIs. Add them only with the task that uses them. The task table above owns delivery status.
-
-### Feature Behavior
-
-| Feature | Trigger | Observable result |
-| --- | --- | --- |
-| Save a run | Persist configuration, result, committed events, and selected artifacts. | Store provenance and coverage with a recoverable commit position. |
-| Reopen or reconnect | Request a snapshot and events after its covered sequence. | Return a consistent boundary; expired history requires an explicit resync rather than silent loss. |
-| Export research evidence | Export a stage/comparison/run bundle. | Include data, plot settings, revision, method/guarantee, and version provenance; validate imported bundles. |
-
-### Processing Flow
-
-1. Write a new artifact to a temporary file, validate it, then publish it atomically.
-2. Commit event/index references only after all referenced artifacts are available.
-3. Associate snapshots with a committed event boundary; recover only the committed prefix after a crash.
-4. Read through a repository interface for live/history modes; report coverage and corruption separately.
-5. Export relative artifact references and a manifest; reject path traversal and size-limit violations on import.
-
-### Proposed Public Operations
-
-| Operation | Contract and responsibility |
-| --- | --- |
-| `createRunRecord(manifest) → RecordRef` | Initial immutable inputs/provenance; no solver-state claim. |
-| `appendCommit(runId, batch, artifactRefs) → CommitPosition` | Idempotent by committed batch identity; all references must be readable. |
-| `readSnapshot(runId, atSeq?) / readEvents(runId, afterSeq)` | Consistent boundary and explicit retention/coverage response. |
-| `readArtifact(id) / exportBundle(query, plotConfig)` | Validate integrity and preserve provenance; render through an injected view renderer. |
-
-### Planned Files (design targets)
-
-Implemented equivalents: `repository.py` + `commit_log.py` + `bundle.py` → `store.py` (one small class until REC-02/03 need more).
-
-Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
-
-| File | Responsibility |
-| --- | --- |
-| `repository.py` | Small storage interface and first local implementation. |
-| `commit_log.py` | Committed positions, snapshot index, and recovery. |
-| `bundle.py` | Manifest, integrity, import/export, and relative references. |
-| `test_records.py` | Crash recovery, duplicate batches, missing files, and traversal rejection. |
-
-### State, Failure, and Recovery Rules
-
-Persistence failures must be visible as recording failure/degradation, not silently reported as a complete recording. Do not claim an engine rollback merely because storage failed. Orphan published artifacts can be cleaned only after checking committed references. Replay never executes imported commands.
-
-### Task Completion Record
-
-For each completed task, attach its implementation PR, fixture/input provenance, exact commands and results, any ACT/provider dependency, and remaining capability limitations. Update status here only after the stated evidence exists. Tests mentioned in this document remain planned until then.
+</details>

@@ -1,78 +1,94 @@
 # Workspace
 
-**Status:** first version: `selection.ts`, `modes.ts`, `layout.tsx` (WS-01/02, vitest); server data moved from the in-house `useQuery` to TanStack Query on 2026-11-04 (keys in `shared/queryClient.ts`); WS-03 not started. **Owner:** C.
-Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
+Current responsibility: own the browser's shared model, run, layer, and neuron selection, mode registry, layout context, theme, and onboarding tour. The first slice is implemented in `selection.ts`, `modes.ts`, `layout.tsx`, `theme.tsx`, and the tour files. WS-03, pinning and layout restoration, is not started. This module is browser-only. It does not own server data, solver state, or ACT commands. See the [parent scope](../README.md), the [repository rules](../../AGENTS.md), and the [development task guide](../../README.md#choose-a-development-task).
 
+## Change Guide
 
-## Current Files and Usage
+| Goal | Edit here | Conditional / reused path |
+| --- | --- | --- |
+| Change selection/reset behavior | [selection.ts](selection.ts) and [selection.test.ts](selection.test.ts) | Update [app.tsx](../app.tsx) or consumers only when action/prop contracts change. No server change. |
+| Add or remap a center mode | [modes.ts](modes.ts), its owning view, [modes.test.ts](modes.test.ts) | Existing app composition uses the registry. A new engine method also needs verification/bridge support; a display-only mode does not. |
+| Change tour wording or order | [tourSteps.ts](tourSteps.ts) | Copy-only changes need no prose-pinning tests. Change [tour.tsx](tour.tsx) for interaction; [app.tsx](../app.tsx) only for region targets or composition. |
+| Change tour placement | placeCard in [tourSteps.ts](tourSteps.ts) and its placement tests | Keep viewport-boundary cases in [tourSteps.test.ts](tourSteps.test.ts); render desktop/mobile. |
+| Change context bar or theme | [layout.tsx](layout.tsx), [theme.tsx](theme.tsx), relevant [styles.css](../styles.css) | Other feature modules only if their public selection/navigation contract changes. |
 
-| File | Responsibility |
-| --- | --- |
-| `selection.ts` (+ `selection.test.ts`) | Selection reducer: model/run/layer/value context and stale-selection rules. |
-| `modes.ts` (+ `modes.test.ts`) | Mode registry `{ id, label, method, View }` for Fuzzing, Verification, BaB; `app.tsx` renders modes and maps run methods to modes from it. Add a mode here, not in `app.tsx`. |
-| `layout.tsx` | Context bar and layout pieces used by `app.tsx`. |
-| `theme.tsx` | Light/dark theme toggle and persistence. |
-| `tour.tsx`, `tourSteps.ts` (+ `tourSteps.test.ts`) | Skippable onboarding tour. Starts automatically on the first visit (`localStorage` key `act-gui.tour.v1`), spotlights layout regions marked `data-tour="..."` in `app.tsx`, and replays from the topbar Guide button. Esc or Skip ends it; steps whose region is not on screen (no model selected) show a centered card with a hint. Add or reorder steps in `tourSteps.ts`. |
-
-Browser-wide infrastructure lives in [`../shared/`](../README.md#shared-browser-layer): HTTP client, wire-number helpers, the TanStack `QueryClient` with the query key factory, and shared UI (`Empty`, `StopButton`, image rendering). Tests: `npm test`.
+Pinning and restoration are WS-03 future work, not an existing docking API.
 
 ## Flow Diagram
 
-Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
+```mermaid
+flowchart TB
+  U["User click or keyboard input"] --> A["app.tsx"]
+  A --> S["selection.ts<br/>selectionReducer"]
+  A --> M["modes.ts<br/>modeForMethod / modeForId"]
+  S -- "selection context and revision" --> V["module views"]
+  M -- "method to mode view" --> V
+  V -- "select layer or neuron" --> S
+  V -- "data queries" --> H["module hooks and ../shared"]
+```
+
+The context bar and theme are independent presentation helpers in layout.tsx and theme.tsx. The tour has its own path:
 
 ```mermaid
 flowchart TB
-  classDef ext stroke-dasharray: 4 3
-  U["user input"] --> App["app.tsx"]
-  App --> Sel["selection.ts"]
-  App --> Modes["modes.ts"]
-  App --> Lay["layout.tsx<br/>theme.tsx"]
-  App -- "context, mode" --> V["module views<br/>hooks.ts"]:::ext
-  V -- "navigation" --> Sel
-  V -- "query keys" --> SH["shared/"]:::ext
+  Entry["First visit / Guide button"] --> App["app.tsx"]
+  App --> Tour["tour.tsx"]
+  Steps["tourSteps.ts"] -->|"Copy, targets and placement"| Tour
+  Regions["data-tour regions"] -->|"Measured target bounds"| Tour
+  Tour -->|"Skip / Finish / Escape"| Close["Persist completion and close"]
 ```
 
-## 1. Subproblems and Objective
-
-Maintain one authoritative user-selection context so views remain coordinated.
-
-| Subproblem | Responsibility |
+| Block | Implementation and contract |
 | --- | --- |
-| Layout | Panel registration, visibility, size, and restoration. Start with a fixed layout; introduce docking when needed. |
-| Selection | Distinguish network layers from BaB nodes. Coordinate run/node/layer/revision and pinned contexts. |
-| Asynchronous changes | Expose loading/stale states during selection changes; late results must not replace newer selections. |
+| User input | `app.tsx` callbacks. Produces selection actions or mode changes. |
+| Selection | `selectionReducer` in [selection.ts](selection.ts). Returns a new context and revision; model changes clear run, layer, and neuron. |
+| Modes | `modes`, `modeForMethod`, and `modeForId` in [modes.ts](modes.ts). Maps `fuzz`, `interval`, and `bab` to visible center views. |
+| Layout and theme | `ContextBar` in [layout.tsx](layout.tsx) and theme state in [theme.tsx](theme.tsx). Renders shared context; it does not fetch. |
+| Tour | `Tour` in [tour.tsx](tour.tsx) plus `TOUR_STEPS` in [tourSteps.ts](tourSteps.ts). Reads `data-tour` regions and ends on Finish, Skip, or Escape. |
+| Neighbor handoff | Module views receive selection and callbacks from `app.tsx`; their data path continues through the [parent flow diagram](../README.md#flow-diagram). |
 
-## 2. Scope and Non-goals
+## Validation
 
-Own the behavior above and its failure/availability states. Deliver it incrementally using the sequence below; the full scope is not a first-slice requirement.
+Run the browser test suite:
 
-Does not own solver state, weights, large-tensor caches, or ACT search commands.
+```bash
+npm test
+```
 
-## 3. Inputs, Outputs, and State
+Relevant observable behavior is that selection changes update the context bar and dependent views, mode methods select the corresponding center view, and the tour starts once, can be replayed from Guide, and exits with Finish, Skip, or Escape. These are validation instructions, not a new test result.
 
-- **Inputs:** Selectable model/run indexes, user actions, and navigation requests from other panels.
-- **Outputs:** SelectionContext, layout state, and context-bearing navigation notifications.
-- State, absence, and scientific semantics follow the [architecture](../../docs/design.md). Type names here describe intended contracts, not existing APIs.
+## Reference and Backlog
 
-## 4. Design Patterns and Rationale
+<details>
+<summary>Current files and routes</summary>
 
-**Pure state reducer and derived selectors.** Express selection changes as testable transitions. Views consume derived state rather than bypassing the state owner through an unrestricted event bus.
+## Current Files and Routes
 
-**Layout adapter.** A library such as Dockview handles layout only; domain objects do not contain renderer instances or layout-library nodes.
+There are no workspace HTTP routes. `app.tsx` is the composition root that consumes this module.
 
-Use small interfaces, pure functions, or ordinary classes. A pattern name alone does not justify adding a framework.
+| File | Responsibility |
+| --- | --- |
+| [selection.ts](selection.ts) | Pure reducer for `modelId`, `runId`, `layerId`, `neuron`, and monotonic `revision`. Changing model or run clears incompatible context. |
+| [selection.test.ts](selection.test.ts) | Selection transitions and stale-context behavior. |
+| [modes.ts](modes.ts) | The `Fuzzing`, `Verification`, and `BaB` mode registry. Each entry maps a run method to a view. Add modes here, not in `app.tsx`. |
+| [modes.test.ts](modes.test.ts) | Mode IDs and method mapping. |
+| [layout.tsx](layout.tsx) | Context bar showing the current model, run, layer, and index. |
+| [theme.tsx](theme.tsx) | Light and dark theme toggle with persistence. |
+| [tour.tsx](tour.tsx) | Skippable first-visit tour, keyboard navigation, target measurement, and portal rendering. |
+| [tourSteps.ts](tourSteps.ts) | Tour copy, order, target regions, and missing-region hints. |
+| [tourSteps.test.ts](tourSteps.test.ts) | Tour step and placement behavior. |
 
-## 5. Dependencies and Implementation Placement
+Browser-wide HTTP, wire-number, query-key, and shared UI code lives in [`../shared/`](../README.md#shared-browser-layer). Views obtain server data through their module hooks.
 
-Inject selectable objects and query entry points. Do not import another feature’s internal store. The first slice can use a minimal context interface.
 
-Start with state.ts and the necessary components. Do not prebuild a general plugin registry.
+</details>
 
-Add code and focused tests in this module as implementation proceeds. Keep language/runtime boundaries explicit. No installation or test commands exist yet.
+<details>
+<summary>Task acceptance, rationale, and planned capabilities</summary>
 
-## 6. Implementation Plan
+## Tasks and Acceptance
 
-All tasks are **Planned**. IDs identify reviewable implementation slices; dependencies are completion prerequisites, not code-import instructions. Fixture-based work may proceed earlier against an agreed contract, but it does not satisfy real-integration acceptance.
+All tasks remain tracked in [the development plan](../../docs/plan.md). Dependencies are acceptance prerequisites, not import instructions.
 
 | ID | Deliverable | Depends on | Completion evidence |
 | --- | --- | --- | --- |
@@ -80,66 +96,13 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 | WS-02 | Link two panels through context | WS-01 | Select A then B; delaying A’s response cannot revert either active panel. |
 | WS-03 | Add pinning and layout restoration | WS-02 | A pinned panel survives active-context changes; invalid restored references have an explicit fallback. |
 
-Owner: **C**. A reviews scientific semantics; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.
+Current status: WS-01 and WS-02 are implemented as the selection reducer and application wiring. WS-03 is planned.
 
-Missing ACT interfaces require linked ACT issues/changes owned by A. Record the required capability and engine PR before marking the corresponding GUI integration task complete.
 
-## 7. Acceptance and Tests
+Use pure state transitions and derived context rather than a feature-wide event bus. A layout library may be added later, but domain objects must not contain renderer instances or layout-library nodes. Pinning, restoration, and unavailable-object states belong to WS-03 and are not current capabilities.
 
-- After a rapid A→B selection, a late A response cannot revert selection or panel content.
-- Pinned panels retain their own revision while ordinary panels follow the active context.
-- Restoring a layout containing unavailable objects produces an explicit fallback, not a blank screen.
+Planned public operations are `reduceWorkspace`, `getPanelContext`, and `navigateTo`. Their names describe intended boundaries, not shipped APIs. The current equivalent is `selectionReducer` plus callbacks in `app.tsx`.
 
-On completion, provide real samples, commands actually run, results, and unverified items, then update this document's status. See the [development plan](../../docs/plan.md).
+Owner: C. A reviews scientific identity and semantics. On task completion, record the implementation, fixture provenance, exact commands and results, ACT or provider dependencies, and unverified behavior here.
 
-## 8. Future Extraction Criteria
-
-Split internal files/directories when independent evolution, reuse, or size warrants it. This README owns this module's subproblem and design details; the parent retains summary and navigation.
-
-## 9. Functional Implementation Specification
-
-**Design proposal:** the interfaces and file names below are implementation targets, not existing code or ACT APIs. Add them only with the task that uses them. The task table above owns delivery status.
-
-### Feature Behavior
-
-| Feature | Trigger | Observable result |
-| --- | --- | --- |
-| Select an object | Click a layer/node or follow an evidence reference. | Publish one typed SelectionContext; retain a previous view only with a stale label. |
-| Pin a panel | Pin a layer inspection, then change the active run. | The pinned panel keeps its original context; unpinned panels follow the new selection. |
-| Restore a layout | Reload saved panel arrangement. | Restore layout version and valid selections; show an unavailable-object state when a reference no longer resolves. |
-
-### Processing Flow
-
-1. Receive a typed navigation action with object kind and snapshot identity.
-2. Validate it against the available object index; update the pure reducer.
-3. Derive context keys for each panel, including pinned contexts.
-4. Panels request data under their own key; response handlers never overwrite another key.
-
-### Proposed Public Operations
-
-| Operation | Contract and responsibility |
-| --- | --- |
-| `reduceWorkspace(state, action) → state` | Pure function. Actions include selectRun, selectLayer, selectNode, pinPanel, unpinPanel, and restoreLayout. |
-| `getPanelContext(state, panelId) → SelectionContext` | Returns active or pinned context; layer and search-node IDs have distinct types. |
-| `navigateTo(reference) → NavigationResult` | Resolve evidence references; a missing historical object produces a visible unavailable state. |
-
-### Planned Files (design targets)
-
-Implemented equivalents: `state.ts` → `selection.ts`; `Workspace.tsx` → `app.tsx` + `layout.tsx` + `modes.ts`.
-
-Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
-
-| File | Responsibility |
-| --- | --- |
-| `state.ts` | Actions, reducer, typed selection, and selectors. |
-| `Workspace.tsx` | Panel composition and context binding. |
-| `layout_adapter.ts` | Add only when a docking library is introduced. |
-| `state.test.ts` | Selection races, pinning, and restore behavior. |
-
-### State, Failure, and Recovery Rules
-
-No selection action sends an engine mutation. If a referenced run is gone, navigation reports the missing object rather than selecting a similarly named object.
-
-### Task Completion Record
-
-For each completed task, attach its implementation PR, fixture/input provenance, exact commands and results, any ACT/provider dependency, and remaining capability limitations. Update status here only after the stated evidence exists. Tests mentioned in this document remain planned until then.
+</details>

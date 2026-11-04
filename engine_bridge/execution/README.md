@@ -1,89 +1,115 @@
 # Execution Adapter
 
-**Status:** first version: `verify.py` (EXE-01 `verify_once` in the interval / dual / hybridz domain, + BaB), `fuzz.py` (EXE-04 ACTFuzzer); EXE-02/03 blocked on ACT-02/05. **Owner:** B; A owns ACT operation semantics.
-Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
+The current bridge invokes ACT's `verify_once` for interval, dual, and HybridZ domains, ACT's batched BaB entry point, and ACTFuzzer. It maps ACT statuses without deciding scientific verdicts, exposes method eligibility and fuzzing provenance, and returns neutral frozen outcomes. Runs are blocking inside the caller's worker process. The workbench owns process lifecycle, run records, idempotency, HTTP, and SSE.
 
+For project navigation, see [engine_bridge flow](../README.md#flow-diagram) and [choose a development task](../../README.md#choose-a-development-task).
 
-## Current Files and Usage
+## Change Guide
 
-| File | Responsibility |
-| --- | --- |
-| `verify.py` | `run_verification(model, method, budget, domain)` → `RunOutcome`: `verify_once` (interval/dual/hybridz) or `verify_bab_batched`; ACT's VerifyStatus mapped 1:1. |
-| `fuzz.py` | `run_fuzzing(...)` → `FuzzOutcome` (ACTFuzzer on `ACTToTorch(net)`); `fuzzing_defaults()`; `split_options()` (run arguments vs. `FuzzingConfig` hyperparameters); `PROVENANCE` of fuzzing records. |
-| `methods.py` | `verify_methods(input_rows)` and `UNIVERSAL_METHODS`: which run methods ACT's entry points accept for a net, so the workbench does not encode ACT limits. |
-| `__init__.py` | Public API: `run_verification`, `run_fuzzing`, `fuzzing_defaults`, `split_options`, `FUZZ_PROVENANCE`, `verify_methods`, `UNIVERSAL_METHODS`. |
-| `test_execution.py` | Verdicts vs. recorded native results, domains vs. native `verify_once`, fuzzing counterexamples/stop/certified nets, structured errors. |
-
-Used by: the run worker (`visual_bench/verification/worker.py`, `visual_bench/fuzzing/runner.py`) and `visual_bench/model_spec` (methods). Tests: `.venv/bin/python -m pytest engine_bridge/execution`.
+| Goal | Required edits | Conditional / reused path |
+| --- | --- | --- |
+| Change verification invocation/domain setup | [verify.py](verify.py), direct ACT parity tests | Compatible RunOutcome passes through the existing worker/service; no UI or lifecycle rewrite. |
+| Expose an ACT fuzz hyperparameter | [fuzz.py](fuzz.py) TUNABLE plus tests, then [workbench fuzzing](../../visual_bench/fuzzing/README.md#change-guide) | split_options and runner forwarding are generic for ordinary hyperparameters; change them only for independent run arguments. |
+| Add progress/frame/outcome data | [fuzz.py](fuzz.py), [contracts.py](../contracts.py), relevant tests and consuming workbench mappings | Worker dataclass serialization/storage may already carry the field; inspect rather than rewrite it. |
+| Change supported methods | [methods.py](methods.py), tests | Workbench asks verify_methods; browser policy should not duplicate ACT limits. |
+| Add pause/step/split controls | EXE-02/03 and ACT-02/05 backlog | Not an extension of an existing control API; first establish safe ACT semantics. |
 
 ## Flow Diagram
 
-Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
+Arrows name requests, returned data, or persistence handoffs. Only implemented paths are shown.
+
+### Verification / BaB
 
 ```mermaid
 flowchart TB
-  classDef ext stroke-dasharray: 4 3
-  W["worker.py"]:::ext
-  FR["runner.py"]:::ext
-  VMS["visual_bench<br/>model_spec"]:::ext
-  VFZ["visual_bench<br/>fuzzing"]:::ext
-  V["verify.py"]
-  F["fuzz.py"]
-  M["methods.py"]
-  MS["model_spec"]:::ext
-  ES["engine_session"]:::ext
-  ACT[("ACT")]
-  W -- "run_verification" --> V
-  FR -- "run_fuzzing" --> F
-  VFZ -- "provenance" --> F
-  VMS -- "verify_methods" --> M
-  V & F -- "load_net" --> MS
-  V & F -- "act_imports" --> ES
-  V -- "verify_once,<br/>BaB" --> ACT
-  F -- "ACTFuzzer" --> ACT
+Worker["visual_bench verification worker"] -->|"Model, method, budget, domain"| Verify["verify.py<br/>run_verification"]
+  Verify -->|"verify_once / verify_bab_batched"| ACT["ACT"]
+  ACT -->|"Status and metadata"| Verify
+  Verify -->|"RunOutcome"| Worker
 ```
 
-## 1. Subproblems and Objective
+### Fuzzing
 
-Faithfully invoke ACT verification and supported controls and report actual outcomes.
+```mermaid
+flowchart TB
+Runner["visual_bench fuzzing runner"] -->|"Options and callbacks"| Fuzz["fuzz.py<br/>run_fuzzing"]
+  Fuzz -->|"Seed ACTToTorch model"| ACT["ACTFuzzer"]
+  ACT -->|"Iteration observations and report"| Fuzz
+  Fuzz -->|"FuzzProgress / FuzzFrame / FuzzOutcome"| Runner
+```
 
-| Subproblem | Responsibility |
+| Block | Code / contract | Handoff |
+| --- | --- | --- |
+| Verification | [verify.py](verify.py): select_domain, run_verification, _outcome; RunOutcome in [contracts.py](../contracts.py) | [verification worker](../../visual_bench/verification/README.md#flow-diagram); supervisor persists the final result. |
+| Fuzzing | [fuzz.py](fuzz.py): split_options, run_fuzzing, fuzzing_defaults, PROVENANCE | [fuzzing runner/live service](../../visual_bench/fuzzing/README.md#flow-diagram); bridge emits callbacks, workbench serializes/delivers them. |
+| Method eligibility | [methods.py](methods.py): verify_methods, UNIVERSAL_METHODS | [visual_bench/model_spec](../../visual_bench/model_spec/README.md#flow-diagram) publishes allowed methods. |
+| Shared internals | [model_spec loader](../model_spec/README.md#flow-diagram), [engine_session imports](../engine_session/README.md#flow-diagram) | Reused setup, not an automatic edit target for every new option. |
+
+## Validation
+
+Run the focused real-ACT tests:
+
+```bash
+.venv/bin/python -m pytest engine_bridge/execution
+```
+
+These tests compare adapter statuses with recorded native ACT results and direct `verify_once` calls. Fuzz tests use real ACTFuzzer and check ACT counterexamples, input-box membership, stop behavior, and a BaB-certified net that fuzzing leaves `unknown`. The test suite does not establish browser or real-provider behavior. No test result is implied by this guide.
+
+## Reference and Backlog
+
+<details>
+<summary>Current files and operation details</summary>
+
+## Current Files and Usage
+
+| File | Current responsibility |
 | --- | --- |
-| Verification | Map fixed run configuration to supported ACT entry points. |
-| Controls | Submit pause/step/split/cancel only when supported, with explicit safe-boundary semantics and granularity. |
-| Results | Separate execution errors, timeouts, scientific verdicts, and command receipts; preserve counterexample provenance. |
+| [verify.py](verify.py) | `run_verification`, domain selection, ACT result mapping |
+| [fuzz.py](fuzz.py) | `run_fuzzing`, defaults, option split, ACT fuzzing provenance and observations |
+| [methods.py](methods.py) | `verify_methods` and `UNIVERSAL_METHODS` |
+| [__init__.py](__init__.py) | Public execution functions and constants |
+| [test_execution.py](test_execution.py) | Native verdict/domain parity, fuzz counterexamples and stop behavior, and structured errors |
 
-## 2. Scope and Non-goals
+Callers are [`visual_bench/verification/worker.py`](../../visual_bench/verification/worker.py), [`visual_bench/fuzzing/runner.py`](../../visual_bench/fuzzing/runner.py), and [`visual_bench/model_spec/service.py`](../../visual_bench/model_spec/service.py). The neutral contracts are `RunOutcome`, `FuzzOutcome`, `FuzzProgress`, `FuzzFrame`, `FuzzCounterexample`, `FuzzSeed`, `FuzzStrategyStats`, `Method`, `Domain`, `Verdict`, and `BridgeError` in [`../contracts.py`](../contracts.py).
 
-Own the behavior above and its failure/availability states. Deliver it incrementally using the sequence below; the full scope is not a first-slice requirement.
+## Operation Notes
 
-Does not implement search strategies, replace ACT validity checks, manage workbench run lists, or host HTTP services.
+### Change verification invocation
 
-## 3. Inputs, Outputs, and State
+Edit [verify.py](verify.py):
 
-- **Inputs:** Valid engine/model handles, run configuration, targets/revision preconditions, and stable command_id.
-- **Outputs:** RunHandle, ACT results, actual applied/rejected receipts, and structured exceptions.
-- State, absence, and scientific semantics follow the [architecture](../../docs/design.md). Type names here describe intended contracts, not existing APIs.
+* `run_verification(model_path, method, time_budget_s, domain)` validates method, domain, and budget.
+* `select_domain()` resets ACT's process-global solver and transfer-function modes before each call.
+* `interval` calls `verify_once`; `bab` calls `verify_bab_batched` with ACT's configured `TorchLPSolver`.
+* `_outcome()` maps ACT `VerifyStatus` one to one into `RunOutcome`, keeps raw `act_status`, summarizes scalar metadata, and copies a counterexample only when ACT supplies one.
 
-## 4. Design Patterns and Rationale
+Update [test_execution.py](test_execution.py) with a direct native ACT comparison. Do not turn timeout, unresolved search, or an empty frontier into `certified`.
 
-**Command adapter.** Map application-validated commands into engine calls and recheck actual preconditions at the point of execution.
+### Change fuzzing
 
-**Explicit handles and outcomes.** Return actual handles/state rather than assuming that a function return means verification has completed.
+Edit [fuzz.py](fuzz.py):
 
-Use small interfaces, pure functions, or ordinary classes. A pattern name alone does not justify adding a framework.
+* `run_fuzzing()` rebuilds the net with ACT `ACTToTorch`, seeds ACTFuzzer from input rows, validates budgets and tunable fields, and returns `FuzzOutcome`.
+* `split_options()` separates run arguments from `FuzzingConfig` hyperparameters.
+* `fuzzing_defaults()` reads the pinned ACT configuration.
+* `PROVENANCE` documents the ACT call, config source, and display frames.
+* Progress and frames are observations between ACT iterations. Counterexamples are only ACT PropertyChecker results. Fuzzing returns `falsified` or `unknown`, never `certified`.
 
-## 5. Dependencies and Implementation Placement
+The current implementation relies on ACTFuzzer's private `_print_progress` and `mutation_engine.mutate` seams. Recheck both against the pinned ACT commit when changing ACT.
 
-Uses engine_session/model_spec/contracts and ACT. The workbench owns the idempotency log; the adapter must not blindly retry an operation whose application is uncertain.
+### Change method availability
 
-Support one verified execution mode first. Planned control methods must not be represented as existing ACT APIs.
+Edit [methods.py](methods.py) when ACT accepts or rejects a method based on input rows. Keep `verify_methods` free of browser policy. `UNIVERSAL_METHODS` currently contains only `fuzz`.
 
-Add code and focused tests in this module as implementation proceeds. Keep language/runtime boundaries explicit. No installation or test commands exist yet.
 
-## 6. Implementation Plan
+</details>
 
-All tasks are **Planned**. IDs identify reviewable implementation slices; dependencies are completion prerequisites, not code-import instructions. Fixture-based work may proceed earlier against an agreed contract, but it does not satisfy real-integration acceptance.
+<details>
+<summary>Task evidence, design constraints and future capabilities</summary>
+
+<a id="1-subproblems-and-objective"></a><a id="2-scope-and-non-goals"></a><a id="3-inputs-outputs-and-state"></a><a id="4-design-patterns-and-rationale"></a><a id="5-dependencies-and-implementation-placement"></a><a id="6-implementation-plan"></a><a id="7-acceptance-and-tests"></a><a id="8-future-extraction-criteria"></a><a id="9-functional-implementation-specification"></a>
+
+## Task Evidence
 
 | ID | Deliverable | Depends on | Completion evidence |
 | --- | --- | --- | --- |
@@ -93,67 +119,11 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 | EXE-04 | Adapt ACT's inference-based fuzzer | EXE-01 | `run_fuzzing` rebuilds the net with ACT's `ACTToTorch`, seeds ACTFuzzer with the net's INPUT rows, and reports ACT's `FuzzingReport`; counterexamples are only those ACT's PropertyChecker accepted. Verdict is `falsified` iff ACT reported a counterexample, otherwise `unknown` (fuzzing never certifies). Progress (iteration, coverage, counterexample count, corpus) is read between iterations. `test_execution.py`: a counterexample on `unsafe_linear` lies inside the input box; 200 iterations on `bab_deep_mlp` (BaB-certified) report none. |
 | EXE-05 | Report which run methods ACT accepts for a net | EXE-01, EXE-04 | `methods.verify_methods(input_rows)` returns `interval`/`bab` only for single-lane nets (`verify_once` rejects several INPUT rows) and `UNIVERSAL_METHODS` holds `fuzz` (ACTFuzzer runs on every JSON net ACTToTorch rebuilds); `fuzz.split_options` and `fuzz.PROVENANCE` keep fuzz option and provenance knowledge in the bridge. Evidence: `visual_bench/fuzzing/test_fuzzing.py::test_torch_batch_is_one_fuzz_only_net_fuzzed_row_by_row` (a 3-image net lists only `fuzz` and rejects `interval`). |
 
-**EXE-01 domains.** `run_verification(..., method="interval", domain=...)` runs `verify_once` in one of ACT's abstract domains: `interval` (IntervalTF), `dual` (`set_solver_mode("dual")`, DualSolver), or `hybridz` (solver and TF mode `hybridz`, HybridzTF + HZSolver with the run budget as its MILP time limit). Selection mirrors `act/config/pipeline_cli.py` and always sets both ACT globals, so a previous run in the same process cannot leak. Layer inspection explicitly resets to the interval domain. BaB keeps its existing bounding path; domain selection for BaB is not exposed.
+## Boundaries and Cross-Module Changes
 
-**EXE-04 notes.** `run_fuzzing(hyperparameters=...)` overrides only the `TUNABLE` `FuzzingConfig` fields (unknown keys and settings ACT rejects raise `invalid_options`); output, tracing and reporting stay owned by the adapter. `fuzzing_defaults()` returns those fields from the pinned ACT's `pipeline.yaml`. Mutated-input frames (`FuzzFrame`, `on_frame`) come from a second instance seam: `fuzz.py` wraps the fuzzer's `mutation_engine.mutate`, keeps references to the latest seeds and mutated batch, and returns ACT's tensor unchanged; frames are display data, never a verdict. ACTFuzzer has no public progress hook in the baseline, so `fuzz.py` replaces the fuzzer instance's `_print_progress` (called after every iteration with `report_interval=1`); this private seam is recorded as the `fuzz.actfuzzer` capability source and must be rechecked when the pinned ACT commit changes. A public observer in ACTFuzzer would remove it. Seeds for `random`, NumPy, and torch are set from `rng_seed`; a time-bounded run still varies in iteration count. Mutation weights and other settings come from ACT's `act/config/pipeline.yaml`.
+Changes to outcome fields or method names require checking the worker, verification/fuzzing mappings, wire schemas, generated types and affected tests. Edit only explicit mappings or contracts that actually change; generic dataclass serialization may already carry a new field. Changes limited to ACT invocation that preserve the frozen contracts pass through the existing worker. New controls cross into engine_session capability reporting, events commit semantics, records, and shared manual/AI commands. Do not add control methods or committed event hooks to current diagrams before ACT implements them.
 
-Owner: **B**. A reviews scientific semantics; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.
 
-Missing ACT interfaces require linked ACT issues/changes owned by A. Record the required capability and engine PR before marking the corresponding GUI integration task complete.
+The earlier design proposed `RunHandle` and `submitControl`. Neither is a current API. Add them only with EXE-02 and EXE-03 evidence from ACT-02 and ACT-05. Keep application idempotency in visual_bench. Split adapter files only when a new ACT capability has independent tests and lifecycle.
 
-## 7. Acceptance and Tests
-
-- Adapter and native ACT scientific results agree under documented tolerances.
-- Unsupported controls, invalid nodes, and stale revisions are rejected with explanations.
-- Cutoffs with unresolved domains or an empty frontier are not rewritten as CERTIFIED.
-
-On completion, provide real samples, commands actually run, results, and unverified items, then update this document's status. See the [development plan](../../docs/plan.md).
-
-## 8. Future Extraction Criteria
-
-Split internal files/directories when independent evolution, reuse, or size warrants it. This README owns this module's subproblem and design details; the parent retains summary and navigation.
-
-## 9. Functional Implementation Specification
-
-**Design proposal:** the interfaces and file names below are implementation targets, not existing code or ACT APIs. Add them only with the task that uses them. The task table above owns delivery status.
-
-### Feature Behavior
-
-| Feature | Trigger | Observable result |
-| --- | --- | --- |
-| Verify a fixed input | The worker submits model/spec/config references. | Invoke ACT and return its verdict/counterexample/provenance without reinterpretation. |
-| Expose a running computation | The application needs observation/inspection handles. | Bind a run handle to the actual execution and its safe observation boundaries. |
-| Control supported work | Receive a versioned control command. | Apply only supported operations at ACT-safe points and report the real outcome. |
-
-### Processing Flow
-
-1. Resolve valid session/model/spec handles and validate configuration against capabilities.
-2. Start ACT computation in the already-owned worker context.
-3. Bind run identity to committed observation/inspection state; convert completion and failures.
-4. For controls, recheck target/revision at the execution boundary, then return ACT applied/rejected evidence.
-
-### Proposed Public Operations
-
-| Operation | Contract and responsibility |
-| --- | --- |
-| `verify(session, model, spec, config) → VerifyResult` | First supported mode may be blocking inside the worker; it must not block the HTTP server. |
-| `startExecution(...) → RunHandle` | Proposed extension for observable execution; concrete semantics must be agreed with ACT. |
-| `submitControl(runHandle, command) → ControlOutcome` | Requires engine capability and safe-boundary semantics; do not assume the API exists today. |
-
-### Planned Files (design targets)
-
-Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
-
-| File | Responsibility |
-| --- | --- |
-| `adapter.py` | Version-specific invocation and result conversion. |
-| `controls.py` | Add only after supported control hooks exist. |
-| `test_execution.py` | Native parity, verdict/error separation, and safe controls. |
-
-### State, Failure, and Recovery Rules
-
-For a command whose application is uncertain after transport failure, do not retry blindly. Return uncertainty for application-level reconciliation. A dropped domain, exhausted frontier, or local solver SAT status must not be transformed into a new global verdict by the adapter.
-
-### Task Completion Record
-
-For each completed task, attach its implementation PR, fixture/input provenance, exact commands and results, any ACT/provider dependency, and remaining capability limitations. Update status here only after the stated evidence exists. Tests mentioned in this document remain planned until then.
+</details>

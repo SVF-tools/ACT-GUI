@@ -1,82 +1,102 @@
 # Model and Specification Adapter
 
-**Status:** first version: `describe.py` (MSB-01..03 for JSON nets with box INPUT_SPEC), `sources.py` (MSB-04); parity tests in `test_model_spec.py`; A review pending. **Owner:** B; A reviews scientific mapping.
-Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
+The current bridge loads JSON ACT nets, maps their DAG and box specification into immutable `ModelDescription` data, computes source hashes, and builds nets from VNN-LIB instances or supported image-classifier sources through ACT's own front ends. It does not own browser model views, graph layout, arbitrary path access, or a second specification parser. Keep this module distinct from [`visual_bench/model_spec`](../../visual_bench/model_spec/README.md), which owns catalog presentation, source selection, persistence, and wire mapping.
 
+For project navigation, see [engine_bridge flow](../README.md#flow-diagram) and [choose a development task](../../README.md#choose-a-development-task).
 
-## Current Files and Usage
+## Change Guide
 
-| File | Responsibility |
-| --- | --- |
-| `describe.py` | `load_net(path)`, `describe_model(path)` → `ModelDescription` (layers, input specs, output spec), `file_sha256`. |
-| `sources.py` | Model sources: `vnnlib_instances()`, `classifier_sources()`, `dataset_sample()`, `build_vnnlib_net()`, `build_classifier_net()` → `BuiltNet` (description, params, `input_rows`). |
-| `__init__.py` | Public API: `describe_model`, `file_sha256`; `sources` is imported as a submodule. |
-| `test_model_spec.py` | Native DAG/spec parity, image specs, source builders vs. ACT spec creation, rejected instances. |
-
-Used by: `visual_bench/model_spec` (catalog, sources, descriptions), execution and inspection (`load_net`). Tests: `.venv/bin/python -m pytest engine_bridge/model_spec`.
+| Goal | Required edits | Conditional / reused path |
+| --- | --- | --- |
+| Change DAG/spec description | [describe.py](describe.py), native parity tests; [contracts.py](../contracts.py) for a new field | [Workbench model_spec](../../visual_bench/model_spec/README.md#change-guide) mapping/schema/view only for new public data or meaning. |
+| Add or fix source building | [sources.py](sources.py), [test_model_spec.py](test_model_spec.py) | Existing discovery/list shapes may suffice; edit workbench load input/UI only when the user request changes. |
+| Change batch support | Builder row semantics and relevant tests | [execution/methods.py](../execution/methods.py) changes only when ACT method eligibility changes; a different row count already follows the current rule. |
+| Change graph layout or persisted model IDs | [visual_bench/model_spec](../../visual_bench/model_spec/README.md#change-guide) | Keep renderer and storage policy outside this bridge. |
 
 ## Flow Diagram
 
-Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
+Arrows name requests, returned data, or persistence handoffs. Only implemented paths are shown.
 
 ```mermaid
 flowchart TB
-  classDef ext stroke-dasharray: 4 3
-  VMS["visual_bench model_spec<br/>ModelService"]:::ext
-  EXIN["execution, inspection"]:::ext
-  ES["engine_session<br/>act_imports"]:::ext
-  D["describe.py<br/>describe_model, load_net, file_sha256"]
-  S["sources.py<br/>vnnlib_instances, classifier_sources,<br/>dataset_sample, build_*_net"]
-  VMS -- "ModelDescription" --> D
-  VMS -- "sources, samples, BuiltNet" --> S
-  EXIN -- "load_net" --> D
-  D & S -- "act_imports" --> ES
-  D -- "load_net_from_file" --> ACT[("ACT serialization,<br/>spec creators")]
-  S --> ACT
-  S --> Data[("ACT data/ and literature/")]
+Caller["visual_bench/model_spec"] -->|"Source and destination path"| Builder["sources.py<br/>build source"]
+  Builder -->|"ACT front-end conversion"| ACT["ACT"]
+  ACT -->|"Net written to requested path"| Builder
+  Builder -->|"BuiltNet metadata"| Caller
+  Caller -->|"Model path"| Describe["describe.py<br/>describe_model"]
+  Describe -->|"ModelDescription"| Caller
 ```
 
-## 1. Subproblems and Objective
+| Block | Code / contract | Handoff |
+| --- | --- | --- |
+| Source discovery/build | [sources.py](sources.py): source lists, dataset_sample, build_vnnlib_net, build_classifier_net; BuiltNet records build metadata | [Workbench model_spec](../../visual_bench/model_spec/README.md#flow-diagram) hashes/stores the output file and selects methods. |
+| Description | [describe.py](describe.py): describe_model, file_sha256; ModelDescription in [contracts.py](../contracts.py) | Workbench maps the neutral description into ModelDescriptionOut. |
+| Internal loader | [describe.py](describe.py): load_net uses [engine_session](../engine_session/README.md#flow-diagram) | [execution](../execution/README.md#flow-diagram) and [inspection](../inspection/README.md#flow-diagram) get a process-local ACT net; it is not a public wire object. |
 
-Obtain accurate, stable, read-only model/specification descriptions from ACT for workbench consumption.
+## Validation
 
-| Subproblem | Responsibility |
+Run the focused real-ACT tests:
+
+```bash
+.venv/bin/python -m pytest engine_bridge/model_spec
+```
+
+The parity tests use native ACT networks and the pinned catalog. Source-builder tests require ACT data, ONNX files, and torchvision datasets, and are skipped or rejected by their own `require_sources` and structured error paths when those inputs are unavailable. No test result is implied by this guide.
+
+## Reference and Backlog
+
+<details>
+<summary>Current files and operation details</summary>
+
+## Current Files and Usage
+
+| File | Current responsibility |
 | --- | --- |
-| Loading | Parse models/specifications through supported ACT entry points, not a separate parser with different semantics. |
-| Mapping | Layer/tensor IDs, DAG connections, variable mapping, shape/dtype, input domains, and output constraints. |
-| Boundaries | Distinguish model snapshots from native handles and metadata from large weight artifacts. |
+| [describe.py](describe.py) | `load_net`, `describe_model`, `file_sha256` |
+| [sources.py](sources.py) | VNN-LIB and classifier discovery, dataset samples, `build_vnnlib_net`, `build_classifier_net`, `BATCH_LIMIT` |
+| [__init__.py](__init__.py) | Re-exports `describe_model` and `file_sha256`; `sources` remains a submodule |
+| [test_model_spec.py](test_model_spec.py) | Native DAG/spec parity, image shapes and centers, builder parity, and rejected inputs |
 
-## 2. Scope and Non-goals
+The public bridge types are `ModelDescription`, `LayerDescription`, `InputSpec`, `OutputSpec`, `BuiltNet`, `DatasetSample`, `VnnlibInstance`, `ClassifierSource`, and `BridgeError` in [`../contracts.py`](../contracts.py). [describe.py](describe.py) and [sources.py](sources.py) use `engine_session.act_imports`.
 
-Own the behavior above and its failure/availability states. Deliver it incrementally using the sequence below; the full scope is not a first-slice requirement.
+## Operation Notes
 
-Does not emit Model Explorer-specific formats, compute graph layout, or silently replace unsupported specifications.
+### Change model or specification mapping
 
-## 3. Inputs, Outputs, and State
+Edit [describe.py](describe.py):
 
-- **Inputs:** Valid SessionHandle, permitted model/specification sources, and loading parameters.
-- **Outputs:** ModelDescription, SpecDescription, stable IDs/provenance, and LoadError/Unsupported results.
-- State, absence, and scientific semantics follow the [architecture](../../docs/design.md). Type names here describe intended contracts, not existing APIs.
+* `load_net(path)` is the only ACT JSON loader and raises structured `BridgeError` values for missing or unreadable files.
+* `describe_model(path)` maps ACT layers, predecessor/successor IDs, shapes, parameter summaries, `INPUT_SPEC` boxes, and one `ASSERT` into `ModelDescription`.
+* `_MAX_SPEC_VALUES` and `_MAX_SPEC_ROWS` are deliberate payload limits. A larger or non-box input specification must raise `unsupported_spec`, not be truncated.
+* `file_sha256(path)` supplies snapshot identity for the workbench.
 
-## 4. Design Patterns and Rationale
+Keep ACT objects and tensors inside the bridge. Update [test_model_spec.py](test_model_spec.py) against native ACT calls and check repeated descriptions for stable equality and primitive leaves.
 
-**Adapter and anti-corruption layer.** Translate changing ACT representations into stable integration descriptions so GUI code does not track internal object changes.
+### Add a model source or builder
 
-**Immutable snapshots.** Bind descriptions to source hashes and do not expose mutable tensors or caches.
+Edit [sources.py](sources.py) and its parity tests:
 
-Use small interfaces, pure functions, or ordinary classes. A pattern name alone does not justify adding a framework.
+* `vnnlib_instances()` lists existing `instances.csv` entries under ACT data.
+* `classifier_sources()` lists available pinned ONNX and dataset sources.
+* `dataset_sample()` returns a neutral `DatasetSample`.
+* `build_vnnlib_net()` uses ACT `create_specs_from_paths`.
+* `build_classifier_net()` uses ACT ONNX conversion and `TorchToACT`, writes an ACT net, and returns `BuiltNet`.
 
-## 5. Dependencies and Implementation Placement
+Preserve source parameters, content-addressed output, and the distinction between one input row and a batch. `visual_bench/model_spec/service.py` owns the model ID and storage mapping.
 
-Uses engine_session, shared contracts, and native ACT loading/description capabilities. Does not depend on inspection or GUI modules.
+### Change method eligibility
 
-Start with one mapping module using neutral types. The workbench separately encodes the wire schema.
+If a builder changes input-row semantics, inspect `engine_bridge/execution/methods.py` and its tests. A new row count alone already follows the existing eligibility rule. The workbench asks `verify_methods` and adds universal `fuzz` through the execution bridge.
 
-Add code and focused tests in this module as implementation proceeds. Keep language/runtime boundaries explicit. No installation or test commands exist yet.
 
-## 6. Implementation Plan
+</details>
 
-All tasks are **Planned**. IDs identify reviewable implementation slices; dependencies are completion prerequisites, not code-import instructions. Fixture-based work may proceed earlier against an agreed contract, but it does not satisfy real-integration acceptance.
+<details>
+<summary>Task evidence, design constraints and future capabilities</summary>
+
+<a id="1-subproblems-and-objective"></a><a id="2-scope-and-non-goals"></a><a id="3-inputs-outputs-and-state"></a><a id="4-design-patterns-and-rationale"></a><a id="5-dependencies-and-implementation-placement"></a><a id="6-implementation-plan"></a><a id="7-acceptance-and-tests"></a><a id="8-future-extraction-criteria"></a><a id="9-functional-implementation-specification"></a>
+
+## Task Evidence
 
 | ID | Deliverable | Depends on | Completion evidence |
 | --- | --- | --- | --- |
@@ -85,63 +105,11 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 | MSB-03 | Implement spec loading and validation | MSB-02 | Real input-domain/output-constraint mapping matches ACT; invalid variables and unsupported representations have explicit errors. |
 | MSB-04 | Build nets from model sources | MSB-03 | `sources.py`: VNN-LIB instances listed from `ACT_ROOT/data/vnnlib/*/instances.csv` and built with ACT's `create_specs_from_paths` (first query); ONNX image classifiers (BaVerLy MNIST/CIFAR-10, EMSOFT MNIST 4x256) built as an L-inf box of radius eps around a chosen MNIST/CIFAR-10 test image (or a batch of up to 64 distinct test images, one ACT input/spec row each, which ACTFuzzer fuzzes as one batch; ACT's `verify_once` rejects such a net, so a batch is fuzz-only) with a TOP1_ROBUST assertion, via `convert_onnx_to_pytorch`, `VerifiableModel`, `TorchToACT`. Parity tests: the VNN-LIB box/property equals ACT's spec creation, the classifier box equals clip(image ± eps) with the dataset label, and the builder reproduces a pinned catalog net byte for byte. |
 
-Owner: **B**. A reviews scientific semantics; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.
+## Boundaries and Cross-Module Changes
 
-Missing ACT interfaces require linked ACT issues/changes owned by A. Record the required capability and engine PR before marking the corresponding GUI integration task complete.
+Description-only changes pass through the existing `visual_bench/model_spec` mapping when dataclass fields and meanings stay compatible. New fields require that service's Pydantic schema, generated wire types, and tests. Changes to source parameters or input row count also affect method eligibility and the workbench load flow. Do not edit generated browser types by hand. ACT loader or spec semantics changes require native parity tests and a capability or error update in the owning bridge module.
 
-## 7. Acceptance and Tests
 
-- Connections, shapes, variables, and normalization agree with native ACT.
-- Repeated reads of a snapshot preserve identity.
-- Invalid or unsupported inputs have explicit errors; descriptions contain no raw ACT objects.
+The earlier design proposed explicit model and spec handles and separate mapping files. Those are not current APIs. Add them only when a caller needs lifecycle or independently complex mapping. A source content change must create a new snapshot identity. Renderer fields, arbitrary AI paths, raw tensors, and a multi-engine plugin layer remain outside this module.
 
-On completion, provide real samples, commands actually run, results, and unverified items, then update this document's status. See the [development plan](../../docs/plan.md).
-
-## 8. Future Extraction Criteria
-
-Split internal files/directories when independent evolution, reuse, or size warrants it. This README owns this module's subproblem and design details; the parent retains summary and navigation.
-
-## 9. Functional Implementation Specification
-
-**Design proposal:** the interfaces and file names below are implementation targets, not existing code or ACT APIs. Add them only with the task that uses them. The task table above owns delivery status.
-
-### Feature Behavior
-
-| Feature | Trigger | Observable result |
-| --- | --- | --- |
-| Load a model | Given an allowed artifact source and active session. | Use ACT loading and return a model handle plus an immutable structural description. |
-| Load/validate a specification | Given a model reference and specification data/source. | Preserve domains, constraints, variable mapping, normalization, and unsupported reasons. |
-| Describe without payload inflation | Request model/spec metadata. | Provide stable IDs and artifact references without dumping all weights or mutable ACT caches. |
-
-### Processing Flow
-
-1. Resolve the workbench-provided source into an ACT-supported loader input.
-2. Invoke ACT loading/validation and capture the source hash and engine baseline.
-3. Map DAG/layer/tensor identity and specification variables into neutral descriptions.
-4. Retain native handles inside their owner process; expose metadata/artifact references only.
-
-### Proposed Public Operations
-
-| Operation | Contract and responsibility |
-| --- | --- |
-| `loadModel(session, source) → ModelHandle + ModelDescription` | Stable IDs are scoped to a model snapshot. |
-| `loadSpec(session, modelHandle, sourceOrDraft) → SpecDescription` | Use ACT validation; preserve unsupported types rather than coercing them. |
-| `describeModel(modelHandle) → ModelDescription` | Read-only mapping; no renderer-specific fields or raw ACT objects. |
-
-### Planned Files (design targets)
-
-Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
-
-| File | Responsibility |
-| --- | --- |
-| `adapter.py` | ACT loader/validator mapping and immutable description conversion. |
-| `mapping.py` | Add if graph/spec mapping becomes independently complex. |
-| `test_mapping.py` | Native parity, stable identity, unsupported inputs, and immutable descriptions. |
-
-### State, Failure, and Recovery Rules
-
-Changing source content produces a new snapshot identity. A renderer namespace or filename is not a stable model identity. Native file loading is restricted to sources already admitted by the workbench, not arbitrary paths generated by AI.
-
-### Task Completion Record
-
-For each completed task, attach its implementation PR, fixture/input provenance, exact commands and results, any ACT/provider dependency, and remaining capability limitations. Update status here only after the stated evidence exists. Tests mentioned in this document remain planned until then.
+</details>

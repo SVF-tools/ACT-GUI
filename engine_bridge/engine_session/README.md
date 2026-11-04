@@ -1,80 +1,93 @@
 # Engine Session
 
-**Status:** first version: `session.py` (ES-01 probe, diagnostics, capabilities; ES-04 Gurobi license probe); ES-02 handles and ES-03 not started. **Owner:** B; A reviews environment and capability semantics.
-Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
+The current bridge can locate the configured ACT checkout, import it, probe its commit and runtime, report the pinned baseline capabilities, and run Gurobi's own license check in a fresh process. It does not create session handles or manage workers, queues, HTTP connections, or user sessions. The workbench owns worker lifecycle. Follow the [repository rules](../../AGENTS.md) and [engine_bridge scope](../README.md).
 
+For project navigation, see [engine_bridge flow](../README.md#flow-diagram) and [choose a development task](../../README.md#choose-a-development-task).
 
-## Current Files and Usage
+## Change Guide
 
-| File | Responsibility |
-| --- | --- |
-| `session.py` | `act_root()`, `act_imports()` (makes the pinned ACT importable or raises `act_missing`), `probe(expected_commit)` → `EngineInfo` with capabilities and diagnostics, `probe_gurobi(license_file)` → `SolverStatus`. |
-| `__init__.py` | Public API: `act_imports`, `act_root`, `probe`, `probe_gurobi`. |
-| `test_engine_session.py` | Probe against the pinned commit, missing ACT, version mismatch, Gurobi license rejection. |
-
-Used by: every other bridge module (`act_imports`), `visual_bench/engine` (status, license check). Tests: `.venv/bin/python -m pytest engine_bridge/engine_session`.
+| Goal | Required edits | Conditional / reused path |
+| --- | --- | --- |
+| Change checkout discovery or diagnostics | [session.py](session.py), [test_engine_session.py](test_engine_session.py) | Existing EngineInfo consumers need no change if fields/semantics remain compatible. |
+| Advertise a capability | Prove the native ACT path, then update _BASELINE_CAPABILITIES and the owning adapter/test | Update workbench gating only if availability/contract changes, not just because a capability label is added. |
+| Change Gurobi probing | probe_gurobi in [session.py](session.py), probe tests | License storage/upload policy belongs to [visual_bench/engine](../../visual_bench/engine/README.md#change-guide). |
+| Add process-local handles | ES-02 backlog and ACT lifecycle prerequisite | No current handle API exists; keep worker supervision in verification. |
 
 ## Flow Diagram
 
-Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
+Arrows name requests, returned data, or persistence handoffs. Only implemented paths are shown.
 
 ```mermaid
 flowchart TB
-  classDef ext stroke-dasharray: 4 3
-  VE["visual_bench<br/>engine"]:::ext
-  VMS["visual_bench<br/>model_spec"]:::ext
-  BR["model_spec, execution,<br/>inspection"]:::ext
-  P["probe"]
-  PG["probe_gurobi"]
-  AI["act_root<br/>act_imports"]
-  VE --> P & PG
-  VMS --> AI
-  BR --> AI
-  P & AI --> ACT[("ACT checkout")]
-  PG --> GRB[("gurobipy")]
+Caller["visual_bench/engine"] -->|"Expected commit / optional license path"| Probe["session.py<br/>probe / probe_gurobi"]
+  Probe -->|"Read metadata / run native probe"| Runtime["ACT checkout / Gurobi subprocess"]
+  Runtime -->|"Diagnostics / license check result"| Probe
+  Probe -->|"EngineInfo / SolverStatus"| Caller
 ```
 
-## 1. Subproblems and Objective
+| Block | Code / contract | Handoff |
+| --- | --- | --- |
+| Probe | [session.py](session.py): probe, probe_gurobi; [contracts.py](../contracts.py): EngineInfo, SolverStatus | [Workbench engine](../../visual_bench/engine/README.md#flow-diagram) maps status and gating. |
+| Import setup | [session.py](session.py): act_root, act_imports | [model_spec](../model_spec/README.md#flow-diagram), [execution](../execution/README.md#flow-diagram), [inspection](../inspection/README.md#flow-diagram) reuse it internally; events does not import ACT. |
 
-Establish an ACT integration context with explicit versions/capabilities and manage engine resource handles.
+## Validation
 
-| Subproblem | Responsibility |
+Run the focused real-ACT tests:
+
+```bash
+.venv/bin/python -m pytest engine_bridge/engine_session
+```
+
+The tests use the pinned catalog and real ACT checkout. `test_probe_missing_act_is_a_deterministic_error` uses a temporary path only for the missing-environment branch. Gurobi tests are skipped when `gurobipy` is not installed. No test result is implied by this guide.
+
+Acceptance evidence for the stable current slice is ES-01 and ES-04 below. ES-02 and ES-03 remain planned.
+
+## Reference and Backlog
+
+<details>
+<summary>Current files and operation details</summary>
+
+## Current Files and Usage
+
+| File | Current responsibility |
 | --- | --- |
-| Version | Inspect the actual ACT commit/API and dependencies instead of inferring capabilities from GUI versions. |
-| Capabilities | Describe supported model/specification/inspection/operation scopes and limitations. |
-| Resources | Acquire/release handles and prevent cross-process misuse or access after release. |
+| [session.py](session.py) | `act_root`, `act_imports`, `probe`, `probe_gurobi`, and the baseline capability table |
+| [__init__.py](__init__.py) | Re-exports `act_imports`, `act_root`, `probe`, and `probe_gurobi` |
+| [test_engine_session.py](test_engine_session.py) | Real pinned-commit probe, missing ACT, version mismatch, and Gurobi license rejection |
 
-## 2. Scope and Non-goals
+Import callers are model_spec, execution and inspection through `act_imports`, plus `visual_bench/engine` through `probe` and `probe_gurobi`. The bridge types are `EngineInfo`, `Capability`, `Diagnostic`, `SolverStatus`, and `BridgeError` in [`../contracts.py`](../contracts.py).
 
-Own the behavior above and its failure/availability states. Deliver it incrementally using the sequence below; the full scope is not a first-slice requirement.
+## Operation Notes
 
-Does not manage user sessions, Web connections, worker startup/restart policy, or task queues.
+### Change the ACT probe or capability list
 
-## 3. Inputs, Outputs, and State
+Edit [session.py](session.py):
 
-- **Inputs:** Pinned dependency configuration, required capabilities, and actual execution environment.
-- **Outputs:** EngineInfo, Capabilities, SessionHandle, and structured unavailability diagnostics.
-- State, absence, and scientific semantics follow the [architecture](../../docs/design.md). Type names here describe intended contracts, not existing APIs.
+* `act_root()` resolves `ACT_ROOT`, defaulting to `/data1/guanqin/ACT`.
+* `act_imports()` verifies the checkout and imports ACT, raising `BridgeError` with `act_missing` or `act_import_failed`.
+* `_BASELINE_CAPABILITIES` is the source for advertised support. Keep each source tied to a real ACT call or an explicit missing hook.
+* `probe(expected_commit, root)` returns `EngineInfo` with commit, Python, torch, CUDA, capabilities, and diagnostics. A commit mismatch is a warning, not a failed probe. A missing or unimportable checkout is an error.
+* `probe_gurobi(license_file)` starts a separate Python process and returns `SolverStatus`. It reports Gurobi's result, never a credential value, and does not claim that current methods use Gurobi.
 
-## 4. Design Patterns and Rationale
+Update [test_engine_session.py](test_engine_session.py) with a real baseline expectation when ACT changes. Then inspect `visual_bench/engine/service.py`, which maps `EngineInfo` to the Engine tab and calls `require_engine()` before bridge work.
 
-**Session facade and explicit resource lifecycle.** Use one integration entry point for capabilities and handles; avoid an implicit global ACT singleton.
+### Add an ACT-dependent bridge capability
 
-**Capability discovery.** Select behavior from actual capability information instead of spreading version branches throughout the workbench.
+First establish the native ACT call and its semantics. Then update `_BASELINE_CAPABILITIES`, the owning bridge module, its parity test, and the workbench service mapping. If the capability needs a new ACT hook, retain the task's ACT dependency in [docs/plan.md](../../docs/plan.md). Do not advertise a capability because a UI control exists.
 
-Use small interfaces, pure functions, or ordinary classes. A pattern name alone does not justify adding a framework.
+### Add resource handles
 
-## 5. Dependencies and Implementation Placement
+This is planned work, not a current API. It requires ES-01, then ES-02 and ACT-02. Add process ownership, close behavior, and post-close diagnostics only when ACT exposes a safe lifecycle. Do not move worker startup or restart policy into this module.
 
-Depends only on ACT/environment and integration contracts. Workbench workers create/use sessions; no callbacks into workbench logic are required.
 
-Start with one session adapter, not a multi-engine provider registry.
+</details>
 
-Add code and focused tests in this module as implementation proceeds. Keep language/runtime boundaries explicit. No installation or test commands exist yet.
+<details>
+<summary>Task evidence, design constraints and future capabilities</summary>
 
-## 6. Implementation Plan
+<a id="1-subproblems-and-objective"></a><a id="2-scope-and-non-goals"></a><a id="3-inputs-outputs-and-state"></a><a id="4-design-patterns-and-rationale"></a><a id="5-dependencies-and-implementation-placement"></a><a id="6-implementation-plan"></a><a id="7-acceptance-and-tests"></a><a id="8-future-extraction-criteria"></a><a id="9-functional-implementation-specification"></a>
 
-All tasks are **Planned**. IDs identify reviewable implementation slices; dependencies are completion prerequisites, not code-import instructions. Fixture-based work may proceed earlier against an agreed contract, but it does not satisfy real-integration acceptance.
+## Task Evidence
 
 | ID | Deliverable | Depends on | Completion evidence |
 | --- | --- | --- | --- |
@@ -83,62 +96,11 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 | ES-04 | Probe optional solver licenses (Gurobi) | ES-01 | `probe_gurobi(license_file)` starts a Gurobi environment in a fresh process and returns Gurobi's own verdict as licensed, restricted, invalid, or not_installed, without credential values; a host-bound license for another host reports invalid with Gurobi's HostID message (`test_engine_session.py`). |
 | ES-03 | Validate cleanup and compatibility regression | ES-02 | Repeated close and post-close access produce deterministic diagnostics with no leaked resources; ES-01 incompatibility diagnostics hold across every declared engine combination. |
 
-Owner: **B**. A reviews scientific semantics; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.
+## Boundaries and Cross-Module Changes
 
-Missing ACT interfaces require linked ACT issues/changes owned by A. Record the required capability and engine PR before marking the corresponding GUI integration task complete.
+Changes to this module normally pass through existing callers without edits when the public functions and frozen contract fields remain compatible. A changed capability affects `visual_bench/engine` and any service that gates on it. A changed `EngineInfo` or `SolverStatus` requires updates to the workbench schemas and their tests, but engine_bridge must not import those schemas. ACT version changes require the adapter, parity tests, and capability source to move together.
 
-## 7. Acceptance and Tests
 
-- Missing ACT or an incompatible version produces structured diagnostics.
-- Unsupported capabilities never default to true.
-- Repeated release and use of invalid handles have defined behavior without resource leaks.
+The original design target was a process-local session facade with explicit `openSession` and `closeSession` operations. That API is not implemented. Add it only with ES-02 and ACT-02 evidence. Split internal files only when lifecycle logic has independent evolution or size. Do not create a provider registry or another process manager for this task.
 
-On completion, provide real samples, commands actually run, results, and unverified items, then update this document's status. See the [development plan](../../docs/plan.md).
-
-## 8. Future Extraction Criteria
-
-Split internal files/directories when independent evolution, reuse, or size warrants it. This README owns this module's subproblem and design details; the parent retains summary and navigation.
-
-## 9. Functional Implementation Specification
-
-**Design proposal:** the interfaces and file names below are implementation targets, not existing code or ACT APIs. Add them only with the task that uses them. The task table above owns delivery status.
-
-### Feature Behavior
-
-| Feature | Trigger | Observable result |
-| --- | --- | --- |
-| Probe ACT | Start the workbench service/worker. | Report the actual ACT version/environment and supported capabilities without importing GUI code. |
-| Bind engine resources | A worker opens a session for supported work. | Return a process-local handle with explicit ownership and release semantics. |
-| Reject incompatible use | An operation requires an unavailable method or uses a closed handle. | Return a structured reason; never optimistically advertise the capability. |
-
-### Processing Flow
-
-1. Read configured ACT baseline and inspect installed engine metadata/capabilities.
-2. Validate the requested capability set and resource prerequisites.
-3. Create a session inside its owning execution process; expose only neutral diagnostics outside it.
-4. Release resources deterministically and invalidate dependent handles.
-
-### Proposed Public Operations
-
-| Operation | Contract and responsibility |
-| --- | --- |
-| `probeEngine(config) → EngineInfo + Capabilities` | Non-computational compatibility probe; record unknown/unsupported explicitly. |
-| `openSession(config) → SessionHandle` | Handle has an owning process/session identity; it is not a browser DTO. |
-| `closeSession(handle) → CloseResult` | Idempotent close; subsequent operations receive invalid_handle. |
-
-### Planned Files (design targets)
-
-Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
-
-| File | Responsibility |
-| --- | --- |
-| `adapter.py` | ACT metadata, binding, capability mapping, and cleanup. |
-| `test_session.py` | Missing/incompatible engine and handle lifecycle. |
-
-### State, Failure, and Recovery Rules
-
-Do not manage worker scheduling or user run lists here. A supported GUI platform does not imply this engine environment is supported; report engine compatibility independently.
-
-### Task Completion Record
-
-For each completed task, attach its implementation PR, fixture/input provenance, exact commands and results, any ACT/provider dependency, and remaining capability limitations. Update status here only after the stated evidence exists. Tests mentioned in this document remain planned until then.
+</details>

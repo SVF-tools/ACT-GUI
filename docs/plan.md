@@ -1,6 +1,17 @@
 # Development Plan
 
-**Status:** a first runnable version exists; see [First-version status](#first-version-status). No task is marked complete: each row there states what was built and what its acceptance still lacks. Module READMEs own detailed feature behavior, interfaces, implementation files, task acceptance, and completion records. This document owns bootstrap, ACT-side, and cross-cutting tasks, integration order, and release acceptance.
+**Status:** a runnable version exists; [First-version status](#first-version-status) records dated implementation evidence and remaining acceptance gaps. An implementation milestone is not full roadmap acceptance. Module READMEs own current development paths, detailed task acceptance and completion records. This document owns the task index, ACT prerequisites, future integration order and release acceptance.
+
+## Choose the Right Entry
+
+| Your task | Read first |
+| --- | --- |
+| Change an implemented feature | [Root task chooser](../README.md#choose-a-development-task), then the owning module's Change Guide and Validation sections |
+| Understand a cross-module handoff | [Workbench map](../visual_bench/README.md#flow-diagram) or [bridge map](../engine_bridge/README.md#flow-diagram) |
+| Plan an unsupported capability | The module backlog, then [Cross-repository Work](#cross-repository-work) and the integration slices below |
+| Review past acceptance evidence | [First-version status](#first-version-status) and the owning module's task record; rerun relevant checks for a new change |
+
+Roadmap dependencies below are not a file-edit sequence. A feature may reuse a completed lifecycle/storage path without modifying it. Current flows belong in module guides; proposed APIs and future file names stay in their backlogs.
 
 Task dependencies are prerequisites for acceptance, not code-import directions. Developers may build against explicitly labeled fixtures before engine work lands; a fixture alone cannot complete a real ACT integration task. No duration or staffing-throughput estimate is assumed.
 
@@ -19,7 +30,7 @@ BASE-02 does not wait for ACT; only BASE-03 needs the pinned engine. Development
 | Module | Owner | Task IDs | Detailed plan |
 | --- | --- | --- | --- |
 | visual_bench/workspace | C | WS-01, WS-02, WS-03 | [README](../visual_bench/workspace/README.md) |
-| visual_bench/model_spec | C | MSV-01, MSV-02, MSV-03 | [README](../visual_bench/model_spec/README.md) |
+| visual_bench/model_spec | C | MSV-01, MSV-02, MSV-03, MSV-04 | [README](../visual_bench/model_spec/README.md) |
 | visual_bench/verification | B | VER-01, VER-02, VER-03, VER-04, VER-07 (stop, verdict banner) | [README](../visual_bench/verification/README.md) |
 | visual_bench/fuzzing | B (service), C (views) | VER-06, VER-07 (saved counterexamples) | [README](../visual_bench/fuzzing/README.md) |
 | visual_bench/engine | B | VER-05 | [README](../visual_bench/engine/README.md) |
@@ -27,13 +38,15 @@ BASE-02 does not wait for ACT; only BASE-03 needs the pinned engine. Development
 | visual_bench/analysis | D | ANA-01, ANA-02, ANA-03 | [README](../visual_bench/analysis/README.md) |
 | visual_bench/assistant | B | AI-01, AI-02, AI-03, AI-04 | [README](../visual_bench/assistant/README.md) |
 | visual_bench/records | B | REC-01, REC-02, REC-03, REC-04 | [README](../visual_bench/records/README.md) |
-| engine_bridge/engine_session | B | ES-01, ES-02, ES-03 | [README](../engine_bridge/engine_session/README.md) |
-| engine_bridge/model_spec | B | MSB-01, MSB-02, MSB-03 | [README](../engine_bridge/model_spec/README.md) |
+| engine_bridge/engine_session | B | ES-01, ES-02, ES-03, ES-04 | [README](../engine_bridge/engine_session/README.md) |
+| engine_bridge/model_spec | B | MSB-01, MSB-02, MSB-03, MSB-04 | [README](../engine_bridge/model_spec/README.md) |
 | engine_bridge/execution | B | EXE-01, EXE-02, EXE-03, EXE-04, EXE-05 | [README](../engine_bridge/execution/README.md) |
 | engine_bridge/inspection | A | INSP-01, INSP-02, INSP-03 | [README](../engine_bridge/inspection/README.md) |
 | engine_bridge/events | A | EVT-01, EVT-02, EVT-03 | [README](../engine_bridge/events/README.md) |
 
 ## Integration Slices
+
+These are roadmap acceptance chains, including unimplemented ACT capabilities. They do not describe the order of calls in the current workbench. Fuzzing reuses I2's run lifecycle and records; its current start/live/export paths are in the [fuzzing guide](../visual_bench/fuzzing/README.md#flow-diagram).
 
 | Slice | Required outcome | Main dependency chain |
 | --- | --- | --- |
@@ -44,7 +57,7 @@ BASE-02 does not wait for ACT; only BASE-03 needs the pinned engine. Development
 | I5: evidence-based AI | Ask about a selected real layer/stage, obtain supported evidence, and navigate to the source; then the same for a committed BaB node | AI-01 + ANA-01 → AI-02; AI-02 + BAB-01 → AI-03. Provider integration is selected and configured in AI-02 |
 | I6: controls, advanced analysis, export, and distribution | Shared manual/AI execution, recorded propagation, traceable exports, one-origin build | ACT-05 + EXE-03 → VER-04 → BAB-03/AI-04; INSP-03 + REC-03 → ANA-03; ANA-02 + REC-03 → REC-04; VER-03 → DIST-01 |
 
-First delivery is I1, then I2 and I3. I3 needs only a completed run plus ACT-01, so the first AI explanation (AI-02) can follow I3 without waiting for committed BaB events. I4 depends on the riskiest ACT changes (ACT-02/03) and may proceed in parallel with I3/AI-02 once I2 lands. Do not schedule all modules concurrently for a three-person team.
+The initial delivery sequence was I1, then I2 and I3; first-version implementations now exist with the gaps listed below. I3 needs only a completed run plus ACT-01, so real-provider explanation work (AI-02) can follow I3 without waiting for committed BaB events. I4 depends on the riskiest ACT changes (ACT-02/03) and may proceed in parallel with I3/AI-02 once I2's prerequisites are satisfied.
 
 ## Cross-repository Work
 
@@ -78,6 +91,8 @@ Each task owner supplies its tests. A reviews mathematical semantics; C reviews 
 | DIST-02 | B | Ship the workbench as a Docker Compose service with GPU support and user-supplied Gurobi licenses | BASE-02, BASE-03, ES-04, VER-05 | `scripts/docker_build.sh` builds one image from the pinned ACT commit; `docker compose up` serves the workbench on loopback; the bridge and service test suites pass inside the container on CPU and, with `compose.gpu.yaml`, on an NVIDIA GPU with the run result recording a CUDA device; no license file is present in the image. |
 
 ## First-version status
+
+The following is historical evidence, not a fresh test report or a replacement for current module guides. Later source-loading, fuzzing and structural additions are recorded in their own rows.
 
 Recorded 2026-11-03 against ACT `deff2fb0c031` (branch CLIMB, tracked tree clean), CPU, conda `act-py312` (Python 3.12, torch 2.11). Evidence: `.venv/bin/python -m pytest` (29 passed, real ACT), `npm test` (5 passed), `npm run typecheck`, `npm run check:types`, plus a headless-Chrome walk-through of the localhost UI (model → BaB run → layer → assistant → export). Fuzzing addition (same day): 39 passed, plus a headless-Chrome walk-through of live and completed fuzz runs on `bab_deep_mlp` and `unsafe_linear` (desktop dark/light, 390 px width).
 

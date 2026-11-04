@@ -1,78 +1,92 @@
 # Committed Events Adapter
 
-**Status:** first version: `coverage.py` (EVT-01 audit: final summary only); EVT-02/03 blocked on ACT-03. **Owner:** A; B integrates workbench mappings and reviews contract consistency.
-Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
+The current module does not observe ACT, import ACT, own SSE, or emit committed node and wave events. It filters final BaB metadata into a stable summary and reports the pinned baseline's observation coverage. Node-level events, rollback-safe commit batches, and backpressure remain blocked on ACT-03. The workbench owns event persistence, replay, and browser SSE.
 
+For project navigation, see [engine_bridge flow](../README.md#flow-diagram) and [choose a development task](../../README.md#choose-a-development-task).
 
-## Current Files and Usage
+## Change Guide
 
-| File | Responsibility |
-| --- | --- |
-| `coverage.py` | `observation_coverage()` (what the pinned ACT lets the GUI observe of BaB) and `bab_summary(metadata)` (final-summary keys only). |
-| `__init__.py` | Public API: `observation_coverage`, `bab_summary`, `BAB_SUMMARY_KEYS`. |
-
-Used by: the run worker (BaB summary) and `visual_bench/bab` (coverage). No dedicated tests yet: the BaB summary path is exercised by `visual_bench/verification/test_verification.py`.
+| Goal | Required edits | Conditional / reused path |
+| --- | --- | --- |
+| Include another scalar final-summary key | BAB_SUMMARY_KEYS in [coverage.py](coverage.py), affected verification assertions | Worker's summary dictionary and generic view may already carry/render it. No new SSE protocol is required. |
+| Change declared coverage | observation_coverage in [coverage.py](coverage.py), capability evidence/tests | [BabService](../../visual_bench/bab/service.py) maps run-specific availability; change it only when semantics differ. |
+| Change event delivery/replay | [verification](../../visual_bench/verification/README.md#change-guide), [records](../../visual_bench/records/README.md#change-guide) | This module has no SSE transport. |
+| Add committed node/wave observations | EVT-02/03 backlog after ACT-03 | Requires native commit/rollback evidence and contracts, not inference from summary counters. |
 
 ## Flow Diagram
 
-Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there. This module does not import ACT: it reads metadata that execution already returned.
+Arrows name requests, returned data, or persistence handoffs. Only implemented paths are shown.
 
 ```mermaid
 flowchart TB
-  classDef ext stroke-dasharray: 4 3
-  W["visual_bench verification<br/>worker.py"]:::ext
-  BAB["visual_bench bab<br/>BabService"]:::ext
-  C["coverage.py<br/>bab_summary(metadata)"]
-  O["coverage.py<br/>observation_coverage()"]
-  P["planned EVT-02/03:<br/>committed node and wave events"]
-  W -- "final-summary keys, BAB_SUMMARY_KEYS" --> C
-  BAB -- "what pinned ACT exposes of BaB" --> O
-  P -. "blocked on ACT-03" .-> ACT[("ACT commit hooks")]
+Worker["verification worker"] -->|"RunOutcome.metadata"| Filter["bab_summary"]
+  Filter -->|"Filtered summary in worker output"| Worker
+  Worker -->|"Output file"| Supervisor["verification supervisor"]
+  Supervisor -->|"Persist result and bab.summary event"| Run["RunService query"]
+  Run -->|"Recorded result"| Bab["visual_bench/bab"]
+  Coverage["observation_coverage"] -->|"Baseline capability report"| Bab
 ```
 
-## 1. Subproblems and Objective
+| Block | Code / contract | Handoff |
+| --- | --- | --- |
+| Filter | [coverage.py](coverage.py): BAB_SUMMARY_KEYS, bab_summary; plain dict[str, object] | [worker.py](../../visual_bench/verification/worker.py) receives the return value; no direct adapter-to-browser stream. |
+| Persistence/query | [verification/service.py](../../visual_bench/verification/service.py): _commit_result, get | [verification](../../visual_bench/verification/README.md#flow-diagram) owns the lifecycle event and RunOut projection. |
+| Coverage | [coverage.py](coverage.py): observation_coverage; dict[str, str] | [BabService](../../visual_bench/bab/service.py) combines baseline coverage with run status/summary. |
 
-Provide ACT committed events with identity, ordering, and coverage for observation and recording.
+## Validation
 
-| Subproblem | Responsibility |
+There is no focused events test command today. Validate the current path with the existing verification tests:
+
+```bash
+.venv/bin/python -m pytest visual_bench/verification/test_verification.py
+```
+
+That test exercises the real worker, final BaB summary, ordered workbench lifecycle events, and persisted records. It does not prove ACT node observation because the baseline has no observer. No test result is implied by this guide.
+
+## Reference and Backlog
+
+<details>
+<summary>Current files and operation details</summary>
+
+## Current Files and Usage
+
+| File | Current responsibility |
 | --- | --- |
-| Commit boundaries | Publish only after actual commit; temporary state before OOM retry/rollback must not become visible. |
-| Identity and order | Preserve run/node/revision, per-run sequence, and batch changes; lane indices are not node IDs. |
-| Coverage and backpressure | Distinguish wave summaries from full node events; report overflow or loss explicitly. |
+| [coverage.py](coverage.py) | `observation_coverage`, `bab_summary`, and `BAB_SUMMARY_KEYS` |
+| [__init__.py](__init__.py) | Re-exports the three public names |
+| Tests | No dedicated events test currently exists. The summary path is covered by `visual_bench/verification/test_verification.py` |
 
-## 2. Scope and Non-goals
+The current input is `RunOutcome.metadata`, already returned by `engine_bridge.execution`. The current outputs are `dict[str, str]` coverage data and a filtered `dict[str, object]` summary. No ACT object or workbench type crosses this module.
 
-Own the behavior above and its failure/availability states. Deliver it incrementally using the sequence below; the full scope is not a first-slice requirement.
+## Operation Notes
 
-Does not host SSE, persist an event log, make search decisions, or fabricate unobserved node history.
+### Change final BaB summary
 
-## 3. Inputs, Outputs, and State
+Edit [coverage.py](coverage.py):
 
-- **Inputs:** Committed ACT observer output, RunHandle, and observation configuration.
-- **Outputs:** Normalized events/batches, per-run sequence, coverage, gaps, and terminal states.
-- State, absence, and scientific semantics follow the [architecture](../../docs/design.md). Type names here describe intended contracts, not existing APIs.
+* `BAB_SUMMARY_KEYS` is the allowlist of metadata copied from ACT's final `VerifyResult`.
+* `bab_summary(metadata)` returns only keys present in that metadata.
+* `observation_coverage()` reports node and wave events as unsupported, final summary as available, and explains the missing ACT observer hook.
 
-## 4. Design Patterns and Rationale
+Update the visual_bench verification and BaB tests when summary keys or availability meanings change. The worker calls `bab_summary` after execution, and `visual_bench/bab/service.py` serves the resulting summary and coverage.
 
-**Observer adapter.** Translate ACT observations into neutral events without changing search semantics.
+### Add committed ACT events
 
-**Bounded producer-consumer flow.** Bound queues and handle cancellation/release; report gaps instead of silently discarding state.
+This is planned work, not a current API. It requires ACT-03 and EVT-01. First document the native commit and rollback boundary, then add neutral event contracts and parity tests. Publish only committed state. Do not infer nodes from final summary keys, timestamps, coverage counts, or lane indices.
 
-**Commit batches.** Identify all changes in a wave; consumers advance the visible revision only after complete application.
+### Change browser delivery
 
-Use small interfaces, pure functions, or ordinary classes. A pattern name alone does not justify adding a framework.
+Do not add SSE, replay, record storage, or browser event hooks here. Those belong to visual_bench verification and records. The bridge should return neutral committed batches and coverage only after ACT exposes them.
 
-## 5. Dependencies and Implementation Placement
 
-Uses contracts and ACT commit interfaces with execution-created run context. If ACT has no sequence, assign it at the commit boundary with one explicitly designated sequence owner.
+</details>
 
-Start with one observation adapter without introducing message middleware. Validate capability and coverage claims experimentally.
+<details>
+<summary>Task evidence, design constraints and future capabilities</summary>
 
-Add code and focused tests in this module as implementation proceeds. Keep language/runtime boundaries explicit. No installation or test commands exist yet.
+<a id="1-subproblems-and-objective"></a><a id="2-scope-and-non-goals"></a><a id="3-inputs-outputs-and-state"></a><a id="4-design-patterns-and-rationale"></a><a id="5-dependencies-and-implementation-placement"></a><a id="6-implementation-plan"></a><a id="7-acceptance-and-tests"></a><a id="8-future-extraction-criteria"></a><a id="9-functional-implementation-specification"></a>
 
-## 6. Implementation Plan
-
-All tasks are **Planned**. IDs identify reviewable implementation slices; dependencies are completion prerequisites, not code-import instructions. Fixture-based work may proceed earlier against an agreed contract, but it does not satisfy real-integration acceptance.
+## Task Evidence
 
 | ID | Deliverable | Depends on | Completion evidence |
 | --- | --- | --- | --- |
@@ -80,63 +94,11 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 | EVT-02 | Implement committed node/event batches | EVT-01, ACT-03 | With ACT-03 in the pinned baseline, rollback/retry leaves no ghost nodes; batch identity, seq, revision, and snapshot boundary agree. |
 | EVT-03 | Validate backpressure and observation overhead | EVT-02, PERF-01 | A burst either preserves complete committed data or reports an explicit gap/degradation; deterministic scientific outcomes match observer-off execution. |
 
-Owner: **A**. B reviews integration and contract consistency; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.
+## Boundaries and Cross-Module Changes
 
-Missing ACT interfaces require linked ACT issues/changes owned by A. Record the required capability and engine PR before marking the corresponding GUI integration task complete.
+Changing summary keys normally requires only `coverage.py` and the visual_bench BaB or verification mapping. Adding actual events crosses ACT, execution run context, shared bridge contracts, visual_bench records, verification SSE, and browser schemas. It must also update the parent [flow diagram](../README.md#flow-diagram). Do not claim committed events, node history, rollback handling, or controls until ACT-03 evidence exists.
 
-## 7. Acceptance and Tests
 
-- Failed attempts and retries do not create ghost nodes or duplicate commits.
-- Order by sequence rather than timestamp; batch and snapshot coverage boundaries agree.
-- Observation does not change deterministic-sample scientific outcomes, and overflow reports a gap/degraded recording.
+The earlier design proposed an observer iterator, commit positions, bounded buffers, and stop-observation operations. None exists today. When EVT-02 starts, choose one sequence owner, require an atomic ACT commit boundary, and report gaps instead of silently dropping data. The bridge must not create an SSE layer or reconstruct scientific history from summaries.
 
-On completion, provide real samples, commands actually run, results, and unverified items, then update this document's status. See the [development plan](../../docs/plan.md).
-
-## 8. Future Extraction Criteria
-
-Split internal files/directories when independent evolution, reuse, or size warrants it. This README owns this module's subproblem and design details; the parent retains summary and navigation.
-
-## 9. Functional Implementation Specification
-
-**Design proposal:** the interfaces and file names below are implementation targets, not existing code or ACT APIs. Add them only with the task that uses them. The task table above owns delivery status.
-
-### Feature Behavior
-
-| Feature | Trigger | Observable result |
-| --- | --- | --- |
-| Observe committed progress | Subscribe while a run executes. | Emit honest wave summaries first, identifying what detail is and is not available. |
-| Observe node changes | ACT supplies stable identities and commit hooks. | Emit complete committed batches of creation/update/resolution events without ghost state. |
-| Handle pressure and reconnect handoff | Consumer slows or observation stops. | Bound queues, report loss/coverage, and expose a sequence/checkpoint boundary for workbench persistence. |
-
-### Processing Flow
-
-1. Attach to verified ACT commit hooks using the execution run identity.
-2. Collect a wave’s changes without publishing transient retry state.
-3. Assign or preserve one per-run sequence and publish a complete batch with coverage.
-4. On overflow/cancellation, report a defined terminal/gap state and detach resources; the workbench owns replay/SSE.
-
-### Proposed Public Operations
-
-| Operation | Contract and responsibility |
-| --- | --- |
-| `observe(runHandle, config) → CommittedEventIterator` | Iterator yields normalized committed events/batches; coverage declares summary-only versus node-level information. |
-| `getCommittedPosition(runHandle) → CommitPosition` | Position must agree with the corresponding snapshot boundary, not merely the latest observed timestamp. |
-| `stopObservation(subscription) → ObservationStatus` | Releases observer resources without silently cancelling the ACT run. |
-
-### Planned Files (design targets)
-
-Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
-
-| File | Responsibility |
-| --- | --- |
-| `adapter.py` | Commit hooks, identity/sequence normalization, and coverage. |
-| `buffer.py` | Bounded queue and batch assembly only as required. |
-| `test_events.py` | Rollback, batch completeness, identity, overflow, and observer parity. |
-
-### State, Failure, and Recovery Rules
-
-Do not emit a new global sequence from both ACT and bridge. Choose one owner at the integration boundary. If ACT cannot provide an atomic snapshot/commit relationship, document and fix that engine capability before promising exact reconnect/replay.
-
-### Task Completion Record
-
-For each completed task, attach its implementation PR, fixture/input provenance, exact commands and results, any ACT/provider dependency, and remaining capability limitations. Update status here only after the stated evidence exists. Tests mentioned in this document remain planned until then.
+</details>

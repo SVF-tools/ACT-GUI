@@ -1,74 +1,82 @@
-# Documentation Scope
+# Documentation: Developer Navigation
 
-**Owner:** B coordinates cross-module consistency. A, C, and D maintain the scientific semantics, interaction, and validation content affected by their changes.
+[Project task chooser](../README.md#choose-a-development-task) → **documentation ownership**.
 
-## Purpose
+Documentation should let a developer find the smallest correct change without reading the entire repository. The root chooses a goal, parent scopes explain collaboration, and module guides connect the goal to files, contracts and tests. Keep technical documentation in English.
 
-Use a small set of documents to explain boundaries, decisions, and current work, so contributors can determine where an implementation belongs, who owns it, and how it will be accepted.
+## Change Guide
 
-## Responsibilities
-
-- [design.md](design.md): system boundaries, cross-module data/execution semantics, AI-native behavior, cross-platform access, and structure evolution.
-- [plan.md](plan.md): implementation order, role assignments, testing strategy, and completion criteria.
-- This README: documentation ownership, information placement, and maintenance rules.
-
-## Non-goals
-
-- Do not maintain a complete API field catalog independently of executable schemas. Once implemented, Pydantic owns the wire schema.
-- Document the defined major modules without prebuilding deeper component directories, an ADR collection, or task-generation machinery.
-- Do not present planned capabilities as implemented or unexecuted checks as test results.
-
-## Inputs and Outputs
-
-Inputs are confirmed requirements, design decisions, implementation constraints, and actual validation evidence. Outputs are the current scope, boundaries, plan, and acceptance criteria.
-
-Mark unresolved items explicitly. Update the original decision when new evidence changes it; do not accumulate contradictory appendices. Technical documents are maintained in English.
-
-## Information Ownership
-
-| Information | Authoritative location |
-| --- | --- |
-| Project navigation and overall startup entry point | Root README.md |
-| Repository-wide contributor rules | Root AGENTS.md |
-| Workbench scope and module navigation | visual_bench/README.md |
-| ACT integration scope and module navigation | engine_bridge/README.md |
-| Module subproblems, patterns, and implementation sequence | The owning module's README.md |
-| Cross-module architecture and decisions | design.md |
-| Cross-module task index, bootstrap, release, and validation strategy | plan.md |
-| Detailed feature tasks and completion evidence | The owning module’s README.md |
-
-Link to the owning document instead of maintaining independent copies. READMEs define responsibility; AGENTS.md defines contributor behavior.
+| Information to change | Authoritative location | Also update only when needed |
+| --- | --- | --- |
+| Task entry or startup instructions | [Root README](../README.md) | Parent/module links if entry points moved. |
+| Module responsibility or neighbor handoff | [visual_bench](../visual_bench/README.md) or [engine_bridge](../engine_bridge/README.md) | The producer and consumer module guides. |
+| Feature path, files, routes, tests or acceptance evidence | Owning module README | Parent summary if its responsibility or boundary contract changed. |
+| Cross-module invariant or architecture decision | [design.md](design.md) | Affected module guides and integration prerequisites. |
+| Task dependency or cross-repository prerequisite | [plan.md](plan.md) for the index; module README for detailed task | Keep stable task IDs and link the acceptance evidence. |
+| Repository-wide contributor behavior | [AGENTS.md](../AGENTS.md) | Scope-specific rules only if genuinely distinct. |
 
 ## Flow Diagram
 
-Where a piece of information goes, following the ownership table above. Dashed arrows are summary-and-link references, never copies.
+Arrows here mean **read next**, not runtime calls. A developer should follow one branch until the intended change and its validation are clear.
+
 
 ```mermaid
 flowchart TB
-  In["New information"] --> Kind{"What does<br/>it describe?"}
-  Kind -- "startup" --> Root["README.md"]
-  Kind -- "rules" --> Agents["AGENTS.md"]
-  Kind -- "architecture" --> Design["docs/design.md"]
-  Kind -- "task index" --> Plan["docs/plan.md"]
-  Kind -- "scope" --> Parent["visual_bench, engine_bridge<br/>README.md"]
-  Kind -- "module detail" --> Module["module<br/>README.md"]
-  Module -. "summary, link" .-> Parent
-  Parent -. "summary, link" .-> Root
-  Plan -. "task IDs" .-> Module
+  Goal["Root README<br/>Choose a development goal"] --> Scope["Parent README<br/>Find owner and handoffs"]
+  Scope --> Module["Module README<br/>Change Guide"]
+  Module --> Path["Scenario diagram<br/>Block-to-code mapping"]
+  Path --> Check["Validation<br/>Test and observable result"]
+  Module -. "Only when needed" .-> Detail["Reference and backlog<br/>Rationale, task evidence, future work"]
+
 ```
+
+| Block | What the reader must learn | What to leave for the next level |
+| --- | --- | --- |
+| Root | Which feature owns the intended change; how to run the project | Detailed API fields and file inventories |
+| Parent | Which modules collaborate and what crosses their boundaries | Internal helper calls and every import edge |
+| Module | Required edits, conditional edits, reused path, exact code/contract links, validation | Lengthy rationale and unimplemented design |
+| Reference/backlog | Constraints, stable task IDs, dependencies, acceptance evidence, future extraction criteria | Nothing here should masquerade as a current capability |
 
 ## Module README Structure
 
-Each defined module documents its status/owner, subproblems and objective, scope/non-goals, inputs/outputs/state, design patterns and rationale, dependencies and implementation placement, implementation sequence, acceptance tests, and future extraction criteria.
+Use a short current responsibility/status paragraph followed by:
 
-Each README carries a `## Flow Diagram` section with a Mermaid flowchart of its current code path. Arrows point from caller to callee; nodes from other modules are dashed and named as in the parent diagram, and every cross-module edge in a module diagram also appears in the parent diagram (the parent `visual_bench` or `engine_bridge` README, and the root README above both). Update the diagram in the same change as the code it describes.
+1. **Change Guide:** concrete developer goals mapped to required edits, conditional edits and existing pass-through code. Do not turn the runtime path into a mandatory edit checklist.
+2. **Flow Diagram:** one compact top-down Mermaid diagram per distinct use case. Follow requests through execution and show how the result reaches the user; separate live and recorded paths when their semantics differ.
+3. **Block mapping:** beside the diagram, link each block to its code entry, contract/artifact and neighbor guide. A file name in a box alone is not a development instruction.
+4. **Validation:** focused existing commands and an observable end-to-end result, including errors and unavailable data. Commands are not evidence until actually run.
+5. **Reference/backlog:** current file/route inventory, rationale, detailed task IDs/dependencies/evidence, and clearly labeled future plans. Use GitHub details disclosures for long material, not for the primary development path.
 
-Each module also includes a functional implementation specification: feature triggers/results, processing flow, proposed public operations, planned files, state/failure rules, and a task table with stable IDs, dependencies, and completion evidence. Proposed interfaces are labeled as design targets. Replace them with actual public interfaces and working commands when code exists. A pattern must explain the problem it solves; ordinary functions and small interfaces are sufficient unless a framework has demonstrated value.
+Browser-only modules do not need invented service layers. Storage and assistant modules use their actual store.py and explain.py entries. Preserve task IDs and evidence when reorganizing sections; repair inbound anchors when headings move.
 
-## Acceptance and Extraction Criteria
+### Diagram Correspondence
 
-Local links must resolve, current state must be distinguishable from planned work, and responsibilities must not conflict. Contributors should be able to identify the first implementation slice from these documents.
+- Parent blocks represent responsibilities; child diagrams expand the selected responsibility. They need not repeat every internal edge in the parent.
+- Use the same module names at each level. Qualify visual_bench/model_spec versus engine_bridge/model_spec whenever both scopes could be meant.
+- Label arrow meaning: request/call, result, event, artifact, or navigation. A return arrow is not an import dependency. Explain the legend locally rather than relying on color alone.
+- Every cross-module handoff links to the receiving module's guide and names its public contract. Do not maintain a duplicate field catalog: link executable schemas or bridge dataclasses.
+- Keep current and proposed flows separate. Short labels and small top-down charts must remain readable in GitHub's README column; split an overloaded graph by scenario before shrinking text.
 
-Module entry points are listed in [visual_bench](../visual_bench/README.md) and [engine_bridge](../engine_bridge/README.md). Parent documents retain summaries and navigation; detailed requirements live in the owning module README.
+## Validation
 
-Only one level of major modules is expanded. Subproblems such as analysis/propagation remain README sections until implementation complexity justifies extraction. Split architecture or decision documents when their size or ownership requires it.
+For a documentation change:
+
+- Follow at least one concrete task from the root to its module and test entry. Confirm both the request and result paths, not only a list of filenames.
+- Compare code links and public operations with the implementation. Check required versus conditional edits against actual forwarding behavior.
+- Validate local file links and heading anchors, Mermaid syntax/rendering, and disclosure markup. Inspect rendered diagrams, not just fenced text.
+- Check that no stable task ID, dependency or acceptance evidence was accidentally removed and that historical test results remain dated evidence, not current claims.
+
+Examples for this repository: expose a fuzz hyperparameter; add a live fuzz metric; adjust an existing layer view; change run stop behavior. Each should lead to a different edit scope. A task that changes only presentation should not send the developer through the whole engine stack.
+
+## Reference
+
+<details>
+<summary>Ownership and maintenance boundaries</summary>
+
+B coordinates cross-module consistency. A, C and D maintain the scientific semantics, interaction and validation content affected by their work. READMEs explain responsibility and development; AGENTS.md defines contributor behavior.
+
+Inputs are confirmed requirements, decisions, constraints and actual evidence. Outputs are navigable scope, implementation guidance and acceptance criteria. Mark unresolved items explicitly and revise the original decision when facts change; do not append contradictory histories to current instructions.
+
+Feature plans and task evidence stay with the owning module. Cross-module decisions stay in design.md; the task index and integration order stay in plan.md. Do not add a parallel document tree or empty implementation directories merely to fit a template. Extract detail into another file only when its size or independent maintenance warrants it.
+
+</details>

@@ -1,69 +1,109 @@
 # Engine Status and Solver Licenses
 
-**Status:** first version (split out of verification on 2026-11-04): ACT engine probe and the Gurobi license (VER-05). **Owner:** B; C owns the Engine tab interaction.
-Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
+**Current responsibility and status.** This module reports whether the pinned ACT checkout is usable and manages the optional user supplied Gurobi license. The first version is implemented for VER-05. B owns the service path and C owns the Engine tab.
 
-## 1. Objective and Scope
+This module does not run verification, call a solver for its own purposes, or decide a license's scientific effect. ACT probing and Gurobi probing are bridge responsibilities. Model loading and run lifecycle call this module through `require_engine` and worker environment setup. See the [parent flow diagram](../README.md#flow-diagram) and [project development entry point](../../README.md#choose-a-development-task).
 
-Show which ACT checkout the workbench runs against and whether it is usable, and manage the optional user-supplied Gurobi license that run workers inherit.
+## Change Guide
 
-| Subproblem | Responsibility |
-| --- | --- |
-| Engine status | Report ACT root, commit vs. the pinned commit, tracked changes, Python/torch/CUDA, capabilities, and diagnostics from `engine_bridge.engine_session.probe`. |
-| Engine gate | `EngineService.require_engine()` is the single check other services call before asking the bridge to touch ACT; an unusable engine becomes a 503 with ACT's diagnostic. |
-| Solver license | Upload, remove, and check a Gurobi license; hand it to each run worker through its environment. The license text never leaves the service. |
-
-Non-goals: no verification, no solver calls of its own, no license validation beyond the file shape (Gurobi's own check is the verdict).
-
-## 2. Files and Usage
-
-| File | Layer | Responsibility |
+| Goal | Required edits | Conditional edits / reused path |
 | --- | --- | --- |
-| `schemas.py` | Wire | `EngineInfoOut`, `CapabilityOut`, `DiagnosticOut`, `SolverStatusOut`, `SolverLicenseUpload`. |
-| `service.py` | Service | `EngineService`: cached probe (`info`), `engine_out()`, `require_engine()`, owns `gurobi`. |
-| `solver_license.py` | Service | `GurobiLicense`: validate/store (0600 under `ACT_GUI_SECRETS`), remove, status via `probe_gurobi`, `worker_env()`. |
-| `routes.py` | HTTP | `GET /api/engine`, `GET /api/solvers/gurobi`, `PUT/DELETE /api/solvers/gurobi/license`. |
-| `api.ts`, `hooks.ts` | Browser data | Engine info and Gurobi status queries; upload/remove mutations invalidate the Gurobi status query. |
-| `EngineBadge.tsx`, `EngineView.tsx`, `GurobiBadge.tsx`, `GurobiLicensePanel.tsx` | Views | Top-bar badges and the Engine tab. |
-| `test_engine.py` | Tests | License upload privacy and Gurobi verdict, rejection of non-license text. |
+| Add a diagnostic or capability using existing fields | [bridge engine_session](../../engine_bridge/engine_session/README.md#change-guide), probe tests | Existing diagnostic/capability lists already map to the wire. Schema/service/view changes only for a new shape or presentation. |
+| Change readiness gating | [service.py](service.py), caller error tests | Model/run services reuse require_engine unless its contract changes. |
+| Add or change license source policy | [solver_license.py](solver_license.py), privacy/source tests | Schema/routes/hooks/view only if the public API or selectable source changes. |
+| Change license handoff to workers | worker_env in [solver_license.py](solver_license.py), run manifest tests | [verification](../verification/README.md#change-guide) only if environment/manifest contract changes. |
+| Change badge or license form layout | Owning Engine/Gurobi view | No bridge or worker changes for the same status data. |
 
-Run this module's tests: `.venv/bin/python -m pytest visual_bench/engine`.
-
-Dependencies: engine_bridge.engine_session (probe, probe_gurobi), `visual_bench.errors`. Used by model_spec and verification services (engine gate, commit, worker license env).
+Generate wire.ts after schema changes. No current method declares a Gurobi requirement; status is not proof that a run used the solver.
 
 ## Flow Diagram
 
-Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
+Arrows are labeled as calls, results, or events. Neighboring modules are named explicitly and linked in the block tables. HTTP transport may be grouped; views use hooks or props, never direct fetch calls.
+
+### Probe and gate ACT
 
 ```mermaid
 flowchart TB
-  classDef ext stroke-dasharray: 4 3
-  Views["EngineBadge, GurobiBadge,<br/>EngineView, GurobiLicensePanel"]
-  H["hooks.ts, api.ts"]
-  R["routes.py<br/>/api/engine, /api/solvers/gurobi"]
-  S["service.py<br/>EngineService"]
-  L["solver_license.py<br/>GurobiLicense"]
-  MS["model_spec<br/>ModelService"]:::ext
-  VER["verification<br/>RunService"]:::ext
-  EB["engine_bridge<br/>engine_session"]:::ext
-  Views --> H
-  H -- "HTTP" --> R
-  R --> S
-  S --> L
-  L -- "license file, 0600" --> Sec[("ACT_GUI_SECRETS")]
-  S -- "probe" --> EB
-  L -- "probe_gurobi" --> EB
-  MS -- "require_engine" --> S
-  VER -- "require_engine, commit, worker_env" --> S
+  Browser["Engine view"] -- "GET /api/engine" --> Routes["routes.py"]
+  Routes --> Service["EngineService"]
+  Service -- "Probe" --> Bridge["bridge engine_session"]
+  Bridge -- "EngineInfo" --> Service
+  Service -- "EngineInfoOut" --> Browser
+  Callers["ModelService / RunService"] -- "require_engine" --> Service
+  Service -- "Proceed or 503" --> Callers
 ```
 
-## 3. Tasks
+| Block | Code entry | Contract or artifact | Neighbor handoff |
+| --- | --- | --- | --- |
+| Probe | `EngineService.info` | Cached `EngineInfo` includes commit, expected commit, tracked changes, runtime, capabilities, and diagnostics | Bridge owns compatibility facts |
+| Gate | `require_engine` | Usable ACT proceeds; first error diagnostic becomes 503 | [Model_spec](../model_spec/README.md) and [verification](../verification/README.md) stop before ACT access |
+| Browser | `engine_out`, hooks | `EngineInfoOut` preserves diagnostics and capability availability | Engine views present status, not verdicts |
+
+### Upload and hand off Gurobi
+
+```mermaid
+flowchart TB
+  User["GurobiLicensePanel.tsx"] -- "license text" --> Routes["engine/routes.py"]
+  Routes --> License["GurobiLicense"]
+  License -- "validate and write mode 0600" --> Secret[("ACT_GUI_SECRETS/gurobi.lic")]
+  License -- "probe active file" --> Bridge["engine_bridge/engine_session"]
+  Bridge -- "license state and message" --> License
+  License -- "SolverStatusOut, no text" --> User
+  Runs["verification.RunService"] -- "worker_env" --> License
+  License -- "GRB_LICENSE_FILE and source" --> Worker["verification worker"]
+```
+
+| Block | Code entry | Contract or artifact | Neighbor handoff |
+| --- | --- | --- | --- |
+| Validate | `validate_license_text` | Accepts only printable `KEY=VALUE` text with identifying Gurobi keys | Route maps rejection to 422 |
+| Store | `GurobiLicense.upload` | Uploaded file is mode 0600; content is never returned or logged | Secret path is service owned |
+| Probe | `GurobiLicense.status` | Reports source, fingerprint, timestamp, state, message, and methods using it | Bridge owns Gurobi's verdict |
+| Worker handoff | `worker_env` | Uploaded source overrides `GRB_LICENSE_FILE`; run manifest stores only source | [Verification](../verification/README.md) owns run provenance |
+
+## Validation
+
+Run the module's real ACT and bridge probe tests:
+
+```bash
+.venv/bin/python -m pytest visual_bench/engine
+```
+
+Acceptance is observable when `/api/engine` reports the pinned commit and diagnostics, an unusable ACT checkout blocks model or run access with 503, valid license text returns status without its content, the stored file is mode 0600, invalid text returns 422 without creating a file, and a run manifest records `uploaded` or `environment` without the license secret.
+
+The status reports `used_by_methods: []`: no current method declares a Gurobi requirement. Fuzzing is inference-based; do not infer solver usage from this list. Do not claim Gurobi affects a verdict unless a bridge execution path and test prove it.
+
+## Reference and Backlog
+
+<details>
+<summary>Current files, routes and contracts</summary>
+
+## Current Files and Contracts
+
+| Layer | Entry | Contract or artifact | Owner for handoff |
+| --- | --- | --- | --- |
+| Wire | [schemas.py](schemas.py) | Engine info, diagnostics, solver status, license upload payload | Generated browser types come from Pydantic |
+| Service | [service.py](service.py) | Cached `probe`, `engine_out`, `require_engine` | Model_spec and verification call the gate |
+| License service | [solver_license.py](solver_license.py) | Validate, store mode 0600, remove, status, and worker environment | Verification records source in the run manifest |
+| HTTP | [routes.py](routes.py) | `/api/engine`, `/api/solvers/gurobi`, license PUT and DELETE | Browser uses the same service data |
+| Browser data | [api.ts](api.ts), [hooks.ts](hooks.ts) | Engine and solver queries, upload and remove invalidation | Shared query client owns cache |
+| Views | [EngineBadge.tsx](EngineBadge.tsx), [EngineView.tsx](EngineView.tsx), [GurobiBadge.tsx](GurobiBadge.tsx), [GurobiLicensePanel.tsx](GurobiLicensePanel.tsx) | Status badges and license controls | Workspace owns tab placement |
+| Tests | [test_engine.py](test_engine.py) | Privacy, file mode, Gurobi probe result, rejection, and run manifest source | Bridge tests cover native probe behavior |
+
+
+</details>
+
+<details>
+<summary>Task acceptance and planned capabilities</summary>
+
+## Tasks
+
+<a id="3-tasks"></a>
 
 | ID | Deliverable | Depends on | Completion evidence |
 | --- | --- | --- | --- |
 | VER-05 | Accept a user-supplied Gurobi license and hand it to run workers | ES-04 | Only text shaped like a Gurobi license is stored (0600, `ACT_GUI_SECRETS`, default `<records>/../secrets`); its content is never returned; an uploaded license overrides `GRB_LICENSE_FILE`; each run manifest records the license source and requested device (`test_engine.py`). The task ID keeps its original VER prefix. |
 
-## 4. Acceptance
 
-- A missing or incompatible ACT checkout is reported with ACT's diagnostic and blocks runs with 503, never with a verdict.
-- The license content never appears in any response, record, or log; removal deletes the stored file.
+Future solver selection or method specific license use needs a bridge capability and an updated task. The current module reports Gurobi's own probe state and passes the active path to workers, but does not validate solver correctness or select a solver.
+
+</details>

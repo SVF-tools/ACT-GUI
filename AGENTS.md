@@ -14,7 +14,7 @@ Read the root README, docs/design.md, docs/plan.md, and the README of each affec
 - Keep each visual_bench module a vertical slice (docs/design.md section 3): `schemas.py` → `service.py` → `routes.py` on the service, `api.ts` → `hooks.ts` → views in the browser. Views never fetch directly; server data goes through the module's TanStack Query hooks. A change that crosses modules goes through a service constructor or a public `hooks.ts`, never through another module's internals.
 - After changing any `schemas.py`, run `npm run gen:types` and commit the regenerated `visual_bench/generated/wire.ts`; never edit it by hand.
 - Add tests with the behavior they verify and keep them close to the relevant module. Distinguish synthetic fixtures from ACT recordings and fake-provider tests from real-provider evaluations.
-- Report checks actually run and any unverified behavior. There is currently no runnable application; do not invent startup or test results.
+- Report checks actually run and any unverified behavior. Historical startup/test evidence does not establish that the current working tree passes; do not invent results.
 - Keep feature implementation plans and task evidence in module READMEs. Each task needs a stable ID, dependencies, observable deliverable, and acceptance evidence; proposed APIs/files are not implemented capabilities.
 - Keep cross-module decisions in docs/design.md and the task index/integration order in docs/plan.md. Add scoped AGENTS.md files only when distinct, stable local rules justify them.
 

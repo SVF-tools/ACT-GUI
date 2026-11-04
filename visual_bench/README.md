@@ -1,140 +1,127 @@
-# Visual Bench Scope
+# Visual Bench: Developer Map
 
-**Status:** first version: service (`server.py`, `workbench.py`) and browser (`app.tsx`) run on localhost; restructured into module slices on 2026-11-04 (see [plan status](../docs/plan.md#first-version-status)). **Owner:** C owns interaction and product consistency; B owns application services and AI orchestration; D, when available, owns visualization and test integration.
+[Project task chooser](../README.md#choose-a-development-task) → **workbench collaboration** → a module's Change Guide.
 
-## Purpose
+This scope owns interaction, application services, run workers, and records. ACT-specific loading, computation, and result adaptation belong to [engine_bridge](../engine_bridge/README.md). The browser and service are parts of the same product, not separate feature owners.
 
-Provide a complete interactive environment connecting networks, specifications, verification state, BaB, approximation sets, and AI plans within one research context.
+## Change Guide
 
-## Responsibilities
+Choose the owner of the behavior, then follow the linked module guide for files and tests. The nine module names below are the stable names used by the diagrams.
 
-- Research context: selected model/spec/run/node/layer/revision and linked views.
-- Visualization: networks, specifications, search, layer bounds/geometry, experiments, and research figures.
-- Operations: runs, queries, inspection, capability-gated controls, plans, and execution receipts.
-- AI collaboration: context assembly, evidence-based explanations, provider integration, tools, and action records.
-- Application state and persistence: requests, snapshots/events, reconnect, replay, import, and export.
-- Product delivery: layout, errors, accessibility, browser compatibility, service configuration, and distribution entry points.
-
-A feature may include both browser presentation and service-side use cases.
-
-## Modules
-
-Each of the nine modules has a README covering its subproblems, current files and usage, patterns, implementation sequence, and acceptance criteria.
-
-| Module | Scope | Main inputs/outputs | First delivery |
-| --- | --- | --- | --- |
-| [workspace](workspace/README.md) | Layout, research context, selection, linked panels | User selection → model/spec/run/node/layer/revision context | Basic page and selection |
-| [model_spec](model_spec/README.md) | Network/layer/specification inspection and input drafts | Engine descriptions → views and explicit model/spec references | Real-data inspection |
-| [verification](verification/README.md) | Run lifecycle: start/stop, worker supervision, run state, SSE events, verdict banner | User/AI run requests → run_id, committed events, results | First real run |
-| [fuzzing](fuzzing/README.md) | ACTFuzzer options, live/recorded fuzzing views, saved counterexamples and export | Fuzz runs and their records → Fuzzing mode, VNN-LIB/PNG exports | Live fuzzing demo |
-| [engine](engine/README.md) | ACT engine status, engine gate for other services, Gurobi license | Bridge probe, license uploads → status badges, Engine tab, worker env | Engine diagnostics |
-| [bab](bab/README.md) | Search tree, local subtrees, paths, node details, branch actions | Nodes/edges/events → selection and commands via verification | BaB observability |
-| [analysis](analysis/README.md) | Propagation, bounds/set views, node/method/experiment comparisons | ACT numerical/geometry data → views with coordinates, guarantees, and provenance | Inspection integration |
-| [assistant](assistant/README.md) | Context, provider, explanations, plans, tools, interaction | Frozen context/questions → evidence, plans, navigation, use-case requests | Real-node read-only explanations |
-| [records](records/README.md) | Snapshots/events/artifacts, experiment index, replay, exports | Committed records and fixed queries/plot settings → traceable bundles | First saved run |
-
-### Module Slice and Shared Layers
-
-Every module follows the same file pattern ([design section 3](../docs/design.md#3-runtime-and-implementation-boundaries)): `schemas.py` (wire payloads) → `service.py` (use cases; the only caller of engine_bridge and records for this module) → `routes.py` (HTTP) on the service, and `api.ts` (endpoints) → `hooks.ts` (TanStack Query) → views in the browser, with tests next to them. One contributor can own a module without touching another module's files.
-
-| Root file | Responsibility |
-| --- | --- |
-| `server.py` | FastAPI app: error rendering, `/api/health`, includes each module's router, serves the production build. |
-| `workbench.py` | Builds the module services and wires their constructor dependencies; the assistant and routes use the same instances. |
-| `schemas.py` | Re-exports every module's payloads and lists `WIRE_MODELS` for `npm run gen:types` (never add models here; add them in the module). |
-| `wire.py`, `errors.py`, `config.py` | Shared service kernel: wire primitives (`Wire`, `WireNumber`, `ErrorBody`), `AppError`, paths and `ACT_GUI_*` settings. |
-| `conftest.py`, `testing.py` | Shared test fixture (`client`) and helpers (`follow_to_end`, `sources_or_skip`). |
-| `app.tsx`, `main.tsx` | Browser composition root (layout, selection, mode registry) and the `QueryClientProvider`. |
-| `generated/wire.ts` | Generated browser types; do not edit. |
-
-#### Shared browser layer
-
-`shared/` imports no feature module: `http.ts` (`call`, `ApiError`, `followRun` SSE), `wire.ts` (`num`, `fmt`, `indexRanges`), `queryClient.ts` (the `QueryClient` and the `keys` factory: run projections are keyed under `["runs", "detail", id]`, so one committed run event refreshes the run, its fuzzing record, layers, coverage, and records views), and `ui/` (`Empty`, `StopButton`, image rendering).
-
-### State Ownership and Shared Entry Points
-
-workspace owns user selection, layout, and the mode registry. verification owns runs and run commands. ACT owns scientific state. records persists committed records. Panels consume server data only through TanStack Query (one cache, keyed by run), never through private copies or refresh counters.
-
-verification exposes application queries and commands backed by the bridge. bab, analysis, and assistant use these entry points. Pure navigation stays within workspace.
-
-BaB layout/expansion are display state; actual node resolution comes from ACT. analysis prepares views, while ACT performs scientific projections, bound calculations, and proof evaluation.
-
-assistant uses the same entry points and does not directly modify engine state or records. AI session events remain distinct from ACT run events. records stores plot data/settings and coordinates export; the owning view renders the figure.
-
-### Acceptance Overview
-
-Test stale selection responses in workspace; variable/layer mapping in model_spec; lifecycle, failure, and idempotency in verification; identity/events in bab; provenance/coordinates/guarantees in analysis; evidence/capabilities/failures in assistant; and availability/replay/export provenance in records.
-
-Detailed propagation navigation, set views, playback, and comparison requirements live in [analysis](analysis/README.md).
+| Goal / module | Current responsibility and entry guide | Neighbor handoff |
+| --- | --- | --- |
+| **workspace** | [Selection, modes, layout, theme, tour](workspace/README.md#change-guide) | Passes selection to views; no HTTP service of its own. |
+| **model_spec** | [Load models and inspect graph/spec/input images](model_spec/README.md#change-guide) | Provides model ID, verified path, supported methods to verification; source adaptation goes through bridge model_spec. |
+| **verification** | [Start/stop runs, supervise workers, expose lifecycle/SSE](verification/README.md#change-guide) | Accepts RunRequest; returns run_id/RunOut; persists results through records. |
+| **fuzzing** | [Options, live images, saved counterexamples and export](fuzzing/README.md#change-guide) | Uses verification lifecycle; provides runner.py and FuzzLive; serves FuzzingOut. |
+| **engine** | [ACT status and Gurobi license management](engine/README.md#change-guide) | Model loading/runs use its engine gate; workers inherit license environment. |
+| **analysis** | [Recorded layer bounds and interval-box views](analysis/README.md#change-guide) | Reads run status and sealed layers.json; new scientific data requires bridge inspection. |
+| **bab** | [Observation coverage and final BaB summary](bab/README.md#change-guide) | Reads RunOut and bridge events coverage; no node tree/control path exists yet. |
+| **assistant** | [Frozen context, typed evidence, fake-provider answers](assistant/README.md#change-guide) | Reads the same model/run/analysis/BaB services as HTTP; navigates through workspace. |
+| **records** | [Artifacts, event log, integrity, annotations, zip export](records/README.md#change-guide) | Feature modules supply content; RecordStore persists it without deciding scientific meaning. |
 
 ## Flow Diagram
 
-Module wiring in current code (`workbench.py` builds the services, `app.tsx` composes the views). Arrows point from caller to callee. Each module README has a Flow Diagram that expands its box with the same node names, and every edge to another module there appears here. engine_bridge is expanded in the [engine_bridge diagram](../engine_bridge/README.md#flow-diagram).
+These are feature-level handoffs, not an import inventory or a mandatory edit list. Each named module expands into files and contracts in its own guide. Labeled arrows distinguish a request from produced data.
+
+### Start a run and consume its results
+
 
 ```mermaid
 flowchart TB
-  classDef ext stroke-dasharray: 4 3
-  subgraph Browser["Browser: app.tsx"]
-  WS["workspace"]
-  V["module views<br/>hooks.ts"]
-  SH["shared/"]
-  end
-  subgraph Service["Service: server.py, workbench.py"]
-  AS["assistant"]
-  BAB["bab"]
-  AN["analysis"]
-  FZ["fuzzing"]
-  VER["verification"]
-  MS["model_spec"]
-  REC["records"]
-  EN["engine"]
-  end
-  W["run worker<br/>process"]
-  EB["engine_bridge"]:::ext
-  WS --> V
-  V -- "navigation" --> WS
-  V --> SH
-  SH -- "HTTP, SSE" --> Service
-  AS --> MS & VER & BAB & AN
-  BAB --> VER
-  AN --> VER & REC
-  FZ --> VER & REC & MS
-  VER -- "LiveObserver" --> FZ
-  VER --> MS & EN & REC
-  MS --> EN
-  VER -- "spawn" --> W
-  W -- "runner.py" --> FZ
-  EN & MS & FZ & BAB & W --> EB
+  Model["model_spec"] -->|"Selected model ID and methods"| Run["verification"]
+  Engine["engine"] -->|"Engine gate and worker environment"| Run
+  Run -->|"RunRequest to isolated worker"| Work["verification worker<br/>fuzzing runner for fuzz"]
+  Work -->|"Invoke computation"| Bridge["engine_bridge"]
+  Bridge -->|"Outcome and observations"| Work
+  Work -->|"Progress and final output"| Run
+  Run -->|"Commit events and seal artifacts"| Store["records"]
+  Store -->|"Recorded data via module services"| Views["fuzzing / analysis / bab<br/>Result views"]
 ```
 
-## Non-goals
+| Handoff | Implementation / contract | Where to continue |
+| --- | --- | --- |
+| Model choice → run | [ModelService](model_spec/service.py), [RunRequest](verification/schemas.py); verification validates the pinned model path and allowed method | [Model loading](model_spec/README.md#flow-diagram), [run lifecycle](verification/README.md#flow-diagram) |
+| Run → computation | [worker.py](verification/worker.py) dispatches verification or [fuzzing/runner.py](fuzzing/runner.py); only the bridge invokes ACT | [Execution bridge](../engine_bridge/execution/README.md#flow-diagram) |
+| Worker → recorded result | [RunService](verification/service.py) receives progress, writes result/layers/fuzzing artifacts, seals them, then commits completion | [Records](records/README.md#flow-diagram) |
+| Result → page | Feature services project records; hooks fetch them. [verification/hooks.ts](verification/hooks.ts) follows SSE and invalidates run-scoped query keys | [Fuzz live/recorded paths](fuzzing/README.md#flow-diagram), [analysis](analysis/README.md#flow-diagram), [BaB](bab/README.md#flow-diagram) |
 
-- Do not implement verification algorithms, bound solving, or scientific projections, or infer verdicts from pictures or model-generated text.
-- Do not access ACT tensors/frontiers directly or handle internal ACT version differences.
-- Do not treat display state as engine state or replay as solver checkpoint recovery.
+Live fuzz frames are an exception to the stored-data route: the supervisor forwards them to FuzzLive in memory; the fuzzing query combines that state with committed progress. The completed fuzzing artifact is the durable result. Follow the fuzzing guide before adding a live metric.
 
-## Inputs, Outputs, and State
+### Inspect evidence and navigate
 
-Inputs are user intent and engine_bridge descriptions, capabilities, committed results/events, and artifacts with provenance. Outputs are views, explanations, evidence, receipts, and validated queries/commands with explicit targets and revision preconditions.
 
-Owned state includes selection, layout, plans, requests, and record indexes. Scientific state is recorded or projected, never independently inferred. Bind queries and evidence to their original context; distinguish accepted from applied.
+```mermaid
+flowchart TB
+  WS["workspace"] -->|"Selected model, run, layer, value"| AI["assistant"]
+  AI -->|"Read shared application services"| Evidence["model_spec / verification<br/>analysis / bab"]
+  Evidence -->|"Typed evidence"| AI
+  AI -->|"Answer with resolvable citations"| Answer["Assistant view"]
+  Answer -->|"Navigate to cited layer or value"| WS
 
-The workbench manages authorization scope, budgets, and idempotency. engine_bridge/ACT additionally validate actual capabilities and current engine preconditions.
+```
 
-## Dependencies and Implementation Placement
+The assistant uses [explain.py](assistant/explain.py), not a second API or direct ACT access. Pure selection and navigation remain in [workspace](workspace/README.md#flow-diagram).
 
-visual_bench uses the bridge's GUI-independent integration contract. The bridge does not import visual_bench.
+## Decide the Edit Scope
 
-`app.tsx`, `server.py`, and `workbench.py` stay thin composition roots. Keep feature code in its owning module without duplicating web/service subtrees everywhere. TypeScript does not import Python; Python use cases do not depend on React. Validate build and packaging choices during bootstrap.
+| Intended change | Usually edit | Inspect, but do not change automatically |
+| --- | --- | --- |
+| Restyle or rearrange existing data | Owning view and relevant CSS; workspace only for shared layout/selection | Server, routes, bridge, records |
+| Add a wire field | Owning schemas/service, relevant view, generated wire.ts; API/hook only if access changes | Shared HTTP transport and run supervisor |
+| Add an ACT input/output | Owning bridge adapter/contracts, feature mapping/schema/view | Generic scheduling, storage, SSE transport when existing contracts suffice |
+| Change lifecycle or persistence guarantees | verification or records plus the affected callers' tests | Every feature view; bridge algorithms remain ACT-owned |
+| Add a new module dependency | Service constructor and [workbench.py](workbench.py); browser composition if needed | Unrelated module internals |
 
-The service maps neutral bridge data to wire schemas. The browser uses generated contracts and does not access ACT. Provider credentials/calls remain in the service. The workbench manages task/worker lifecycle and records; worker ACT calls go through the bridge, and ACT defines scientific commit points.
+The wire contract is owned by module Pydantic schemas. Run `npm run gen:types` after a schema change; generated browser types are an output, not another handwritten source.
 
-## First-slice Acceptance
+## Validation
 
-Load a small real ACT model/spec through the bridge and display structure, constraints, provenance, and error states. Full docking and AI are not first-slice requirements. Then deliver layer/stage selection → evidence query → AI explanation → navigation on a completed run, extend it to committed BaB nodes, and follow with supported execution plans.
+Start with the selected module's **Validation** section: it names the focused tests and observable user result. Cross-module changes must verify the complete use case, including failure/missing-data states and the return path to the page.
 
-During development the workbench is opened at the localhost URL printed by `scripts/dev.sh`. Tests: `.venv/bin/python -m pytest visual_bench` (or one module directory) and `npm test`. No platform compatibility certification exists yet.
+Broader checks from the repository root:
 
-## Maintenance
 
-Keep overall ownership here and detailed behavior in module READMEs. See [architecture](../docs/design.md), [plan](../docs/plan.md), and [rules](../AGENTS.md). Update scope when ownership or integration boundaries change; keep renderer internals with their code.
+```bash
+.venv/bin/python -m pytest visual_bench
+npm test
+npm run typecheck
+npm run check:types
+```
+
+These are commands to run, not a claim that a new test run occurred. ACT-backed cases need the pinned checkout and environment; fake-provider tests do not validate a real AI provider.
+
+## Reference
+
+<details>
+<summary>Composition roots, shared layers, and dependency rules</summary>
+
+### Root Files
+
+| File | Responsibility |
+| --- | --- |
+| [server.py](server.py) | FastAPI app, error rendering, /api/health, router inclusion, production assets. |
+| [workbench.py](workbench.py) | Constructs module services and injects collaborators; HTTP and assistant share instances. |
+| [schemas.py](schemas.py) | Re-exports module schemas and lists WIRE_MODELS for generation. |
+| [wire.py](wire.py), [errors.py](errors.py), [config.py](config.py) | Wire primitives, application errors, paths/settings. |
+| [app.tsx](app.tsx), [main.tsx](main.tsx) | Browser composition, shared selection, QueryClientProvider. |
+| [generated/wire.ts](generated/wire.ts) | Generated browser wire types. |
+| [conftest.py](conftest.py), [testing.py](testing.py) | Shared service test fixtures and helpers. |
+
+### Shared Browser Layer
+
+[shared/http.ts](shared/http.ts) owns HTTP and SSE transport. [shared/queryClient.ts](shared/queryClient.ts) owns the QueryClient and key factory: run projections sit under the run key so committed events invalidate related data. [shared/wire.ts](shared/wire.ts) contains formatting helpers; shared/ui contains reusable UI primitives. Shared code imports no feature module.
+
+### Module Slice and Boundaries
+
+A data-serving module normally has schemas.py, service.py, routes.py, api.ts, hooks.ts, views, and nearby tests. Exceptions reflect actual responsibilities: workspace is browser-only; assistant uses explain.py; records uses store.py. The module's file inventory is authoritative.
+
+Views obtain server data through hooks, not direct fetch calls. Services receive collaborators through constructors, not another module's routes. Composition roots may assemble views from several modules. AI explanations never override ACT verdicts. Workers belong to verification; ACT integration belongs to engine_bridge.
+
+### Ownership and Future Work
+
+C owns interaction/product consistency; B owns application services and AI orchestration; D, when available, owns analysis/visualization and test integration. A reviews scientific semantics. Module task tables retain detailed acceptance evidence and future interfaces; [plan.md](../docs/plan.md) owns cross-module integration order. Node-level BaB, advanced geometry, real providers and authorized AI plans remain future work, not current service capabilities.
+
+Extract deeper modules only when ownership or implementation complexity requires it. Keep cross-module decisions in [design.md](../docs/design.md), and feature-specific details in the owning README.
+
+</details>

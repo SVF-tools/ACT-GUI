@@ -1,8 +1,10 @@
 # Architecture Baseline
 
-**Date:** 2026-11-03. ACT-GUI is the AI-native visualization and interaction interface for the ACT engine.
+**Baseline:** 2026-11-03; developer navigation and implementation distinctions updated 2026-11-04. ACT-GUI is the visualization and interaction interface for the ACT engine.
 
-The primary boundaries are visual_bench, engine_bridge, and docs. FastAPI/React and browser/service processes are implementation details within those boundaries. This repository currently contains scope and design documents only. Earlier comprehensive blueprints remain references, not a requirement to create every planned directory.
+The primary boundaries are visual_bench, engine_bridge, and docs. FastAPI/React and browser/service processes are implementation details within those boundaries. A runnable workbench exists. This document owns cross-module invariants and design decisions; module READMEs distinguish implemented behavior from future designs.
+
+For a feature change, start at the [development task chooser](../README.md#choose-a-development-task), not by reading this document end to end. Parent READMEs identify collaborating modules; module Change Guides identify required edits, conditional edits, contracts and tests. The [documentation guide](README.md#module-readme-structure) defines this hierarchy.
 
 ## 1. Product Boundaries
 
@@ -30,7 +32,7 @@ The fourteen modules each have a scope README. Parent READMEs own summaries and 
 
 The two model_spec modules have distinct roles: visual_bench presents descriptions and input drafts; engine_bridge loads through ACT and converts engine descriptions. Both use the same source data without duplicating scientific processing.
 
-A typical query flows from workspace node selection through the verification query entry point to engine_bridge.inspection and ACT, then back to analysis/bab. AI uses that same entry point. Committed ACT changes flow through bridge.events into verification/records before updating views.
+Current inspection reads use module services: analysis reads a completed run's sealed layers.json; bab combines run results with bridge observation coverage. The worker collects interval layer states through engine_bridge.inspection, and verification seals the returned data through records. The assistant calls the same model/run/analysis/BaB services as HTTP routes. There is no live node-inspection gateway or committed BaB node-event stream yet; these remain future ACT-dependent capabilities.
 
 ## 3. Runtime and Implementation Boundaries
 
@@ -53,7 +55,7 @@ ACT-specific knowledge (which methods a net supports, fuzz option split, provena
 
 The browser uses HTTP queries/commands and SSE events. The service calls engine_bridge; long computations execute in a separate worker. HTTP routes and AI tools reuse ordinary application use cases.
 
-Workbench Pydantic schemas are the sole handwritten source for wire types, generating browser clients/types and event validators. REST OpenAPI alone does not define the event payload contract. The service maps neutral bridge data to the wire format; bridge code does not depend on upper-layer API schemas.
+Workbench Pydantic schemas are the sole handwritten source for wire types. The current pipeline generates browser types in generated/wire.ts; module api.ts clients remain handwritten. REST OpenAPI alone does not define the event payload contract. The service maps neutral bridge data to the wire format; bridge code does not depend on upper-layer API schemas.
 
 Service startup, configuration, records, and AI providers belong to visual_bench. ACT invocation and version differences are isolated in engine_bridge. Worker lifecycle is managed by the workbench; ACT calls inside the worker go through the bridge.
 
@@ -61,14 +63,16 @@ Start with a small real-data inspection slice. Propagation requirements live in 
 
 ## 4. Data and Execution Invariants
 
+These are design constraints, not a claim that all associated APIs exist. Current run lifecycle events and fuzz progress are implemented; revision-bound node snapshots, pause/step/split and command receipts remain planned. Use module Change Guides for today's paths.
+
 - Bind queries to run/node/layer/revision. A late response must not replace a newer selection.
 - Keep node identity separate from batch lane indices. Bounds retain scope, direction, computed/inherited origin, method, and provenance.
 - Geometry states its coordinates, representation, projection, and guarantee. Samples are not sound outer approximations; a local visualization does not establish a global verdict.
 - Fix model/spec/config snapshots for a run. Changes create another run.
 - Models come from two places: the pinned catalog (`fixtures/catalog.json`, ACT files by commit + sha256, with recorded native verdicts) and model sources (a VNN-COMP ONNX + VNN-LIB instance, or an ONNX image classifier with a chosen test image and eps). engine_bridge builds a source into an ACT net through ACT's own front end and `save_net_to_file`; the workbench stores it content-addressed (`<kind>-<sha12>`, `ACT_GUI_MODELS`, default next to the records root) with its build parameters. A different image or eps is a different model snapshot, never an edit of an existing one. Built models have no recorded native verdicts.
-- Publish scientific state only after ACT commits it. Snapshots and ordered events support reconnect/replay with explicit duplicate, gap, and rollback handling.
+- Publish scientific state only after a valid observation boundary. Current lifecycle/progress events support ordered replay; committed node snapshots, gap protocols and rollback-aware scientific batches require future ACT interfaces.
 - Replay reconstructs recorded display state, not solver memory. Missing historical bounds are not_recorded.
-- Commands check capabilities, expected_revision, and idempotency. Distinguish accepted from applied. Enable pause/step/split only when ACT supports the stated semantics.
+- Run creation checks supported methods and idempotency. Future engine commands must additionally check capabilities and expected_revision and distinguish accepted from applied. Enable pause/step/split only when ACT supports the stated semantics.
 - Fetch large tensors and detailed tree data on demand instead of streaming everything.
 
 ## 5. First AI-native Workflow
