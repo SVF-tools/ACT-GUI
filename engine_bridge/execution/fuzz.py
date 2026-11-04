@@ -37,6 +37,20 @@ FRAME_LIMIT = 16  # recorded mutated-input frames; each holds two full inputs
 # output, tracing and reporting stay owned by this adapter (it observes the loop through them).
 TUNABLE = frozenset({"coverage_strategy", "activation_threshold", "mutation_weights", "perturb_mode",
                      "perturb_scale", "seed_selection_strategy", "pgd_restarts", "pgd_restarts_binarized"})
+# Options that are run_fuzzing arguments rather than FuzzingConfig fields.
+RUN_OPTIONS = ("max_iterations", "rng_seed", "stop_on_first")
+# Where each part of a fuzzing record comes from, for the workbench to show next to the record.
+PROVENANCE = {
+    "act_call": "act.pipeline.fuzzing.ACTFuzzer(ACTToTorch(net)).fuzz()",
+    "config": "ACT act/config/pipeline.yaml fuzzing section + options",
+    "frames": "lane 0 of ACT's mutated batch, read between iterations (mutation_engine.mutate wrapper)",
+}
+
+
+def split_options(options: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Split flat fuzz options into (run_fuzzing keyword arguments, FuzzingConfig hyperparameters)."""
+    run = {k: options[k] for k in RUN_OPTIONS if k in options}
+    return run, {k: v for k, v in options.items() if k not in RUN_OPTIONS}
 
 
 def _floats(t: Any) -> tuple[float, ...]:

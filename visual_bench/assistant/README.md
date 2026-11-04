@@ -3,6 +3,20 @@
 **Status:** first version: `explain.py`, `AssistantView.tsx` (AI-01 with a deterministic fake provider); no real provider (AI-02), AI-03/04 not started. **Owner:** B owns orchestration; C owns interaction; A reviews scientific explanations.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
+
+## Current Files and Usage
+
+| File | Layer | Responsibility |
+| --- | --- | --- |
+| `schemas.py` | Wire | `SelectionContext`, `ExplainRequest`, `ExplainResponse`, `EvidenceRef`, `AnswerSection`, `ProviderList`. |
+| `explain.py` | Service | Freeze context, collect typed evidence through the same module services the routes use (`wb.models`, `wb.runs`, `wb.bab`, `wb.analysis`), compose with a provider, reject unresolved citations. Deterministic `FakeProvider` only. |
+| `routes.py` | HTTP | `GET /api/assistant/providers`, `POST /api/assistant/explain`. |
+| `api.ts`, `hooks.ts` | Browser data | Providers query, explain mutation. |
+| `AssistantView.tsx` | View | Question, sections with evidence, navigation to the cited layer/value. |
+| `test_assistant.py` | Tests | Resolvable citations, frozen context, ACT verdict passthrough, context mismatch. |
+
+Run this module's tests: `.venv/bin/python -m pytest visual_bench/assistant`.
+
 ## 1. Subproblems and Objective
 
 Use workbench context and ACT evidence to explain problems, propose plans, and call shared application use cases.
@@ -100,7 +114,9 @@ Split internal files/directories when independent evolution, reuse, or size warr
 | `executePlan(planId, planRevision, executionScope) → ActionStream` | Execution authority is service-validated, not inferred from model text. |
 | `cancelSession(sessionId) → SessionStatus` | Stops orchestration; cancelling existing engine work requires a separate explicit command. |
 
-### Planned Files
+### Planned Files (design targets)
+
+Implemented equivalents: `providers.py` → `explain.py` (`FakeProvider`, `providers()`); `tools.py` → direct calls on the Workbench services.
 
 Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
 

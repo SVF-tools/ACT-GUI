@@ -1,10 +1,10 @@
 // ACT verdict of the selected run, shown at the top of the Verification and BaB modes.
 // The verdict is ACT's (RunResultOut.verdict / act_status); this view only labels it.
-import { api, fmt } from "../api";
+import { fmt } from "../shared/wire";
 import type { ModelDescriptionOut, RunOut } from "../generated/wire";
-import { Pixels, specImageShape } from "../workspace/pixels";
-import { useQuery } from "../workspace/useQuery";
-import { StopButton } from "./RunsPanel";
+import { Pixels, specImageShape } from "../shared/ui/pixels";
+import { useRun, useStopRun } from "./hooks";
+import { StopButton } from "../shared/ui/StopButton";
 
 const VERDICT: Record<string, { cls: string; title: string; text: string }> = {
   certified: { cls: "good", title: "CERTIFIED", text: "ACT proved the property holds for every input in the input spec." },
@@ -14,17 +14,18 @@ const VERDICT: Record<string, { cls: string; title: string; text: string }> = {
   error: { cls: "bad", title: "ERROR", text: "ACT reported an error instead of a verdict." },
 };
 
-export function VerdictBanner({ runId, version, model, onStopped }: {
-  runId: string | null; version: number; model: ModelDescriptionOut; onStopped: () => void;
+export function VerdictBanner({ runId, model }: {
+  runId: string | null; model: ModelDescriptionOut;
 }) {
-  const q = useQuery(runId ? `verdict:${runId}:${version}` : null, () => api.run(runId!));
-  if (!runId || q.status !== "ok") return null;
+  const q = useRun(runId);
+  const stopRun = useStopRun();
+  if (!runId || q.status !== "success") return null;
   const run = q.data;
   if (run.status === "queued" || run.status === "running") {
     return (
       <div className="banner verdict bannerrow">
         <span><b className="vbig">RUNNING</b> {run.method}{run.domain ? ` · ${run.domain}` : ""} · {run.run_id} · no verdict yet.</span>
-        <StopButton runId={run.run_id} method={run.method} onStopped={onStopped} />
+        <StopButton method={run.method} onStop={() => stopRun.mutateAsync(run.run_id)} />
       </div>
     );
   }

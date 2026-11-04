@@ -3,6 +3,18 @@
 **Status:** first version: `store.py`, `RecordsView.tsx` (REC-01; REC-02/03 partial: lifecycle events, recovery, replay; REC-04 export only). User annotations (`saved_counterexamples.json`, VER-07) live beside a record: written atomically, mutable after sealing, never hashed into `artifacts.json`, and included in the export bundle. **Owner:** B; D/C integrate figure and data export.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
+
+## Current Files and Usage
+
+| File | Layer | Responsibility |
+| --- | --- | --- |
+| `store.py` | Storage | `RecordStore`: per-run directory with immutable manifest, append-only `events.jsonl`, sha256-sealed artifacts, mutable user annotations, `wait_for_events` for SSE, zip export. |
+| `routes.py` | HTTP | `GET /api/runs/{id}/export` (sealed records only). |
+| `api.ts`, `hooks.ts` | Browser data | Run query shared with verification (`keys.run`), export URL. |
+| `RecordsView.tsx` | View | Records tab: provenance, hashes, export button. |
+
+Tests: record integrity, torn-tail recovery, and export are exercised by `../verification/test_verification.py` and `../fuzzing/test_fuzzing.py` (saved annotations in the bundle).
+
 ## 1. Subproblems and Objective
 
 Persist traceable runs and AI actions, supporting queries, replay, and reproducible exports.
@@ -100,7 +112,9 @@ Split internal files/directories when independent evolution, reuse, or size warr
 | `readSnapshot(runId, atSeq?) / readEvents(runId, afterSeq)` | Consistent boundary and explicit retention/coverage response. |
 | `readArtifact(id) / exportBundle(query, plotConfig)` | Validate integrity and preserve provenance; render through an injected view renderer. |
 
-### Planned Files
+### Planned Files (design targets)
+
+Implemented equivalents: `repository.py` + `commit_log.py` + `bundle.py` → `store.py` (one small class until REC-02/03 need more).
 
 Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
 

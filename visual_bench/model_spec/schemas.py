@@ -1,0 +1,127 @@
+"""Model catalog, model sources, and model/spec description payloads (/api/models, /api/sources)."""
+from __future__ import annotations
+
+from typing import Annotated, Literal, Union
+
+from pydantic import Field, model_validator
+
+from visual_bench.wire import WireNumber, Scalar, Method, Wire
+
+__all__ = ['NativeResult', 'ModelSummary', 'VnnlibInstanceOut', 'VnnlibBenchmarkOut', 'ClassifierSourceOut', 'SourcesOut', 'SampleOut', 'LoadVnnlibRequest', 'LoadTorchRequest', 'LoadModelRequest', 'LoadModelBody', 'ParamOut', 'LayerOut', 'InputSpecOut', 'OutputSpecOut', 'ModelDescriptionOut']
+
+
+class NativeResult(Wire):
+    status: str
+    elapsed_s: float
+    nodes: int | None
+
+class ModelSummary(Wire):
+    model_id: str
+    description: str
+    act_path: str
+    sha256: str
+    methods: list[Method]
+    native: dict[str, NativeResult]
+    source: Literal["catalog", "vnnlib", "torch"] = "catalog"
+    params: dict[str, Scalar] = {}  # how a vnnlib/torch model was built (benchmark, files, dataset, index, eps, ...)
+
+class VnnlibInstanceOut(Wire):
+    onnx: str
+    vnnlib: str
+
+class VnnlibBenchmarkOut(Wire):
+    benchmark: str
+    instances: list[VnnlibInstanceOut]
+
+class ClassifierSourceOut(Wire):
+    source_id: str
+    dataset: str
+    onnx: str
+    description: str
+
+class SourcesOut(Wire):
+    vnnlib: list[VnnlibBenchmarkOut]
+    classifiers: list[ClassifierSourceOut]
+    vnnlib_root: str
+
+class SampleOut(Wire):
+    dataset: str
+    index: int
+    size: int
+    label: int
+    shape: list[int]
+    pixels: list[float]  # CHW in [0, 1]
+
+class LoadVnnlibRequest(Wire):
+    kind: Literal["vnnlib"]
+    benchmark: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.-]+$")
+    onnx: str = Field(min_length=1, max_length=512, pattern=r"^[A-Za-z0-9_./-]+$")
+    vnnlib: str = Field(min_length=1, max_length=512, pattern=r"^[A-Za-z0-9_./-]+$")
+
+    @model_validator(mode="after")
+    def _relative_paths(self) -> "LoadVnnlibRequest":
+        if any(p.startswith("/") or ".." in p.split("/") for p in (self.onnx, self.vnnlib)):
+            raise ValueError("onnx and vnnlib must be paths inside the benchmark directory")
+        return self
+
+class LoadTorchRequest(Wire):
+    kind: Literal["torch"]
+    source_id: str = Field(min_length=1, max_length=64)
+    index: int = Field(ge=0, le=1_000_000)
+    eps: float = Field(ge=0, le=1)
+    # Test images of a batch, one ACT input row each, fuzzed together; None = [index]. A batch net is fuzz-only.
+    indices: list[Annotated[int, Field(ge=0, le=1_000_000)]] | None = Field(default=None, min_length=1, max_length=64)
+
+    @model_validator(mode="after")
+    def _batch_starts_at_index(self) -> "LoadTorchRequest":
+        if self.indices is not None and (self.indices[0] != self.index or len(set(self.indices)) != len(self.indices)):
+            raise ValueError("indices must be distinct and start with index")
+        return self
+
+LoadModelRequest = Annotated[Union[LoadVnnlibRequest, LoadTorchRequest], Field(discriminator="kind")]
+
+class LoadModelBody(Wire):
+    source: LoadModelRequest
+
+class ParamOut(Wire):
+    name: str
+    shape: list[int] | None
+    value: str | None
+
+class LayerOut(Wire):
+    layer_id: int
+    kind: str
+    in_vars: int
+    out_vars: int
+    output_shape: list[int] | None
+    preds: list[int]
+    succs: list[int]
+    params: list[ParamOut]
+
+class InputSpecOut(Wire):
+    layer_id: int
+    kind: str
+    lb: list[WireNumber]
+    ub: list[WireNumber]
+    shape: list[int]  # lb/ub tensor shape as ACT stores it (images: N, C, H, W)
+    center: list[WireNumber] | None  # unperturbed input, when the spec records one
+    dataset: str | None  # dataset name from the INPUT layer, e.g. "mnist", "cifar10"
+
+class OutputSpecOut(Wire):
+    layer_id: int
+    kind: str
+    rows: int
+    matrix: list[list[float]] | None
+    thresholds: list[WireNumber] | None
+    text: str
+    true_class: int | None  # y_true of a robustness assertion (TOP1_ROBUST etc.)
+
+class ModelDescriptionOut(Wire):
+    model_id: str
+    sha256: str
+    act_commit: str | None
+    layers: list[LayerOut]
+    input_specs: list[InputSpecOut]
+    output_spec: OutputSpecOut | None
+    input_dim: int
+    output_dim: int

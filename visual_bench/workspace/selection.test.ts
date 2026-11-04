@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LatestRequest, initialSelection, selectionReducer, type Selection } from "./selection";
+import { initialSelection, selectionReducer, type Selection } from "./selection";
 
 const apply = (s: Selection, ...actions: Parameters<typeof selectionReducer>[1][]) => actions.reduce(selectionReducer, s);
 
@@ -26,25 +26,5 @@ describe("selectionReducer", () => {
   it("returns the same object for a no-op selection", () => {
     const s = selectionReducer(initialSelection, { type: "selectModel", modelId: "a" });
     expect(selectionReducer(s, { type: "selectModel", modelId: "a" })).toBe(s);
-  });
-});
-
-describe("LatestRequest", () => {
-  it("ignores a delayed response for an older selection", async () => {
-    const guard = new LatestRequest();
-    const applied: string[] = [];
-    let releaseA!: () => void;
-    const slowA = new Promise<void>((r) => (releaseA = r));
-    const run = async (label: string, wait: Promise<void>) => {
-      const token = guard.begin();
-      await wait;
-      if (guard.isCurrent(token)) applied.push(label);
-    };
-    const a = run("A", slowA);
-    const b = run("B", Promise.resolve());
-    await b;
-    releaseA();
-    await a;
-    expect(applied).toEqual(["B"]);
   });
 });

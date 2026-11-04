@@ -3,6 +3,16 @@
 **Status:** first version: `coverage.py` (EVT-01 audit: final summary only); EVT-02/03 blocked on ACT-03. **Owner:** A; B integrates workbench mappings and reviews contract consistency.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
+
+## Current Files and Usage
+
+| File | Responsibility |
+| --- | --- |
+| `coverage.py` | `observation_coverage()` (what the pinned ACT lets the GUI observe of BaB) and `bab_summary(metadata)` (final-summary keys only). |
+| `__init__.py` | Public API: `observation_coverage`, `bab_summary`, `BAB_SUMMARY_KEYS`. |
+
+Used by: the run worker (BaB summary) and `visual_bench/bab` (coverage). No dedicated tests yet: the BaB summary path is exercised by `visual_bench/verification/test_verification.py`.
+
 ## 1. Subproblems and Objective
 
 Provide ACT committed events with identity, ordering, and coverage for observation and recording.
@@ -96,7 +106,7 @@ Split internal files/directories when independent evolution, reuse, or size warr
 | `getCommittedPosition(runHandle) → CommitPosition` | Position must agree with the corresponding snapshot boundary, not merely the latest observed timestamp. |
 | `stopObservation(subscription) → ObservationStatus` | Releases observer resources without silently cancelling the ACT run. |
 
-### Planned Files
+### Planned Files (design targets)
 
 Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
 

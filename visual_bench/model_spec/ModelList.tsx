@@ -1,19 +1,19 @@
 import { useLayoutEffect, useRef, type ReactNode } from "react";
-import { fmt, indexRanges } from "../api";
+import { fmt, indexRanges } from "../shared/wire";
 import type { ModelSummary } from "../generated/wire";
-import type { QueryState } from "../workspace/useQuery";
+import type { UseQueryResult } from "@tanstack/react-query";
 
 export function ModelList({ models, selected, onSelect }: {
-  models: QueryState<ModelSummary[]>; selected: string | null; onSelect: (id: string) => void;
+  models: UseQueryResult<ModelSummary[]>; selected: string | null; onSelect: (id: string) => void;
 }) {
-  const groups: [string, ModelSummary[]][] = models.status === "ok"
+  const groups: [string, ModelSummary[]][] = models.status === "success"
     ? [["Catalog", models.data.filter((m) => (m.source ?? "catalog") === "catalog")],
        ["Loaded", models.data.filter((m) => (m.source ?? "catalog") !== "catalog")]]
     : [];
   return (
     <section className="panel">
       <h2>Models</h2>
-      {models.status === "error" && <div className="error">{models.message}</div>}
+      {models.status === "error" && <div className="error">{models.error.message}</div>}
       {groups.filter(([, ms]) => ms.length > 0).map(([title, ms]) => (
         <div key={title} className="modelgroup">
           {groups.length > 1 && <h3 className="grouptitle">{title} <small>{ms.length}</small></h3>}

@@ -475,7 +475,7 @@ random?: Random
 }
 /**
  * ACTFuzzer settings for method "fuzz". Defaults other than max_iterations equal the fuzzing section of
- * the pinned ACT act/config/pipeline.yaml (drift-checked in test_service.py); the browser reads them from
+ * the pinned ACT act/config/pipeline.yaml (drift-checked in fuzzing/test_fuzzing.py); the browser reads them from
  * GET /api/fuzz/defaults. Output, tracing and reporting stay owned by engine_bridge.
  * 
  * This interface was referenced by `ActGuiWire`'s JSON-Schema

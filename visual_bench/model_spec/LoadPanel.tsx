@@ -1,15 +1,16 @@
 // Load a model from a VNN-LIB instance or build one from an image classifier with a chosen test image and eps (MSV-04).
 import { useEffect, useState } from "react";
-import { api, fmt, indexRanges } from "../api";
+import { fmt, indexRanges } from "../shared/wire";
 import type { ModelSummary, SourcesOut } from "../generated/wire";
-import { classLabel, Pixels } from "../workspace/pixels";
-import { useQuery } from "../workspace/useQuery";
+import { classLabel, Pixels } from "../shared/ui/pixels";
+import { useSources, useSample, useLoadModel } from "./hooks";
+import type { LoadModelBody } from "../generated/wire";
 
 type Mode = "vnnlib" | "torch";
 const BATCH_LIMIT = 64; // engine_bridge.model_spec.sources.BATCH_LIMIT
 
 export function LoadPanel({ current, onLoaded }: { current: ModelSummary | null; onLoaded: (m: ModelSummary) => void }) {
-  const sources = useQuery("sources", api.sources);
+  const sources = useSources();
   const [mode, setMode] = useState<Mode>("torch");
   useEffect(() => {
     if (current?.source === "vnnlib" || current?.source === "torch") setMode(current.source);
@@ -24,9 +25,9 @@ export function LoadPanel({ current, onLoaded }: { current: ModelSummary | null;
           </button>
         ))}
       </nav>
-      {sources.status === "loading" && <div className="note">Reading sources from ACT…</div>}
-      {sources.status === "error" && <div className="error">{sources.message}</div>}
-      {sources.status === "ok" && (mode === "torch"
+      {sources.status === "pending" && <div className="note">Reading sources from ACT…</div>}
+      {sources.status === "error" && <div className="error">{sources.error.message}</div>}
+      {sources.status === "success" && (mode === "torch"
         ? <TorchForm s={sources.data} current={current?.source === "torch" ? current : null} onLoaded={onLoaded} />
         : <VnnlibForm s={sources.data} current={current?.source === "vnnlib" ? current : null} onLoaded={onLoaded} />)}
     </section>
@@ -34,14 +35,12 @@ export function LoadPanel({ current, onLoaded }: { current: ModelSummary | null;
 }
 
 function useLoad(onLoaded: (m: ModelSummary) => void) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const run = (body: Parameters<typeof api.loadModel>[0]) => {
-    setBusy(true);
-    setError(null);
-    api.loadModel(body).then(onLoaded, (e: unknown) => setError(e instanceof Error ? e.message : String(e))).finally(() => setBusy(false));
+  const mutation = useLoadModel();
+  return {
+    busy: mutation.isPending,
+    error: mutation.error?.message ?? null,
+    run: (body: LoadModelBody) => mutation.mutate(body, { onSuccess: onLoaded }),
   };
-  return { busy, error, run };
 }
 
 function TorchForm({ s, current, onLoaded }: { s: SourcesOut; current: ModelSummary | null; onLoaded: (m: ModelSummary) => void }) {
@@ -61,8 +60,8 @@ function TorchForm({ s, current, onLoaded }: { s: SourcesOut; current: ModelSumm
   }, [current]);
   const src = s.classifiers.find((c) => c.source_id === sourceId) ?? null;
   const index = indices[slot] ?? indices[0]!;
-  const sample = useQuery(src ? `${src.dataset}:${index}` : null, () => api.sample(src!.dataset, index));
-  const size = sample.status === "ok" ? sample.data.size : 10000;
+  const sample = useSample(src?.dataset ?? null, index);
+  const size = sample.status === "success" ? sample.data.size : 10000;
   const load = useLoad(onLoaded);
   if (s.classifiers.length === 0) {
     return <div className="note">No classifier ONNX models or datasets found in the ACT checkout (literature/, data/torchvision/).</div>;
@@ -123,10 +122,10 @@ function TorchForm({ s, current, onLoaded }: { s: SourcesOut; current: ModelSumm
       )}
       {duplicate && <div className="error">Each image of a batch must be a different test image.</div>}
       <div className="samplepreview">
-        {sample.status === "ok" ? (
+        {sample.status === "success" ? (
           <Pixels xs={sample.data.pixels} shape={{ c: sample.data.shape[0]!, h: sample.data.shape[1]!, w: sample.data.shape[2]! }}
             lo={0} hi={1} size="big" label={`#${index} · label ${classLabel(src?.dataset, sample.data.label)}`} />
-        ) : sample.status === "error" ? <div className="error">{sample.message}</div> : <div className="note">Loading image…</div>}
+        ) : sample.status === "error" ? <div className="error">{sample.error.message}</div> : <div className="note">Loading image…</div>}
       </div>
       <label>eps (L∞ radius) = {fmt(eps, 4)} ≈ {fmt(eps * 255, 1)}/255
         <span className="epsrow">

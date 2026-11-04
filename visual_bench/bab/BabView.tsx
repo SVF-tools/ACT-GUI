@@ -1,11 +1,10 @@
-import { api } from "../api";
-import { Empty } from "../workspace/Empty";
-import { useQuery } from "../workspace/useQuery";
+import { Empty } from "../shared/ui/Empty";
+import { useCoverage } from "./hooks";
 
-export function BabView({ runId, version }: { runId: string | null; version: number }) {
-  const q = useQuery(runId ? `${runId}:${version}` : null, () => api.coverage(runId!));
+export function BabView({ runId }: { runId: string | null }) {
+  const q = useCoverage(runId);
   if (!runId) return <Empty title="No run selected" text="BaB observation needs a run." />;
-  if (q.status !== "ok") return q.status === "error" ? <div className="error">{q.message}</div> : <Empty title="Loading…" text="" />;
+  if (q.status !== "success") return q.status === "error" ? <div className="error">{q.error.message}</div> : <Empty title="Loading…" text="" />;
   const c = q.data;
   return (
     <div>

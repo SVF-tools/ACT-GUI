@@ -3,6 +3,19 @@
 **Status:** first version: `AnalysisView.tsx` (ANA-01 on recorded interval states; ANA-02 limited to interval-box projection); ANA-03 not started. **Owner:** D; with three contributors C implements, B integrates data, and A reviews numerical semantics.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
+
+## Current Files and Usage
+
+| File | Layer | Responsibility |
+| --- | --- | --- |
+| `schemas.py` | Wire | `LayerStatesOut`, `LayerStateOut`. |
+| `service.py` | Service | `AnalysisService.layer_states(run_id)`: reads the sealed `layers.json` of a completed run (recorded by the run worker through `engine_bridge.inspection`), with availability and provenance. |
+| `routes.py` | HTTP | `GET /api/runs/{id}/layers`. |
+| `api.ts`, `hooks.ts` | Browser data | Layer-state query keyed under the run (`keys.layers`), refreshed with the run's events. |
+| `AnalysisView.tsx` | View | Propagation stepper, before/after bars, value selection, interval-box projection (Verification mode). |
+
+Tests: the layer-state route is covered by `../verification/test_verification.py` (BaB lifecycle, domain runs) and the bridge parity in `engine_bridge/inspection/test_inspection.py`.
+
 ## 1. Subproblems and Objective
 
 Show input-to-output approximation propagation and support comparisons with explicit provenance.
@@ -127,7 +140,7 @@ Initial acceptance uses a small real model with fixed input/run: manually traver
 | `compareStages(left, right, alignment) → ComparisonView` | Checks layer/tensor/coordinate compatibility before displaying a tightening comparison. |
 | `advancePlayback(cursor, stageIndex) → PlaybackState` | Changes only the browsing cursor; never submits an engine step command. |
 
-### Planned Files
+### Planned Files (design targets)
 
 Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
 

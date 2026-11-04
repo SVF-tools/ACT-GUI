@@ -1,7 +1,21 @@
 # Model and Specification View
 
-**Status:** first version: `ModelList.tsx`, `ModelGraph.tsx` (in-house SVG DAG), `SpecPanel.tsx` (MSV-01), `LoadPanel.tsx` (MSV-04); MSV-02/03 not started. Image-shaped input specs (N x C x H x W, C = 1 or 3) render through `InputDomain.tsx`: clean input (spec center), lower/upper bound images, a heat map of the allowed change per value, and display-only perturbations sampled inside the box (random corner, uniform, lb, ub) with an amplified difference view (`workspace/pixels.tsx`, shared with the Fuzzing counterexample view). TOP1_ROBUST properties show the required class with dataset labels (MNIST digits, CIFAR-10 names); numeric bounds and ACT's constraint text stay available under disclosures. **Owner:** C; B integrates data; A reviews variable and constraint semantics.
+**Status:** first version: `ModelList.tsx`, `ModelGraph.tsx` (in-house SVG DAG), `SpecPanel.tsx` (MSV-01), `LoadPanel.tsx` (MSV-04); MSV-02/03 not started. Image-shaped input specs (N x C x H x W, C = 1 or 3) render through `InputDomain.tsx`: clean input (spec center), lower/upper bound images, a heat map of the allowed change per value, and display-only perturbations sampled inside the box (random corner, uniform, lb, ub) with an amplified difference view (`shared/ui/pixels.tsx`, shared with the Fuzzing counterexample view). TOP1_ROBUST properties show the required class with dataset labels (MNIST digits, CIFAR-10 names); numeric bounds and ACT's constraint text stay available under disclosures. **Owner:** C; B integrates data; A reviews variable and constraint semantics.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
+
+
+## Current Files and Usage
+
+| File | Layer | Responsibility |
+| --- | --- | --- |
+| `schemas.py` | Wire | `ModelSummary`, `ModelDescriptionOut` (layers, input/output specs), `SourcesOut`, `SampleOut`, `LoadModelBody` (VNN-LIB or torch source). |
+| `service.py` | Service | `ModelService`: catalog + built models (`entry`, `path` with sha256 check, `methods`, `native`), `models()`, `sources()`, `sample()`, `load()` (content-addressed, idempotent), `describe()` (cached). Supported methods come from `engine_bridge.execution`. |
+| `routes.py` | HTTP | `GET/POST /api/models`, `GET /api/models/{id}`, `GET /api/sources`, `GET /api/sources/sample`. |
+| `api.ts`, `hooks.ts` | Browser data | Model list/description, sources, sample queries; load mutation invalidates the model list. |
+| `LoadPanel.tsx`, `ModelList.tsx`, `ModelGraph.tsx`, `SpecPanel.tsx`, `InputDomain.tsx` | Views | Load model panel, model list, SVG network DAG, specification and input-domain images. |
+| `test_model_spec.py` | Tests | Torch and VNN-LIB loads (idempotent, persisted, runnable), dataset samples, structured load errors. |
+
+Run this module's tests: `.venv/bin/python -m pytest visual_bench/model_spec`. The ACT-side loader and builders are [engine_bridge/model_spec](../../engine_bridge/model_spec/README.md).
 
 ## 1. Subproblems and Objective
 
@@ -95,7 +109,9 @@ Split internal files/directories when independent evolution, reuse, or size warr
 | `toNetworkGraph(description) → RendererGraph` | Pure renderer conversion with stable layer/tensor mapping. |
 | `validateSpecDraft(draft, modelRef) → ValidationResult` | Requests ACT-backed validation through the service; returns field-level errors or a new spec reference. |
 
-### Planned Files
+### Planned Files (design targets)
+
+Implemented equivalents: `ModelSpecView.tsx` → `ModelGraph.tsx` + `SpecPanel.tsx`; `view_model.ts` → `hooks.ts` plus view-local transforms.
 
 Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
 

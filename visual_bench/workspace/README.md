@@ -1,7 +1,19 @@
 # Workspace
 
-**Status:** first version: `selection.ts`, `useQuery.ts` (WS-01/02, vitest); WS-03 not started. **Owner:** C.
+**Status:** first version: `selection.ts`, `modes.ts`, `layout.tsx` (WS-01/02, vitest); server data moved from the in-house `useQuery` to TanStack Query on 2026-11-04 (keys in `shared/queryClient.ts`); WS-03 not started. **Owner:** C.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
+
+
+## Current Files and Usage
+
+| File | Responsibility |
+| --- | --- |
+| `selection.ts` (+ `selection.test.ts`) | Selection reducer: model/run/layer/value context and stale-selection rules. |
+| `modes.ts` (+ `modes.test.ts`) | Mode registry `{ id, label, method, View }` for Fuzzing, Verification, BaB; `app.tsx` renders modes and maps run methods to modes from it. Add a mode here, not in `app.tsx`. |
+| `layout.tsx` | Context bar and layout pieces used by `app.tsx`. |
+| `theme.tsx` | Light/dark theme toggle and persistence. |
+
+Browser-wide infrastructure lives in [`../shared/`](../README.md#shared-browser-layer): HTTP client, wire-number helpers, the TanStack `QueryClient` with the query key factory, and shared UI (`Empty`, `StopButton`, image rendering). Tests: `npm test`.
 
 ## 1. Subproblems and Objective
 
@@ -94,7 +106,9 @@ Split internal files/directories when independent evolution, reuse, or size warr
 | `getPanelContext(state, panelId) → SelectionContext` | Returns active or pinned context; layer and search-node IDs have distinct types. |
 | `navigateTo(reference) → NavigationResult` | Resolve evidence references; a missing historical object produces a visible unavailable state. |
 
-### Planned Files
+### Planned Files (design targets)
+
+Implemented equivalents: `state.ts` → `selection.ts`; `Workspace.tsx` → `app.tsx` + `layout.tsx` + `modes.ts`.
 
 Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
 

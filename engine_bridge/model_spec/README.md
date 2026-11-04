@@ -1,7 +1,19 @@
 # Model and Specification Adapter
 
-**Status:** first version: `describe.py` (MSB-01..03 for JSON nets with box INPUT_SPEC), `sources.py` (MSB-04); parity tests in `../test_bridge.py`; A review pending. **Owner:** B; A reviews scientific mapping.
+**Status:** first version: `describe.py` (MSB-01..03 for JSON nets with box INPUT_SPEC), `sources.py` (MSB-04); parity tests in `test_model_spec.py`; A review pending. **Owner:** B; A reviews scientific mapping.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
+
+
+## Current Files and Usage
+
+| File | Responsibility |
+| --- | --- |
+| `describe.py` | `load_net(path)`, `describe_model(path)` → `ModelDescription` (layers, input specs, output spec), `file_sha256`. |
+| `sources.py` | Model sources: `vnnlib_instances()`, `classifier_sources()`, `dataset_sample()`, `build_vnnlib_net()`, `build_classifier_net()` → `BuiltNet` (description, params, `input_rows`). |
+| `__init__.py` | Public API: `describe_model`, `file_sha256`; `sources` is imported as a submodule. |
+| `test_model_spec.py` | Native DAG/spec parity, image specs, source builders vs. ACT spec creation, rejected instances. |
+
+Used by: `visual_bench/model_spec` (catalog, sources, descriptions), execution and inspection (`load_net`). Tests: `.venv/bin/python -m pytest engine_bridge/model_spec`.
 
 ## 1. Subproblems and Objective
 
@@ -95,7 +107,7 @@ Split internal files/directories when independent evolution, reuse, or size warr
 | `loadSpec(session, modelHandle, sourceOrDraft) → SpecDescription` | Use ACT validation; preserve unsupported types rather than coercing them. |
 | `describeModel(modelHandle) → ModelDescription` | Read-only mapping; no renderer-specific fields or raw ACT objects. |
 
-### Planned Files
+### Planned Files (design targets)
 
 Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
 

@@ -1,7 +1,7 @@
 """Evidence-based explanation for a selected layer/neuron of a completed run (AI-01, AI-02 partial).
 
 Flow: freeze the SelectionContext -> collect typed evidence through the same
-Workbench queries the GUI uses -> a provider composes sections that cite
+module services the GUI routes use -> a provider composes sections that cite
 evidence ids -> every cited id must resolve to collected evidence.
 
 Only the deterministic FakeProvider ships in this first version. It restates
@@ -12,13 +12,17 @@ from __future__ import annotations
 import math
 import os
 import uuid
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from visual_bench import schemas as S
-from visual_bench.verification.service import AppError, Workbench
+from visual_bench.assistant import schemas as S
+from visual_bench.errors import AppError
+from visual_bench.wire import WireNumber
+
+if TYPE_CHECKING:
+    from visual_bench.workbench import Workbench
 
 
-def _num(x: S.WireNumber) -> float:
+def _num(x: WireNumber) -> float:
     return float(x) if not isinstance(x, str) else float(x.replace("Infinity", "inf"))
 
 
@@ -30,7 +34,7 @@ class Provider(Protocol):
                 facts: dict[str, object]) -> list[S.AnswerSection]: ...
 
 
-def collect_evidence(wb: Workbench, ctx: S.SelectionContext) -> tuple[dict[str, S.EvidenceRef], dict[str, object]]:
+def collect_evidence(wb: "Workbench", ctx: S.SelectionContext) -> tuple[dict[str, S.EvidenceRef], dict[str, object]]:
     ev: dict[str, S.EvidenceRef] = {}
     facts: dict[str, object] = {}
 
@@ -40,12 +44,12 @@ def collect_evidence(wb: Workbench, ctx: S.SelectionContext) -> tuple[dict[str, 
                                    neuron=neuron, value=value)
         return ref_id
 
-    desc = wb.describe(ctx.model_id)
+    desc = wb.models.describe(ctx.model_id)
     if desc.output_spec:
         facts["spec"] = add("spec", "Output property (ASSERT layer)", desc.output_spec.text, desc.output_spec.layer_id)
     if not ctx.run_id:
         return ev, facts
-    run = wb.get_run(ctx.run_id)
+    run = wb.runs.get(ctx.run_id)
     if run.model_id != ctx.model_id:
         raise AppError(422, "context_mismatch", "run_id belongs to a different model than the selection")
     if run.result:
@@ -55,12 +59,12 @@ def collect_evidence(wb: Workbench, ctx: S.SelectionContext) -> tuple[dict[str, 
                               f"{run.result.act_status} in {run.result.elapsed_s:.3f}s")
     else:
         facts["run_status"] = run.status
-    cov = wb.coverage(ctx.run_id)
+    cov = wb.bab.coverage(ctx.run_id)
     facts["coverage"] = add("coverage", "BaB observation coverage",
                             f"node events {cov.node_events}; final summary {cov.final_summary}; {cov.reason}")
     if cov.summary:
         facts["bab_nodes"] = cov.summary.get("nodes")
-    states = wb.layer_states(ctx.run_id)
+    states = wb.analysis.layer_states(ctx.run_id)
     facts["layers_availability"] = states.availability
     if ctx.layer_id is None or states.availability != "available":
         return ev, facts
@@ -167,7 +171,7 @@ def providers() -> S.ProviderList:
     ])
 
 
-def explain(wb: Workbench, req: S.ExplainRequest, provider: Provider | None = None) -> S.ExplainResponse:
+def explain(wb: "Workbench", req: S.ExplainRequest, provider: Provider | None = None) -> S.ExplainResponse:
     ctx = req.context.model_copy(deep=True)  # frozen for the whole request
     ev, facts = collect_evidence(wb, ctx)
     p = provider or FakeProvider()

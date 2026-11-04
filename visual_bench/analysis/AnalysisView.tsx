@@ -1,20 +1,18 @@
 // Manual propagation through recorded interval layer states (ANA-01, first version).
 import { useState } from "react";
-import { api, fmt, num } from "../api";
-import { Empty } from "../workspace/Empty";
+import { fmt, num } from "../shared/wire";
+import { Empty } from "../shared/ui/Empty";
 import type { LayerStateOut, ModelDescriptionOut } from "../generated/wire";
-import type { Selection } from "../workspace/selection";
-import { useQuery } from "../workspace/useQuery";
+import { useLayers } from "./hooks";
 
-export function AnalysisView({ sel, version, model, onSelectLayer, onSelectNeuron }: {
-  sel: Selection; version: number; model: ModelDescriptionOut | null;
+export function AnalysisView({ sel, model, onSelectLayer, onSelectNeuron }: {
+  sel: { runId: string | null; layerId: number | null; neuron: number | null }; model: ModelDescriptionOut | null;
   onSelectLayer: (id: number) => void; onSelectNeuron: (i: number | null) => void;
 }) {
-  // Re-query when a run commits (version bumps on SSE completion) so "pending" does not stick.
-  const q = useQuery(sel.runId ? `${sel.runId}:${version}` : null, () => api.layers(sel.runId!));
+  const q = useLayers(sel.runId);
   if (!sel.runId) return <Empty title="No run selected" text="Start or pick a run; its interval layer states are recorded with it." />;
-  if (q.status === "loading" || q.status === "idle") return <Empty title="Loading layer states…" text="" />;
-  if (q.status === "error") return <div className="error">{q.message}</div>;
+  if (q.status === "pending") return <Empty title="Loading layer states…" text="" />;
+  if (q.status === "error") return <div className="error">{q.error.message}</div>;
   const st = q.data;
   if (st.availability !== "available") return <Empty title={`Layer states ${st.availability}`} text="Available once the run completes and its record is sealed." />;
   const order = st.layers.map((l) => l.layer_id);

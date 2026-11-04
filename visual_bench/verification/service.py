@@ -1,15 +1,14 @@
-"""Application use cases shared by HTTP routes and the assistant (VER-01/02/03, first version).
+"""Run lifecycle (VER-01..04, VER-07): start, supervise, stop, and read runs of every method.
 
-- Catalog: real ACT models pinned by fixtures/catalog.json (commit + sha256).
-- Runs: start returns immediately; a thread supervises one worker process per run.
-- Idempotency: the same client_request_id with the same parameters returns the
-  same run; with different parameters it is rejected.
+- Start returns immediately; a thread supervises one worker process per run (worker.py).
+- Idempotency: the same client_request_id with the same parameters returns the same run;
+  with different parameters it is rejected.
 - Records are the source of truth; run status is derived from committed events.
+- Method-specific live output (fuzz frames) goes to a LiveObserver; this module stays method-neutral.
 """
 from __future__ import annotations
 
 import json
-import math
 import os
 import signal
 import subprocess
@@ -17,185 +16,42 @@ import sys
 import tempfile
 import threading
 import uuid
-from dataclasses import asdict
-from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
-from engine_bridge.contracts import BridgeError, EngineInfo
-from engine_bridge.engine_session import act_root, probe
-from engine_bridge.events import observation_coverage
-from engine_bridge.contracts import VnnlibInstance
-from engine_bridge.model_spec import describe_model, file_sha256
-from engine_bridge.model_spec import sources as model_sources
-from visual_bench import schemas as S
+from visual_bench.config import REPO_ROOT, requested_device
+from visual_bench.engine.service import EngineService
+from visual_bench.errors import AppError
+from visual_bench.model_spec.schemas import NativeResult
+from visual_bench.model_spec.service import ModelService
 from visual_bench.records import RecordStore
 from visual_bench.records.store import now_iso
-from visual_bench.verification.solver_license import GurobiLicense
+from visual_bench.fuzzing.schemas import FuzzOptions
+from visual_bench.verification import schemas as S
+from visual_bench.wire import ErrorBody
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKER_GRACE_S = 120.0
 STOP_GRACE_S = 10.0  # a stopped fuzz worker finishes its current iteration within this, else it is killed
-LIVE_HIT_LIMIT = 200  # ACT counterexamples kept in memory per running fuzz run (from violating frames)
-SAVED = "saved_counterexamples.json"
-# Every catalog net is a JSON ACT net that ACTToTorch rebuilds, so ACTFuzzer applies to all of them.
-WORKBENCH_METHODS: tuple[S.Method, ...] = ("fuzz",)
 
 
-class AppError(Exception):
-    def __init__(self, status: int, code: str, message: str, retryable: bool = False) -> None:
-        super().__init__(message)
-        self.status, self.code, self.message, self.retryable = status, code, message, retryable
+class LiveObserver(Protocol):
+    def observe(self, run_id: str, msg: dict[str, Any]) -> tuple[str, dict[str, Any]] | None: ...
+
+    def forget(self, run_id: str) -> None: ...
 
 
-def _bridge_error(err: BridgeError, status: int = 422) -> AppError:
-    return AppError(status, err.code, err.message, err.retryable)
-
-
-class Workbench:
-    def __init__(self, records_root: Path, catalog_path: Path | None = None, secrets_root: Path | None = None) -> None:
-        self.catalog_path = catalog_path or REPO_ROOT / "fixtures" / "catalog.json"
-        self.catalog = json.loads(self.catalog_path.read_text())
-        self.records = RecordStore(records_root)
-        # Nets built from VNN-LIB / classifier sources: <id>.json + <id>.meta.json, content-addressed by sha256.
-        self.models_root = Path(os.environ.get("ACT_GUI_MODELS", records_root.parent / "models"))
-        self._derived: dict[str, dict[str, Any]] = {}
-        for meta in sorted(self.models_root.glob("*.meta.json")) if self.models_root.is_dir() else ():
-            entry = json.loads(meta.read_text())
-            self._derived[entry["id"]] = entry
-        self.gurobi = GurobiLicense(secrets_root or records_root.parent / "secrets")
+class RunService:
+    def __init__(self, records: RecordStore, models: ModelService, engine: EngineService, live: LiveObserver) -> None:
+        self.records = records
+        self.models = models
+        self.engine = engine
+        self.live = live
         self._lock = threading.Lock()
         self._active: dict[str, threading.Thread] = {}
-        self._live_frames: dict[str, dict[str, Any]] = {}  # latest mutated input per running fuzz run; not recorded
-        self._live_hits: dict[str, dict[int, dict[str, Any]]] = {}  # ACT counterexamples seen live, by index
         self._procs: dict[str, subprocess.Popen[bytes]] = {}
         self._stop: dict[str, threading.Event] = {}
         self._recover_interrupted()
 
-    # -- engine ------------------------------------------------------------
-    @property
-    def expected_commit(self) -> str:
-        return self.catalog["act"]["commit"]
-
-    @lru_cache(maxsize=1)
-    def engine(self) -> EngineInfo:
-        return probe(self.expected_commit)
-
-    def engine_out(self) -> S.EngineInfoOut:
-        e = self.engine()
-        d = asdict(e)
-        d["usable"] = e.usable
-        return S.EngineInfoOut.model_validate(d)
-
-    def _require_engine(self) -> None:
-        e = self.engine()
-        if not e.usable:
-            first = next(d for d in e.diagnostics if d.severity == "error")
-            raise AppError(503, first.code, first.message)
-
-    # -- catalog / descriptions -------------------------------------------
-    def _model_entry(self, model_id: str) -> dict[str, Any]:
-        for m in self.catalog["models"]:
-            if m["id"] == model_id:
-                return m
-        if model_id in self._derived:
-            return self._derived[model_id]
-        raise AppError(404, "model_not_found", f"Unknown model_id {model_id!r}")
-
-    def model_path(self, model_id: str) -> Path:
-        entry = self._model_entry(model_id)
-        path = self.models_root / f"{model_id}.json" if model_id in self._derived else act_root() / entry["act_path"]
-        if not path.is_file():
-            raise AppError(503, "model_missing", f"{entry['act_path']} is missing from the ACT checkout")
-        if file_sha256(path) != entry["sha256"]:
-            raise AppError(409, "snapshot_mismatch", f"{entry['act_path']} does not match the pinned sha256")
-        return path
-
-    @staticmethod
-    def _methods(entry: dict[str, Any]) -> list[S.Method]:
-        return [*entry["methods"], *WORKBENCH_METHODS]
-
-    def models(self) -> list[S.ModelSummary]:
-        return [S.ModelSummary(model_id=m["id"], description=m["description"], act_path=m["act_path"],
-                               sha256=m["sha256"], methods=self._methods(m), native=m["native"],
-                               source=m.get("source", "catalog"), params=m.get("params", {}))
-                for m in [*self.catalog["models"], *self._derived.values()]]
-
-    # -- model sources (MSB-04) ---------------------------------------------
-    def sources(self) -> S.SourcesOut:
-        self._require_engine()
-        groups: dict[str, list[S.VnnlibInstanceOut]] = {}
-        for inst in model_sources.vnnlib_instances():
-            groups.setdefault(inst.benchmark, []).append(S.VnnlibInstanceOut(onnx=inst.onnx, vnnlib=inst.vnnlib))
-        return S.SourcesOut(
-            vnnlib=[S.VnnlibBenchmarkOut(benchmark=b, instances=i) for b, i in groups.items()],
-            classifiers=[S.ClassifierSourceOut(source_id=c.source_id, dataset=c.dataset, onnx=c.onnx,
-                                               description=c.description)
-                         for c in model_sources.classifier_sources()],
-            vnnlib_root=str(model_sources.vnnlib_root()))
-
-    def sample(self, dataset: str, index: int) -> S.SampleOut:
-        self._require_engine()
-        try:
-            s = model_sources.dataset_sample(dataset, index)
-        except BridgeError as err:
-            raise _bridge_error(err, 404 if err.code == "dataset_not_found" else 422) from err
-        return S.SampleOut(dataset=s.dataset, index=s.index, size=s.size, label=s.label, shape=list(s.shape),
-                           pixels=list(s.pixels))
-
-    def load_model(self, req: S.LoadVnnlibRequest | S.LoadTorchRequest) -> tuple[S.ModelSummary, bool]:
-        """Build a net from a source; the same content returns the existing model (idempotent by sha256)."""
-        self._require_engine()
-        self.models_root.mkdir(parents=True, exist_ok=True)
-        tmp = self.models_root / f".build-{uuid.uuid4().hex}.json"
-        try:
-            if isinstance(req, S.LoadVnnlibRequest):
-                built = model_sources.build_vnnlib_net(VnnlibInstance(req.benchmark, req.onnx, req.vnnlib), tmp)
-            else:
-                built = model_sources.build_classifier_net(req.source_id, req.indices or req.index, req.eps, tmp)
-        except BridgeError as err:
-            tmp.unlink(missing_ok=True)
-            raise _bridge_error(err, 404 if err.code == "source_not_found" else 422) from err
-        sha = file_sha256(tmp)
-        model_id = f"{req.kind}-{sha[:12]}"
-        with self._lock:
-            created = model_id not in self._derived
-            if created:
-                tmp.replace(self.models_root / f"{model_id}.json")
-                entry = {"id": model_id, "description": built.description, "act_path": f"workbench-models/{model_id}.json",
-                         # ACT's verify_once rejects a net with several input rows, so a batch is fuzz-only.
-                         "sha256": sha, "methods": [] if "batch" in built.params else ["interval", "bab"],
-                         "native": {}, "source": req.kind,
-                         "params": built.params}
-                (self.models_root / f"{model_id}.meta.json").write_text(json.dumps(entry, indent=2))
-                self._derived[model_id] = entry
-            else:
-                tmp.unlink(missing_ok=True)
-        return next(m for m in self.models() if m.model_id == model_id), created
-
-    def describe(self, model_id: str) -> S.ModelDescriptionOut:
-        self._require_engine()
-        return self._describe_cached(model_id)
-
-    @lru_cache(maxsize=32)
-    def _describe_cached(self, model_id: str) -> S.ModelDescriptionOut:
-        path = self.model_path(model_id)
-        try:
-            d = describe_model(path)
-        except BridgeError as err:
-            raise _bridge_error(err) from err
-        raw = asdict(d)
-        for spec in raw["input_specs"]:
-            spec["lb"] = [S.wire_number(x) for x in spec["lb"]]
-            spec["ub"] = [S.wire_number(x) for x in spec["ub"]]
-            if spec["center"] is not None:
-                spec["center"] = [S.wire_number(x) for x in spec["center"]]
-        if raw["output_spec"] and raw["output_spec"]["thresholds"] is not None:
-            raw["output_spec"]["thresholds"] = [S.wire_number(x) for x in raw["output_spec"]["thresholds"]]
-        raw.pop("source_path")
-        return S.ModelDescriptionOut(model_id=model_id, act_commit=self.engine().commit, **raw)
-
-    # -- runs ----------------------------------------------------------------
     def _recover_interrupted(self) -> None:
         for run_id in self.records.run_ids():
             evs = self.records.events(run_id)
@@ -209,16 +65,18 @@ class Workbench:
                 return run_id
         return None
 
-    def start_run(self, req: S.RunRequest) -> tuple[S.RunOut, bool]:
+    # -- commands ------------------------------------------------------------
+    def start(self, req: S.RunRequest) -> tuple[S.RunOut, bool]:
         """Return (run, created). Never waits for ACT."""
-        entry = self._model_entry(req.model_id)
-        if req.method not in self._methods(entry):
-            raise AppError(422, "unsupported_method", f"{req.model_id} supports {self._methods(entry)}, not {req.method!r}")
+        entry = self.models.entry(req.model_id)
+        methods = self.models.methods(entry)
+        if req.method not in methods:
+            raise AppError(422, "unsupported_method", f"{req.model_id} supports {methods}, not {req.method!r}")
         if req.method == "fuzz" and req.fuzz is None:
-            req = req.model_copy(update={"fuzz": S.FuzzOptions()})
+            req = req.model_copy(update={"fuzz": FuzzOptions()})
         if req.method == "interval" and req.domain is None:
             req = req.model_copy(update={"domain": "interval"})
-        self._require_engine()
+        self.engine.require_engine()
         with self._lock:
             if req.client_request_id:
                 existing = self._find_by_request_id(req.client_request_id)
@@ -226,33 +84,44 @@ class Workbench:
                     if self.records.manifest(existing)["request"] != req.model_dump():
                         raise AppError(409, "idempotency_conflict",
                                        "client_request_id was already used with different parameters")
-                    return self.get_run(existing), False
-            path = self.model_path(req.model_id)
+                    return self.get(existing), False
+            path = self.models.path(req.model_id)
             run_id = "run-" + uuid.uuid4().hex[:12]
             env, license_source = self._worker_env()
             self.records.create(run_id, {
                 "run_id": run_id, "created_at": now_iso(), "request": req.model_dump(),
                 "model": {"act_path": entry["act_path"], "sha256": entry["sha256"]},
-                "act": {"commit": self.engine().commit, "expected_commit": self.expected_commit},
-                "execution": {"requested_device": self.requested_device, "gurobi_license": license_source},
+                "act": {"commit": self.engine.info.commit, "expected_commit": self.engine.expected_commit},
+                "execution": {"requested_device": requested_device(), "gurobi_license": license_source},
             })
             self.records.append_event(run_id, "run.queued", "queued", {"method": req.method})
             t = threading.Thread(target=self._supervise, args=(run_id, path, req, env), daemon=True, name=run_id)
             self._active[run_id] = t
             self._stop[run_id] = threading.Event()
             t.start()
-        return self.get_run(run_id), True
+        return self.get(run_id), True
 
-    @property
-    def requested_device(self) -> str:
-        return os.environ.get("ACT_GUI_DEVICE", "cpu")
+    def stop(self, run_id: str) -> S.RunOut:
+        """Request a stop; idempotent, and a no-op on a terminal run."""
+        run = self.get(run_id)
+        with self._lock:
+            ev = self._stop.get(run_id)
+            if ev is None or ev.is_set() or run.status in ("completed", "failed"):
+                return run
+            ev.set()
+            proc = self._procs.get(run_id)
+        self.records.append_event(run_id, "run.stop_requested", run.status, {})
+        if proc is not None:
+            self._signal_stop(proc, run.method)
+        return self.get(run_id)
 
+    # -- worker supervision ----------------------------------------------------
     def _worker_env(self) -> tuple[dict[str, str], str]:
         env = dict(os.environ)
         env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(REPO_ROOT), env.get("PYTHONPATH")]))
-        if self.requested_device == "cpu":
+        if requested_device() == "cpu":
             env["CUDA_VISIBLE_DEVICES"] = ""
-        return env, self.gurobi.worker_env(env)
+        return env, self.engine.gurobi.worker_env(env)
 
     def _supervise(self, run_id: str, model_path: Path, req: S.RunRequest, env: dict[str, str]) -> None:
         try:
@@ -287,16 +156,9 @@ class Workbench:
                     try:
                         with os.fdopen(read_fd) as progress:
                             for line in progress:  # ends at EOF: worker exited or was killed
-                                msg = json.loads(line)
-                                if "frame" in msg:
-                                    with self._lock:
-                                        self._live_frames[run_id] = msg["frame"]
-                                        ce = msg["frame"].get("counterexample")
-                                        hits = self._live_hits.setdefault(run_id, {})
-                                        if ce is not None and len(hits) < LIVE_HIT_LIMIT:
-                                            hits[ce["index"]] = ce
-                                else:
-                                    self.records.append_event(run_id, "fuzz.progress", "running", msg["progress"])
+                                event = self.live.observe(run_id, json.loads(line))
+                                if event is not None:
+                                    self.records.append_event(run_id, event[0], "running", event[1])
                         proc.wait()
                     finally:
                         timer.cancel()
@@ -316,10 +178,9 @@ class Workbench:
         except Exception as exc:  # unexpected supervisor fault: still a visible, explicit failure
             self.records.append_event(run_id, "run.failed", "failed", {"code": "supervisor_error", "message": repr(exc)})
         finally:
+            self.live.forget(run_id)
             with self._lock:
                 self._active.pop(run_id, None)
-                self._live_frames.pop(run_id, None)
-                self._live_hits.pop(run_id, None)
                 self._procs.pop(run_id, None)
                 self._stop.pop(run_id, None)
 
@@ -330,20 +191,6 @@ class Workbench:
             threading.Timer(STOP_GRACE_S, proc.kill).start()
         else:  # verify_once / BaB expose no stop hook: end the worker
             proc.kill()
-
-    def stop_run(self, run_id: str) -> S.RunOut:
-        """Request a stop; idempotent, and a no-op on a terminal run."""
-        run = self.get_run(run_id)
-        with self._lock:
-            ev = self._stop.get(run_id)
-            if ev is None or ev.is_set() or run.status in ("completed", "failed"):
-                return run
-            ev.set()
-            proc = self._procs.get(run_id)
-        self.records.append_event(run_id, "run.stop_requested", run.status, {})
-        if proc is not None:
-            self._signal_stop(proc, run.method)
-        return self.get_run(run_id)
 
     def _commit_result(self, run_id: str, out: dict[str, Any]) -> None:
         o = out["outcome"]
@@ -361,7 +208,11 @@ class Workbench:
         self.records.append_event(run_id, "run.completed", "completed",
                                   {"verdict": result["verdict"], "result_sha256": hashes["result.json"]})
 
-    def get_run(self, run_id: str) -> S.RunOut:
+    # -- queries -----------------------------------------------------------------
+    def request(self, run_id: str) -> S.RunRequest:
+        return S.RunRequest.model_validate(self.records.manifest(run_id)["request"])
+
+    def get(self, run_id: str) -> S.RunOut:
         if not self.records.exists(run_id):
             raise AppError(404, "run_not_found", f"Unknown run {run_id!r}")
         m = self.records.manifest(run_id)
@@ -374,16 +225,16 @@ class Workbench:
         if status == "completed":
             raw = self.records.artifact(run_id, "result.json")
             if raw is None:
-                status, error = "failed", S.ErrorBody(code="record_corrupt", message="result.json failed its hash check")
+                status, error = "failed", ErrorBody(code="record_corrupt", message="result.json failed its hash check")
             else:
                 result = S.RunResultOut.model_validate(raw)
         elif status == "failed" and last:
-            error = S.ErrorBody(code=str(last["payload"].get("code")), message=str(last["payload"].get("message")))
+            error = ErrorBody(code=str(last["payload"].get("code")), message=str(last["payload"].get("message")))
         # Records written before domains existed are interval-domain verify_once runs.
         domain = req.domain or ("interval" if req.method == "interval" else None)
         # Native references were recorded with the default (interval) domain only.
-        native_raw = None if domain not in (None, "interval") else self._model_entry(req.model_id)["native"].get(req.method)
-        native = S.NativeResult.model_validate(native_raw) if native_raw else None
+        native_raw = None if domain not in (None, "interval") else self.models.native(req.model_id, req.method)
+        native = NativeResult.model_validate(native_raw) if native_raw else None
         matches = None
         if result and native:
             matches = result.act_status == native.status
@@ -394,133 +245,5 @@ class Workbench:
                         model_sha256=m["model"]["sha256"], act_commit=m["act"]["commit"], result=result, error=error,
                         native_reference=native, matches_native=matches, last_seq=last["seq"] if last else 0)
 
-    def list_runs(self) -> S.RunList:
-        return S.RunList(runs=[self.get_run(r) for r in self.records.run_ids()])
-
-    def layer_states(self, run_id: str) -> S.LayerStatesOut:
-        run = self.get_run(run_id)
-        if run.status != "completed":
-            return S.LayerStatesOut(run_id=run_id, availability="pending" if run.status != "failed" else "not_recorded",
-                                    method=None, layers=[], provenance={})
-        raw = self.records.artifact(run_id, "layers.json")
-        if raw is None:
-            return S.LayerStatesOut(run_id=run_id, availability="not_recorded", method=None, layers=[], provenance={})
-        layers = [S.LayerStateOut(layer_id=l["layer_id"], kind=l["kind"], stage=l["stage"], shape=l["shape"],
-                                  lb=[S.wire_number(x) for x in l["lb"]], ub=[S.wire_number(x) for x in l["ub"]],
-                                  before_layer_ids=l["before_layer_ids"]) for l in raw["layers"]]
-        prov = dict(raw.get("provenance", {}))
-        prov["recorded"] = "computed by the run worker on the run's pinned model snapshot"
-        return S.LayerStatesOut(run_id=run_id, availability=raw["availability"], method=raw["method"], layers=layers,
-                                provenance=prov)
-
-    def coverage(self, run_id: str) -> S.CoverageOut:
-        run = self.get_run(run_id)
-        cov = observation_coverage()
-        summary = run.result.bab_summary if run.result else None
-        return S.CoverageOut(run_id=run_id, node_events=cov["node_events"], wave_events=cov["wave_events"],
-                             final_summary="available" if summary is not None else
-                             ("pending" if run.status in ("queued", "running") else "not_recorded"),
-                             reason=cov["reason"], summary=summary)
-
-    def fuzzing(self, run_id: str) -> S.FuzzingOut:
-        run = self.get_run(run_id)
-        opts = S.RunRequest.model_validate(self.records.manifest(run_id)["request"]).fuzz
-        base = {"run_id": run_id, "status": run.status, "options": opts, "config": {},
-                "provenance": {"act_call": "act.pipeline.fuzzing.ACTFuzzer(ACTToTorch(net)).fuzz()",
-                               "config": "ACT act/config/pipeline.yaml fuzzing section + options",
-                               "frames": "lane 0 of ACT's mutated batch, read between iterations (mutation_engine.mutate wrapper)"}}
-        if run.method != "fuzz":
-            return S.FuzzingOut(availability="unsupported", summary=None, timeline=[], strategies=[],
-                                counterexamples=[], **base)
-        raw = self.records.artifact(run_id, "fuzzing.json") if run.status == "completed" else None
-        wn = S.wire_number
-        base["saved"] = [S.SavedCounterexampleOut(saved_at=e["saved_at"], counterexample=_ce_out(e["counterexample"]))
-                         for e in self.records.annotation(run_id, SAVED) or []]
-
-        def frame_out(fr: dict[str, Any]) -> S.FuzzFrameOut:
-            ce = fr.get("counterexample")
-            return S.FuzzFrameOut.model_validate({**fr, "input": [wn(x) for x in fr["input"]],
-                                                  "seed_input": [wn(x) for x in fr["seed_input"]],
-                                                  "counterexample": _ce_out(ce) if ce else None})
-
-        if raw is None:
-            live = [S.FuzzPointOut.model_validate(e["payload"]) for e in self.records.events(run_id)
-                    if e["kind"] == "fuzz.progress"]
-            with self._lock:
-                latest = self._live_frames.get(run_id)
-                hits = sorted(self._live_hits.get(run_id, {}).values(), key=lambda c: c["index"])
-            # While running, counterexamples are the ones ACT reported in violating frames so far.
-            return S.FuzzingOut(availability="pending" if run.status in ("queued", "running") else "not_recorded",
-                                summary=None, timeline=live, strategies=[], counterexamples=[_ce_out(c) for c in hits],
-                                frames=[frame_out(latest)] if latest else [], **base)
-        ces = [_ce_out(c) for c in raw["counterexamples"]]
-        seeds = [S.FuzzSeedOut(row=s["row"], input=[wn(x) for x in s["input"]], output=[wn(x) for x in s["output"]])
-                 for s in raw.get("seeds", [])]
-        summary = S.FuzzSummaryOut.model_validate({k: raw[k] for k in S.FuzzSummaryOut.model_fields if k in raw})
-        base["config"] = raw["config"]
-        return S.FuzzingOut(availability="available", summary=summary,
-                            timeline=[S.FuzzPointOut.model_validate(p) for p in raw["timeline"]],
-                            strategies=[S.FuzzStrategyOut.model_validate(s) for s in raw["strategies"]],
-                            counterexamples=ces, seeds=seeds,
-                            frames=[frame_out(fr) for fr in raw.get("frames", [])], **base)
-
-    # -- saved counterexamples (user annotations on a fuzz run) ---------------
-    def _find_counterexample(self, run_id: str, index: int) -> dict[str, Any] | None:
-        raw = self.records.artifact(run_id, "fuzzing.json")
-        if raw is not None:
-            found = [c for c in raw["counterexamples"] if c["index"] == index]
-            found += [f["counterexample"] for f in raw.get("frames", [])
-                      if f.get("counterexample") and f["counterexample"]["index"] == index]
-            return found[0] if found else None
-        return self._live_hits.get(run_id, {}).get(index)
-
-    def save_counterexample(self, run_id: str, index: int) -> tuple[S.SavedCounterexampleOut, bool]:
-        """Save ACT's counterexample #index on the run record; saving it again returns the saved entry."""
-        if self.get_run(run_id).method != "fuzz":
-            raise AppError(422, "unsupported_method", "Only fuzz runs record counterexamples to save.")
-        with self._lock:
-            saved = self.records.annotation(run_id, SAVED) or []
-            entry = next((e for e in saved if e["counterexample"]["index"] == index), None)
-            created = entry is None
-            if entry is None:
-                ce = self._find_counterexample(run_id, index)
-                if ce is None:
-                    raise AppError(404, "counterexample_not_found",
-                                   f"ACT reported no counterexample #{index} in this run's record or live state")
-                entry = {"saved_at": now_iso(), "counterexample": ce}
-                self.records.write_annotation(run_id, SAVED, [*saved, entry])
-        return S.SavedCounterexampleOut(saved_at=entry["saved_at"], counterexample=_ce_out(entry["counterexample"])), created
-
-    def saved_assignment(self, run_id: str, index: int) -> str:
-        """A saved counterexample as a VNN-COMP result: "sat" plus the VNN-LIB 2.0 command-line assignment.
-
-        VNN-LIB 2.0 (Sec. 5.3.1): per declared variable, "<name> <type> [<dims>]" then one value per line in
-        row-major order. Variables are the conventional X (input, shaped like the input spec) and Y (output,
-        [1, n]); the element type is float64 because ACT computed and checked the counterexample in float64.
-        """
-        run = self.get_run(run_id)
-        saved = self.records.annotation(run_id, SAVED) or []
-        entry = next((e for e in saved if e["counterexample"]["index"] == index), None)
-        if entry is None:
-            raise AppError(404, "counterexample_not_saved", f"Counterexample #{index} is not saved on {run_id}")
-        x, y = entry["counterexample"]["input"], entry["counterexample"]["output"]
-        specs = self.describe(run.model_id).input_specs
-        shape = specs[0].shape if specs and math.prod(specs[0].shape) == len(x) else [1, len(x)]
-        lines = ["sat", _assignment_header("X", shape), *map(repr, x), _assignment_header("Y", [1, len(y)]), *map(repr, y)]
-        return "\n".join(lines) + "\n"
-
-    def is_terminal(self, run_id: str) -> bool:
-        return self.get_run(run_id).status in ("completed", "failed")
-
-
-def _assignment_header(name: str, shape: list[int]) -> str:
-    return f"{name} float64 [{','.join(str(d) for d in shape)}]"
-
-
-def _ce_out(c: dict[str, Any]) -> S.FuzzCounterexampleOut:
-    wn = S.wire_number
-    return S.FuzzCounterexampleOut(**{**c, "severity": wn(c["severity"]), "input": [wn(x) for x in c["input"]],
-                                      "output": [wn(x) for x in c["output"]],
-                                      "seed_input": [wn(x) for x in c["seed_input"]],
-                                      "seed_output": None if c.get("seed_output") is None else
-                                      [wn(x) for x in c["seed_output"]]})
+    def list(self) -> S.RunList:
+        return S.RunList(runs=[self.get(r) for r in self.records.run_ids()])

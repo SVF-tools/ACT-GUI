@@ -3,6 +3,19 @@
 **Status:** first version: `verify.py` (EXE-01 `verify_once` in the interval / dual / hybridz domain, + BaB), `fuzz.py` (EXE-04 ACTFuzzer); EXE-02/03 blocked on ACT-02/05. **Owner:** B; A owns ACT operation semantics.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
+
+## Current Files and Usage
+
+| File | Responsibility |
+| --- | --- |
+| `verify.py` | `run_verification(model, method, budget, domain)` → `RunOutcome`: `verify_once` (interval/dual/hybridz) or `verify_bab_batched`; ACT's VerifyStatus mapped 1:1. |
+| `fuzz.py` | `run_fuzzing(...)` → `FuzzOutcome` (ACTFuzzer on `ACTToTorch(net)`); `fuzzing_defaults()`; `split_options()` (run arguments vs. `FuzzingConfig` hyperparameters); `PROVENANCE` of fuzzing records. |
+| `methods.py` | `verify_methods(input_rows)` and `UNIVERSAL_METHODS`: which run methods ACT's entry points accept for a net, so the workbench does not encode ACT limits. |
+| `__init__.py` | Public API: `run_verification`, `run_fuzzing`, `fuzzing_defaults`, `split_options`, `FUZZ_PROVENANCE`, `verify_methods`, `UNIVERSAL_METHODS`. |
+| `test_execution.py` | Verdicts vs. recorded native results, domains vs. native `verify_once`, fuzzing counterexamples/stop/certified nets, structured errors. |
+
+Used by: the run worker (`visual_bench/verification/worker.py`, `visual_bench/fuzzing/runner.py`) and `visual_bench/model_spec` (methods). Tests: `.venv/bin/python -m pytest engine_bridge/execution`.
+
 ## 1. Subproblems and Objective
 
 Faithfully invoke ACT verification and supported controls and report actual outcomes.
@@ -50,7 +63,8 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 | EXE-01 | Adapt a real verification entry point | MSB-03, ES-02 | A deterministic no-time-cutoff sample produces the same scientific result as native ACT under recorded tolerances. |
 | EXE-02 | Define observable execution and run handles | EXE-01, ACT-02 | Handle lifecycle, inspection access, completion, and interruption semantics are agreed with A and exercised on ACT. |
 | EXE-03 | Implement capability-gated safe controls | EXE-02, EVT-02, ACT-05 | Only ACT-implemented pause/step/split/cancel operations are enabled; stale targets and failed preconditions have actual rejection receipts. |
-| EXE-04 | Adapt ACT's inference-based fuzzer | EXE-01 | `run_fuzzing` rebuilds the net with ACT's `ACTToTorch`, seeds ACTFuzzer with the net's INPUT rows, and reports ACT's `FuzzingReport`; counterexamples are only those ACT's PropertyChecker accepted. Verdict is `falsified` iff ACT reported a counterexample, otherwise `unknown` (fuzzing never certifies). Progress (iteration, coverage, counterexample count, corpus) is read between iterations. `test_bridge.py`: a counterexample on `unsafe_linear` lies inside the input box; 200 iterations on `bab_deep_mlp` (BaB-certified) report none. |
+| EXE-04 | Adapt ACT's inference-based fuzzer | EXE-01 | `run_fuzzing` rebuilds the net with ACT's `ACTToTorch`, seeds ACTFuzzer with the net's INPUT rows, and reports ACT's `FuzzingReport`; counterexamples are only those ACT's PropertyChecker accepted. Verdict is `falsified` iff ACT reported a counterexample, otherwise `unknown` (fuzzing never certifies). Progress (iteration, coverage, counterexample count, corpus) is read between iterations. `test_execution.py`: a counterexample on `unsafe_linear` lies inside the input box; 200 iterations on `bab_deep_mlp` (BaB-certified) report none. |
+| EXE-05 | Report which run methods ACT accepts for a net | EXE-01, EXE-04 | `methods.verify_methods(input_rows)` returns `interval`/`bab` only for single-lane nets (`verify_once` rejects several INPUT rows) and `UNIVERSAL_METHODS` holds `fuzz` (ACTFuzzer runs on every JSON net ACTToTorch rebuilds); `fuzz.split_options` and `fuzz.PROVENANCE` keep fuzz option and provenance knowledge in the bridge. Evidence: `visual_bench/fuzzing/test_fuzzing.py::test_torch_batch_is_one_fuzz_only_net_fuzzed_row_by_row` (a 3-image net lists only `fuzz` and rejects `interval`). |
 
 **EXE-01 domains.** `run_verification(..., method="interval", domain=...)` runs `verify_once` in one of ACT's abstract domains: `interval` (IntervalTF), `dual` (`set_solver_mode("dual")`, DualSolver), or `hybridz` (solver and TF mode `hybridz`, HybridzTF + HZSolver with the run budget as its MILP time limit). Selection mirrors `act/config/pipeline_cli.py` and always sets both ACT globals, so a previous run in the same process cannot leak. Layer inspection explicitly resets to the interval domain. BaB keeps its existing bounding path; domain selection for BaB is not exposed.
 
@@ -99,7 +113,7 @@ Split internal files/directories when independent evolution, reuse, or size warr
 | `startExecution(...) → RunHandle` | Proposed extension for observable execution; concrete semantics must be agreed with ACT. |
 | `submitControl(runHandle, command) → ControlOutcome` | Requires engine capability and safe-boundary semantics; do not assume the API exists today. |
 
-### Planned Files
+### Planned Files (design targets)
 
 Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
 

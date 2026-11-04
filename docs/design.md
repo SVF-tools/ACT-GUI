@@ -23,10 +23,10 @@ The root contains README.md, AGENTS.md, LICENSE, and .gitignore. The two product
 
 See [Visual Bench](../visual_bench/README.md), [Engine Bridge](../engine_bridge/README.md), and [Documentation](README.md).
 
-- visual_bench: workspace, model_spec, verification, bab, analysis, assistant, records.
-- engine_bridge: engine_session, model_spec, execution, inspection, events, plus a shared contracts.md.
+- visual_bench: workspace, model_spec, verification, fuzzing, engine, bab, analysis, assistant, records, plus the shared kernels `wire.py`/`errors.py`/`config.py` (service) and `shared/` (browser).
+- engine_bridge: engine_session, model_spec, execution, inspection, events, plus a shared contracts.py/contracts.md.
 
-The twelve modules have scope documents, not implementations. Parent READMEs own summaries and navigation; module READMEs own subproblems, patterns, feature behavior, proposed operations/files, dependency-linked implementation tasks, and acceptance evidence.
+The fourteen modules each have a scope README. Parent READMEs own summaries and navigation; module READMEs own subproblems, patterns, feature behavior, current files and usage, dependency-linked implementation tasks, and acceptance evidence. fuzzing and engine were split out of verification on 2026-11-04 (see section 3) so that run lifecycle, fuzzing views, and engine/solver status can be owned and changed independently.
 
 The two model_spec modules have distinct roles: visual_bench presents descriptions and input drafts; engine_bridge loads through ACT and converts engine descriptions. Both use the same source data without duplicating scientific processing.
 
@@ -34,7 +34,22 @@ A typical query flows from workspace node selection through the verification que
 
 ## 3. Runtime and Implementation Boundaries
 
-The first code slice may introduce thin app.tsx and server.py composition roots in visual_bench. Module-specific TypeScript and Python code belongs in the corresponding module. Do not repeat web/service directories inside every module. Build and Python packaging configuration must be validated during bootstrap; these files do not exist yet.
+visual_bench has thin composition roots: `server.py` (FastAPI app, error rendering, router inclusion), `workbench.py` (constructs and wires the module services), and `app.tsx` (layout and shared selection). Module-specific TypeScript and Python code belongs in the corresponding module. Do not repeat web/service directories inside every module.
+
+**Module slice (2026-11-04).** Each visual_bench module that serves data is a vertical slice with a fixed set of files, so one contributor can own a module end to end and the data middle layer is uniform:
+
+| Layer | File | Rule |
+| --- | --- | --- |
+| Wire contract | `<module>/schemas.py` | Pydantic payloads of this module; `visual_bench/schemas.py` only re-exports them and lists `WIRE_MODELS` for generation. Shared primitives live in `wire.py`. |
+| Service (middle layer, server) | `<module>/service.py` | Application use cases; the only code that calls engine_bridge or records for this module. Raises `errors.AppError`. Takes collaborators as constructor arguments built in `workbench.py`; never imports FastAPI. |
+| HTTP | `<module>/routes.py` | `router(service) -> APIRouter`; maps HTTP to service calls only. |
+| Client (middle layer, browser) | `<module>/api.ts`, `<module>/hooks.ts` | Endpoint calls on `shared/http.ts`; TanStack Query hooks with keys from `shared/queryClient.ts`. Mutations invalidate the keys they change. |
+| Views | `<module>/*View.tsx`, panels | Presentation only: data from hooks or props, no fetch calls. |
+| Tests | `<module>/test_*.py`, `*.test.ts` | Next to the code they verify. |
+
+Dependency rules: a service may use another module's service through its constructor (verification uses model_spec and engine; fuzzing, analysis, and bab read runs through verification); routes never import another module's routes; a browser module may import another module's `hooks.ts` but not its views or internals; `shared/` and `wire.py` import no feature module. AI tools (assistant) call the same services the routes call. Server data reaches views only through TanStack Query: there is no second browser cache and no manual refresh counter. Live runs follow SSE and invalidate the affected run queries on each committed event.
+
+ACT-specific knowledge (which methods a net supports, fuzz option split, provenance of fuzzing records) is reported by engine_bridge (`execution.methods`, `execution.fuzz`) instead of being encoded in the workbench, so an ACT change touches the bridge and its tests first.
 
 The browser uses HTTP queries/commands and SSE events. The service calls engine_bridge; long computations execute in a separate worker. HTTP routes and AI tools reuse ordinary application use cases.
 

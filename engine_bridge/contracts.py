@@ -130,6 +130,7 @@ class BuiltNet:
     """An ACT net written by a model source builder; params record how it was built."""
     description: str
     params: dict[str, str | int | float]
+    input_rows: int = 1  # INPUT rows (one per batched image); decides the methods in execution.methods
 
 
 @dataclass(frozen=True)

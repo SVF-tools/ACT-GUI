@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { fmt, num } from "../api";
+import { fmt, num } from "../shared/wire";
 import type { InputSpecOut, ModelDescriptionOut, OutputSpecOut } from "../generated/wire";
-import { classLabel, specImageShape } from "../workspace/pixels";
+import { classLabel, specImageShape } from "../shared/ui/pixels";
 import { InputDomain } from "./InputDomain";
 
 export function SpecPanel({ model, selectedLayer }: { model: ModelDescriptionOut; selectedLayer: number | null }) {

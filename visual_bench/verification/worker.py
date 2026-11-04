@@ -22,43 +22,24 @@ from typing import IO, Any
 
 
 def _run(req: dict[str, Any], progress: IO[str], stop: threading.Event) -> dict[str, Any]:
-    from engine_bridge.contracts import FuzzFrame, FuzzProgress
     from engine_bridge.events import bab_summary
-    from engine_bridge.execution import run_fuzzing, run_verification
+    from engine_bridge.execution import run_verification
 
     model = Path(req["model_path"])
-    if req["method"] != "fuzz":
-        outcome = run_verification(model, req["method"], float(req["time_budget_s"]),
-                                   domain=req.get("domain") or "interval")
-        out: dict[str, Any] = {"outcome": dataclasses.asdict(outcome)}
-        if outcome.method == "bab":
-            out["bab_summary"] = bab_summary(outcome.metadata)
-        return out
+    if req["method"] == "fuzz":
+        from visual_bench.fuzzing import runner
 
-    def send(kind: str, item: Any) -> None:
-        progress.write(json.dumps({kind: dataclasses.asdict(item)}) + "\n")
-        progress.flush()
+        def send(kind: str, item: Any) -> None:
+            progress.write(json.dumps({kind: dataclasses.asdict(item)}) + "\n")
+            progress.flush()
 
-    def emit(p: FuzzProgress) -> None:
-        send("progress", p)
-
-    def emit_frame(fr: FuzzFrame) -> None:
-        send("frame", fr)
-
-    opts = dict(req["fuzz"])
-    budget = {k: opts.pop(k) for k in ("max_iterations", "rng_seed", "stop_on_first")}
-    fz = run_fuzzing(model, float(req["time_budget_s"]), int(budget["max_iterations"]),
-                     rng_seed=int(budget["rng_seed"]), stop_on_first=bool(budget["stop_on_first"]),
-                     hyperparameters=opts, on_progress=emit, on_frame=emit_frame,
-                     should_stop=stop.is_set)
-    first = fz.counterexamples[0].input if fz.counterexamples else None
-    summary = {k: getattr(fz, k) for k in ("iterations", "counterexample_count", "neuron_coverage",
-                                           "seeds_explored", "rng_seed", "stopped")}
-    return {
-        "outcome": {"method": "fuzz", "verdict": fz.verdict, "act_status": fz.act_status, "elapsed_s": fz.elapsed_s,
-                    "metadata": summary, "counterexample": first, "device": fz.device},
-        "fuzzing": dataclasses.asdict(fz),
-    }
+        return runner.run(model, req, send, stop)
+    outcome = run_verification(model, req["method"], float(req["time_budget_s"]),
+                               domain=req.get("domain") or "interval")
+    out: dict[str, Any] = {"outcome": dataclasses.asdict(outcome)}
+    if outcome.method == "bab":
+        out["bab_summary"] = bab_summary(outcome.metadata)
+    return out
 
 
 def main(request_path: str, output_path: str, progress_fd: int) -> int:

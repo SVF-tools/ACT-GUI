@@ -1,4 +1,6 @@
 import { StrictMode } from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./shared/queryClient";
 import { createRoot } from "react-dom/client";
 import { App } from "./app";
 import { applyTheme, storedTheme } from "./workspace/theme";
@@ -8,6 +10,8 @@ applyTheme(storedTheme()); // before first render, so a saved light theme does n
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
   </StrictMode>,
 );

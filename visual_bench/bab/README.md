@@ -3,6 +3,19 @@
 **Status:** not started beyond `BabView.tsx`, which shows observation coverage and ACT's final BaB summary; BAB-01..03 need committed node events (ACT-03). **Owner:** C; D may support rendering; A reviews search semantics.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
+
+## Current Files and Usage
+
+| File | Layer | Responsibility |
+| --- | --- | --- |
+| `schemas.py` | Wire | `CoverageOut`. |
+| `service.py` | Service | `BabService.coverage(run_id)`: observation coverage from `engine_bridge.events` plus ACT's final BaB summary when recorded. |
+| `routes.py` | HTTP | `GET /api/runs/{id}/coverage`. |
+| `api.ts`, `hooks.ts` | Browser data | Coverage query keyed under the run (`keys.coverage`). |
+| `BabView.tsx` | View | Coverage and final summary (BaB mode). |
+
+Tests: covered through `../verification/test_verification.py` (`bab.summary` event) and `../assistant/test_assistant.py` (coverage evidence).
+
 ## 1. Subproblems and Objective
 
 Expose search structure, selected paths, node state, and branching rationale.
@@ -94,7 +107,7 @@ Split internal files/directories when independent evolution, reuse, or size warr
 | `getNodePage(runId, revision, cursor, filters) → NodePage` | Application query backed by recorded committed state or ACT inspection. |
 | `requestNodeAction(nodeRef, action) → CommandReceipt` | Delegates to verification with current capability and revision preconditions. |
 
-### Planned Files
+### Planned Files (design targets)
 
 Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
 

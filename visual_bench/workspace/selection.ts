@@ -1,5 +1,5 @@
 // Research context: the single source of the user's selection (WS-01/WS-02).
-// Pure reducer + stale-response guard; panels read this instead of keeping copies.
+// Pure reducer; feature queries key their data by the selected identity.
 
 export interface Selection {
   modelId: string | null;
@@ -41,28 +41,5 @@ export function selectionReducer(s: Selection, a: SelectionAction): Selection {
     case "selectNeuron":
       if (s.neuron === a.neuron) return s;
       return { ...s, neuron: a.neuron, revision: s.revision + 1 };
-  }
-}
-
-/** The part of a selection a query depends on. */
-export type QueryKey = Pick<Selection, "modelId" | "runId" | "layerId" | "neuron">;
-
-export function keyOf(s: Selection, fields: (keyof QueryKey)[]): string {
-  return JSON.stringify(fields.map((f) => s[f]));
-}
-
-/**
- * Tracks the latest request per panel. A response is applied only if it belongs
- * to the most recent request, so a slow response for an older selection can
- * never overwrite a newer one.
- */
-export class LatestRequest {
-  private latest = 0;
-  begin(): number {
-    this.latest += 1;
-    return this.latest;
-  }
-  isCurrent(token: number): boolean {
-    return token === this.latest;
   }
 }

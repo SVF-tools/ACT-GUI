@@ -20,14 +20,16 @@ BASE-02 does not wait for ACT; only BASE-03 needs the pinned engine. Development
 | --- | --- | --- | --- |
 | visual_bench/workspace | C | WS-01, WS-02, WS-03 | [README](../visual_bench/workspace/README.md) |
 | visual_bench/model_spec | C | MSV-01, MSV-02, MSV-03 | [README](../visual_bench/model_spec/README.md) |
-| visual_bench/verification | B | VER-01, VER-02, VER-03, VER-04, VER-05, VER-06 | [README](../visual_bench/verification/README.md) |
+| visual_bench/verification | B | VER-01, VER-02, VER-03, VER-04, VER-07 (stop, verdict banner) | [README](../visual_bench/verification/README.md) |
+| visual_bench/fuzzing | B (service), C (views) | VER-06, VER-07 (saved counterexamples) | [README](../visual_bench/fuzzing/README.md) |
+| visual_bench/engine | B | VER-05 | [README](../visual_bench/engine/README.md) |
 | visual_bench/bab | C | BAB-01, BAB-02, BAB-03 | [README](../visual_bench/bab/README.md) |
 | visual_bench/analysis | D | ANA-01, ANA-02, ANA-03 | [README](../visual_bench/analysis/README.md) |
 | visual_bench/assistant | B | AI-01, AI-02, AI-03, AI-04 | [README](../visual_bench/assistant/README.md) |
 | visual_bench/records | B | REC-01, REC-02, REC-03, REC-04 | [README](../visual_bench/records/README.md) |
 | engine_bridge/engine_session | B | ES-01, ES-02, ES-03 | [README](../engine_bridge/engine_session/README.md) |
 | engine_bridge/model_spec | B | MSB-01, MSB-02, MSB-03 | [README](../engine_bridge/model_spec/README.md) |
-| engine_bridge/execution | B | EXE-01, EXE-02, EXE-03, EXE-04 | [README](../engine_bridge/execution/README.md) |
+| engine_bridge/execution | B | EXE-01, EXE-02, EXE-03, EXE-04, EXE-05 | [README](../engine_bridge/execution/README.md) |
 | engine_bridge/inspection | A | INSP-01, INSP-02, INSP-03 | [README](../engine_bridge/inspection/README.md) |
 | engine_bridge/events | A | EVT-01, EVT-02, EVT-03 | [README](../engine_bridge/events/README.md) |
 
@@ -103,6 +105,7 @@ Recorded 2026-11-03 against ACT `deff2fb0c031` (branch CLIMB, tracked tree clean
 | EXE-04, VER-06 | First version | ACTFuzzer as run method `fuzz` on every catalog model (`engine_bridge/execution/fuzz.py`, worker progress pipe, `fuzz.progress` SSE events, sealed `fuzzing.json`, `GET /api/runs/{id}/fuzzing`, Fuzzing tab with live timeline, strategies, and counterexamples). Progress relies on ACTFuzzer's private `_print_progress`; no public ACT observer exists. Fuzzing reports `falsified` or `unknown`, never `certified`. |
 | ES-04, VER-05 | First version | Gurobi probe in a subprocess (`engine_bridge/engine_session/session.py`), license upload/remove/status API and the Engine tab; uploaded license stored 0600 and passed to run workers. Current methods do not use Gurobi. |
 | DIST-02 | First version | `Dockerfile`, `compose.yaml` (+ `compose.gpu.yaml`, `compose.gurobi.yaml`), `scripts/docker_build.sh`. No registry publishing or CI yet; the pinned ACT commit is not yet pushed upstream. |
+| STRUCT-01 | First version | 2026-11-04 module-slice restructure (docs/design.md section 3): per-module `schemas.py`/`service.py`/`routes.py` composed in `workbench.py`; new `fuzzing` and `engine` modules split out of verification; browser `shared/` layer, per-module `api.ts`/`hooks.ts` on TanStack Query, mode registry; tests moved next to their modules; ACT method/option/provenance knowledge moved to `engine_bridge/execution`. HTTP paths and payloads unchanged (`npm run check:types` drift check; the only generated change is a docstring path). |
 | DIST-01, PERF-01, REL-01 | Not started | The container serves one origin on loopback, but remote HTTPS/authentication mode is not implemented. |
 
 ## Release Acceptance

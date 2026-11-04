@@ -27,7 +27,7 @@ Five modules have scope READMEs. Shared integration semantics live in contracts.
 | [inspection](inspection/README.md) | Context-specific node/layer/bound/geometry reads | Context/projection request → provenance-bearing data and availability | Node/layer analysis |
 | [events](events/README.md) | Committed node/wave/run observations | ACT observations → normalized events, ordering, coverage | BaB observability |
 
-Shared [contracts](contracts.md) define descriptions, handles, events, command preconditions, and errors. They may begin as a small set of Python types. Workbench Pydantic schemas own HTTP/SSE encoding; the service maps bridge data without creating a reverse dependency or a second handwritten browser protocol.
+Shared [contracts](contracts.md) define descriptions, handles, events, command preconditions, and errors; `contracts.py` holds them as frozen dataclasses (no ACT objects, no tensors, no workbench types). Workbench Pydantic schemas own HTTP/SSE encoding; the service maps bridge data without creating a reverse dependency or a second handwritten browser protocol.
 
 ### Boundaries and Missing Capabilities
 
@@ -42,6 +42,18 @@ events adapts committed observations; the workbench handles browser SSE connecti
 Test incompatible/unavailable engines, native model/spec parity, results and command preconditions, inspection context/provenance/availability, and committed-event identity/order/rollback. Tests do not require a browser or AI provider; engine/solver requirements depend on the tested capability.
 
 Layer propagation data requirements live in [inspection](inspection/README.md).
+
+### Files and Usage
+
+Each module is a package with a public `__init__.py`, implementation files, and its parity tests (`test_*.py`) next to them; the module README lists them. Shared files at this level:
+
+| File | Responsibility |
+| --- | --- |
+| `contracts.py` | Neutral bridge data types and `BridgeError`. |
+| `contracts.md` | Contract semantics and open design items. |
+| `testing.py` | Test helpers: the pinned catalog, `model_path`, `native_net`, `require_sources`. |
+
+Run all bridge tests with `.venv/bin/python -m pytest engine_bridge` (needs the pinned ACT checkout; no browser or AI provider). When ACT changes, update the adapter in the owning module, its parity test, and the capability list in `engine_session/session.py`, then re-check the workbench service that consumes it.
 
 ## Non-goals
 

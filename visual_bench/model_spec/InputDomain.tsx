@@ -1,8 +1,8 @@
 // Image view of an INPUT_SPEC box: clean input, bounds, allowed change per pixel, and sampled perturbations inside the box.
 import { useMemo, useState } from "react";
-import { fmt, num } from "../api";
+import { fmt, num } from "../shared/wire";
 import type { InputSpecOut } from "../generated/wire";
-import { PerturbCompare, Pixels, type Shape } from "../workspace/pixels";
+import { PerturbCompare, Pixels, type Shape } from "../shared/ui/pixels";
 
 type Pattern = "sign" | "uniform" | "lower" | "upper";
 const PATTERNS: { id: Pattern; label: string }[] = [

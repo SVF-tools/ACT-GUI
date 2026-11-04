@@ -1,7 +1,24 @@
 # Verification Application
 
-**Status:** first version: `service.py`, `worker.py`, `RunsPanel.tsx`, `EngineBadge.tsx` (VER-01/02; VER-03/04 partial: lifecycle SSE and idempotent start only); `solver_license.py`, `EngineView.tsx`, `GurobiLicensePanel.tsx` (apply a license from WLS credentials, pasted text, or a file, with Gurobi's verdict), and `GurobiBadge.tsx` (top-bar license state; opens the Engine tab) (VER-05); method `fuzz` and `FuzzView.tsx` (the Fuzzing tab) (VER-06); run stop, saved fuzz counterexamples with tensor/PNG export, and `VerdictBanner.tsx` (VER-07). **Owner:** B; C owns run interaction; A reviews verdict semantics.
+**Status:** first version: run lifecycle service and worker (VER-01/02; VER-03/04 partial: lifecycle SSE and idempotent start only), run stop and the ACT verdict banner (VER-07). Engine status and the Gurobi license moved to [engine](../engine/README.md) (VER-05) and ACTFuzzer views and saved counterexamples to [fuzzing](../fuzzing/README.md) (VER-06, VER-07 saving) on 2026-11-04. **Owner:** B; C owns run interaction; A reviews verdict semantics.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
+
+
+## Current Files and Usage
+
+| File | Layer | Responsibility |
+| --- | --- | --- |
+| `schemas.py` | Wire | `RunRequest`, `RunOut`, `RunResultOut`, `RunList`, `RunEvent` (SSE payload). |
+| `service.py` | Service | `RunService`: `start` (validation, idempotency, manifest, supervisor thread), `stop`, `get`, `list`, `request`. Method-neutral: live worker output goes to an injected `LiveObserver` (fuzzing's `FuzzLive`). |
+| `worker.py` | Worker | `python -m visual_bench.verification.worker <request> <output> <progress_fd>`: runs `run_verification` or `fuzzing.runner`, records interval layer states, writes the result file. ACT calls go through engine_bridge only. |
+| `routes.py` | HTTP | `POST/GET /api/runs`, `GET /api/runs/{id}`, `POST /api/runs/{id}/stop`, `GET /api/runs/{id}/events` (SSE replay + follow). |
+| `api.ts`, `hooks.ts` | Browser data | Run list/run queries, start/stop mutations, SSE following that invalidates the run's queries on each committed event. |
+| `RunsPanel.tsx`, `RunHistory.tsx`, `VerdictBanner.tsx`, `labels.ts` | Views | Run settings and start button beside the network, run history in the right column, ACT verdict banner for Verification/BaB modes, method labels. |
+| `test_verification.py` | Tests | BaB lifecycle vs. native, falsified run, stop without verdict, domains, idempotency, invalid requests, tampered and torn records. |
+
+Run this module's tests: `.venv/bin/python -m pytest visual_bench/verification`.
+
+Dependencies: model_spec (`ModelService`: entry, methods, pinned path, native reference), engine (engine gate, commit, worker license env), records, and an injected `LiveObserver`. fuzzing, analysis, bab, and assistant read runs through `RunService`.
 
 ## 1. Subproblems and Objective
 
@@ -40,9 +57,7 @@ Use small interfaces, pure functions, or ordinary classes. A pattern name alone 
 
 Use bridge capabilities, reads, execution, inspection/events, and an injected records storage interface. Do not depend on graph features or assistant implementations.
 
-Begin with use_cases.py and wire schemas. Keep HTTP composition in visual_bench/server.py; Python use cases do not depend on React.
-
-Add code and focused tests in this module as implementation proceeds. Keep language/runtime boundaries explicit. No installation or test commands exist yet.
+Use cases live in `service.py`, HTTP mapping in `routes.py`, and `server.py` only includes the router; Python use cases do not depend on React or FastAPI. Add code and focused tests in this module as implementation proceeds.
 
 ## 6. Implementation Plan
 
@@ -53,9 +68,9 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 | VER-01 | Implement description gateway and wire generation | MSB-03, BASE-02 | Applies the BASE-02 generation pipeline to real descriptions: real bridge data validates through Pydantic and generated browser types have no drift. |
 | VER-02 | Implement isolated run lifecycle | VER-01, EXE-01, REC-01 | Start returns a run reference without waiting for completion; a deterministic sample matches native ACT; worker failure is visible. Method `interval` takes `domain` (`interval` default, `dual`, `hybridz`), recorded on the run; native references apply to the interval domain only. |
 | VER-03 | Implement committed snapshots, SSE stream, and reconnect | VER-02, EVT-02, REC-02 | The service SSE route emits payloads that validate against the generated event schema; snapshot at S plus events after S reconstructs the same state; duplicates and gaps do not corrupt it. |
-| VER-05 | Accept a user-supplied Gurobi license and hand it to run workers | ES-04 | `PUT/DELETE /api/solvers/gurobi/license` and `GET /api/solvers/gurobi`; only text shaped like a Gurobi license is stored (0600, under `ACT_GUI_SECRETS`, default `<records>/../secrets`), its content is never returned, an uploaded license overrides `GRB_LICENSE_FILE`, and each run manifest records the license source and requested device (`test_service.py`). |
-| VER-06 | Run and demonstrate ACTFuzzer from the GUI | EXE-04, VER-02, REC-01 | `fuzz` is a run method for every catalog model, with `FuzzOptions` (max iterations, RNG seed, stop at first counterexample, and ACTFuzzer's tunable hyperparameters: coverage strategy, activation threshold, mutation weights, perturb mode/scale, seed selection, PGD restarts; defaults equal the pinned ACT `pipeline.yaml`, served by `GET /api/fuzz/defaults` and drift-checked against ACT in `test_service.py`); options on another method are rejected. The worker streams progress as JSON lines over an inherited pipe; the supervisor commits each as a `fuzz.progress` event, so the Fuzzing tab follows the run live over SSE and a reconnect replays it. Mutated-input frames (lane 0 of ACT's mutated batch, sampled with the progress reports) arrive on the same pipe but are held in memory as the latest frame only, never committed as events; the Fuzzing tab shows that frame beside the coverage chart while running, and `fuzzing.json` keeps up to 16 frames as a playable filmstrip whose position is marked on the chart. The sealed `fuzzing.json` artifact holds ACT's summary, timeline, per-strategy counts, and the first 20 counterexamples (each with ACT's model output on its seed), plus the first 20 seed rows with their outputs; `GET /api/runs/{id}/fuzzing` serves it (`pending` with the live timeline while running). The view shows coverage and counterexamples over iterations, the seed inputs and their outputs, a gallery of mutated counterexamples (seed / mutated / perturbation; image thumbnails for 1- or 3-channel square inputs), expected vs argmax class for labelled properties, a seed-vs-mutated input and output comparison, and strategy shares. Records written before seed capture omit those parts. `test_service.py` covers the lifecycle and record. |
-| VER-07 | Stop runs; save and export fuzz counterexamples; show the ACT verdict | VER-06 | `POST /api/runs/{id}/stop` is idempotent and commits `run.stop_requested`: a fuzz worker gets SIGTERM, ACTFuzzer ends after its current iteration through its own timeout check, and the run completes with ACT's report of the iterations run (`summary.stopped`); verify/BaB workers are killed and the run fails with `stopped` (no verdict). A worker that ignores the stop for `STOP_GRACE_S` is killed. Violating frames carry ACT's own counterexample (`FuzzFrameOut.counterexample`; lane 0 need not be it), so the Fuzzing tab lists counterexamples while running. `POST /api/runs/{id}/saved-counterexamples {index}` saves ACT's counterexample #index on the record (idempotent: 201 then 200; 404 if ACT reported none); `GET .../saved-counterexamples/{index}/vnnlib` returns it as a VNN-COMP result file: `sat` followed by the VNN-LIB 2.0 command-line assignment (standard Sec. 5.3.1) of `X` (input-spec shape) and `Y` (`[1, n]`), element type `float64` because ACT computes and checks in float64; the browser exports image inputs as a native-resolution PNG. `VerdictBanner.tsx` shows the selected run's ACT verdict (CERTIFIED / COUNTEREXAMPLE FOUND / UNKNOWN / TIMEOUT, or no verdict) above the Verification and BaB modes. Evidence: `test_service.py` (save/export, fuzz stop, verify stop) and `engine_bridge/test_bridge.py` (frame counterexample, `should_stop`). |
+| VER-05 | Accept a user-supplied Gurobi license and hand it to run workers | ES-04 | Moved to [engine](../engine/README.md#3-tasks). Run manifests still record the license source and requested device (`service.py`). |
+| VER-06 | Run and demonstrate ACTFuzzer from the GUI | EXE-04, VER-02, REC-01 | Moved to [fuzzing](../fuzzing/README.md#3-tasks); this module runs fuzz like any other method (worker, progress pipe, `fuzz.progress` events, SSE). |
+| VER-07 | Stop runs and show the ACT verdict (saving/export of fuzz counterexamples: [fuzzing](../fuzzing/README.md#3-tasks)) | VER-06 | `POST /api/runs/{id}/stop` is idempotent and commits `run.stop_requested`: a fuzz worker gets SIGTERM and ACTFuzzer ends after its current iteration with ACT's report (`summary.stopped`); verify/BaB workers are killed and the run fails with `stopped` (no verdict); a worker that ignores the stop for `STOP_GRACE_S` is killed. `VerdictBanner.tsx` shows ACT's verdict with the native reference for Verification and BaB runs. Evidence: `test_verification.py::test_stop_ends_a_verification_worker_without_a_verdict`, `../fuzzing/test_fuzzing.py::test_stop_ends_fuzz_run_with_act_report_of_iterations_run`. |
 | VER-04 | Implement the shared command gateway | VER-03, EXE-03 | Same-ID retry cannot apply twice; changed parameters, stale revision, unsupported actions, and expired authority are rejected. |
 
 Owner: **B**. A reviews scientific semantics; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.
@@ -104,18 +119,14 @@ Split internal files/directories when independent evolution, reuse, or size warr
 | `submitCommand(command) → CommandReceipt` | Checks expected_revision and idempotency; acceptance is not application. |
 | `getSnapshot(runId) / subscribe(runId, afterSeq)` | Snapshot includes the exact covered sequence; unavailable replay windows require resynchronization. |
 
-### Planned Files
+### Planned Files (design targets)
 
-Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
+Implemented equivalents: `use_cases.py` → `service.py`; `schemas.py` and `worker.py` exist; `client.ts` → `api.ts` + `hooks.ts`; `test_use_cases.py` → `test_verification.py`. Still planned:
 
 | File | Responsibility |
 | --- | --- |
-| `use_cases.py` | Shared application operations for routes and AI tools. |
-| `schemas.py` | Pydantic wire source and exports for REST/event generation. |
-| `worker.py` | Process entry and IPC messages; direct ACT calls remain in bridge. |
-| `run_state.py` | Lifecycle and committed-state projection. |
-| `client.ts` | Generated-client binding and snapshot/event consumption. |
-| `test_use_cases.py` | Parity, retries, worker failures, and control preconditions. |
+| `run_state.py` | Lifecycle and committed-state projection once committed scientific events exist (VER-03). |
+| `commands.py` | Shared command gateway with expected_revision and receipts (VER-04). |
 
 ### State, Failure, and Recovery Rules
 

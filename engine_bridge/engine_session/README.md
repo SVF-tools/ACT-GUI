@@ -3,6 +3,17 @@
 **Status:** first version: `session.py` (ES-01 probe, diagnostics, capabilities; ES-04 Gurobi license probe); ES-02 handles and ES-03 not started. **Owner:** B; A reviews environment and capability semantics.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
+
+## Current Files and Usage
+
+| File | Responsibility |
+| --- | --- |
+| `session.py` | `act_root()`, `act_imports()` (makes the pinned ACT importable or raises `act_missing`), `probe(expected_commit)` → `EngineInfo` with capabilities and diagnostics, `probe_gurobi(license_file)` → `SolverStatus`. |
+| `__init__.py` | Public API: `act_imports`, `act_root`, `probe`, `probe_gurobi`. |
+| `test_engine_session.py` | Probe against the pinned commit, missing ACT, version mismatch, Gurobi license rejection. |
+
+Used by: every other bridge module (`act_imports`), `visual_bench/engine` (status, license check). Tests: `.venv/bin/python -m pytest engine_bridge/engine_session`.
+
 ## 1. Subproblems and Objective
 
 Establish an ACT integration context with explicit versions/capabilities and manage engine resource handles.
@@ -49,7 +60,7 @@ All tasks are **Planned**. IDs identify reviewable implementation slices; depend
 | --- | --- | --- | --- |
 | ES-01 | Implement version/capability probe | BASE-01 | Against the pinned baseline, every advertised capability has a known support source or verified sample; missing ACT and version mismatch produce deterministic diagnostics. |
 | ES-02 | Implement explicit resource handles | ES-01 | Open/use/close has a defined lifecycle; crossing a process boundary does not transfer native solver/GPU objects. |
-| ES-04 | Probe optional solver licenses (Gurobi) | ES-01 | `probe_gurobi(license_file)` starts a Gurobi environment in a fresh process and returns Gurobi's own verdict as licensed, restricted, invalid, or not_installed, without credential values; a host-bound license for another host reports invalid with Gurobi's HostID message (`test_bridge.py`). |
+| ES-04 | Probe optional solver licenses (Gurobi) | ES-01 | `probe_gurobi(license_file)` starts a Gurobi environment in a fresh process and returns Gurobi's own verdict as licensed, restricted, invalid, or not_installed, without credential values; a host-bound license for another host reports invalid with Gurobi's HostID message (`test_engine_session.py`). |
 | ES-03 | Validate cleanup and compatibility regression | ES-02 | Repeated close and post-close access produce deterministic diagnostics with no leaked resources; ES-01 incompatibility diagnostics hold across every declared engine combination. |
 
 Owner: **B**. A reviews scientific semantics; use the team-role mapping in the [development plan](../../docs/plan.md). There are no implied calendar estimates.
@@ -95,7 +106,7 @@ Split internal files/directories when independent evolution, reuse, or size warr
 | `openSession(config) → SessionHandle` | Handle has an owning process/session identity; it is not a browser DTO. |
 | `closeSession(handle) → CloseResult` | Idempotent close; subsequent operations receive invalid_handle. |
 
-### Planned Files
+### Planned Files (design targets)
 
 Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
 

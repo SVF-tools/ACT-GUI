@@ -216,7 +216,7 @@ def build_classifier_net(source_id: str, index: int | Sequence[int], eps: float,
     params |= {"batch": n, "indices": joined(indices), "labels": joined(labels), "predictions": joined(preds),
                "targets": joined(ys), "misclassified": sum(p != y for p, y in zip(preds, labels, strict=True))}
     return BuiltNet(f"{src.description}, batch of {n} {src.dataset} test images {index_ranges(indices)}, L-inf eps={eps:g}",
-                    params)
+                    params, input_rows=n)
 
 
 def index_ranges(indices: Sequence[int]) -> str:

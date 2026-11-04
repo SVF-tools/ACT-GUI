@@ -8,7 +8,8 @@ This repository contains the GUI product. ACT remains a separate computation eng
 
 ```text
 ACT-GUI/
-  visual_bench/       # Workbench: server.py, schemas.py, app.tsx, seven modules, generated/wire.ts
+  visual_bench/       # Workbench: server.py + workbench.py + app.tsx roots, nine module slices, shared/, generated/wire.ts
+    <module>/         #   schemas.py -> service.py -> routes.py (service) | api.ts -> hooks.ts -> views (browser) | tests
   engine_bridge/      # ACT integration: contracts.py and five modules (only place that imports ACT)
   fixtures/catalog.json  # Real ACT models pinned by ACT commit + sha256, with native results
   scripts/            # dev.sh, gen_image_nets.py, record_fixtures.py, gen_types.mjs
@@ -20,7 +21,9 @@ ACT-GUI/
 - [Documentation scope](docs/README.md): ownership and maintenance of design information.
 - [Architecture](docs/design.md) · [Development plan](docs/plan.md) · [Contributor rules](AGENTS.md).
 
-Top-level boundaries follow product responsibilities. One level of module documentation is defined; deeper directories and implementation files are added as needed. Browser and service execution boundaries remain explicit. Module READMEs now include concrete feature plans, proposed interfaces/files, dependency-linked tasks, and acceptance evidence. ## Development
+Top-level boundaries follow product responsibilities. Each module owns its data path end to end (wire schema, service, routes, browser client and TanStack Query hooks, views, tests), so contributors can work on different modules in parallel; see [docs/design.md section 3](docs/design.md#3-runtime-and-implementation-boundaries). Every module README lists its current files, routes, and test command, plus feature plans, dependency-linked tasks, and acceptance evidence.
+
+## Development
 
 Requirements: Linux with the ACT checkout and its conda environment (`act-py312`, see the ACT README), Node 22+, and [uv](https://docs.astral.sh/uv/).
 
@@ -60,7 +63,8 @@ Checks:
 
 ```bash
 .venv/bin/python -m pytest      # bridge parity against real ACT + service tests (CPU: CUDA_VISIBLE_DEVICES=)
-npm test                        # selection/stale-response tests (vitest)
+.venv/bin/python -m pytest visual_bench/fuzzing   # one module's tests (any module directory works)
+npm test                        # browser tests: selection, mode registry, query keys, wire helpers (vitest)
 npm run typecheck               # tsc
 npm run check:types             # generated wire.ts matches visual_bench/schemas.py
 .venv/bin/python scripts/gen_image_nets.py    # (re)generate the MNIST/CIFAR-10 catalog nets into ACT's examples/nets/

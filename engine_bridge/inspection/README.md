@@ -3,6 +3,17 @@
 **Status:** first version: `layers.py` (INSP-01 interval after-states via public `analyze`); INSP-02/03 not started. **Owner:** A; B integrates workbench mappings and reviews contract consistency.
 Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
+
+## Current Files and Usage
+
+| File | Responsibility |
+| --- | --- |
+| `layers.py` | `interval_layer_states(model)` → `LayerStates`: interval after-state of every layer from ACT's public `analyze`. |
+| `__init__.py` | Public API: `interval_layer_states`. |
+| `test_inspection.py` | Parity with native `verify_once` facts, including after a HybridZ run in the same process. |
+
+Used by: the run worker, which records `layers.json` for `visual_bench/analysis`. Tests: `.venv/bin/python -m pytest engine_bridge/inspection`.
+
 ## 1. Subproblems and Objective
 
 Read node, layer, and set evidence under an exact context for propagation views and AI queries.
@@ -113,7 +124,7 @@ ACT performs scientific transformations, bounds, and projections. The bridge req
 | `requestProjection(context, projectionSpec) → GeometryResult or PendingInspection` | Scientific computation remains in ACT; returned metadata identifies the exact projection. |
 | `queryHistorical(context) → InspectionAvailability` | This does not promise access to unrecorded ACT state. |
 
-### Planned Files
+### Planned Files (design targets)
 
 Paths are relative to this module; none of these implementation files exists yet. Keep the public API small and add implementation/testing files with the feature, without further directory scaffolding.
 

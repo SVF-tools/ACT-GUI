@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { api } from "../api";
 import type { ExplainResponse } from "../generated/wire";
-import type { Selection } from "../workspace/selection";
-import { useQuery } from "../workspace/useQuery";
+import { useProviders, useExplain } from "./hooks";
 
-export function AssistantView({ sel, onNavigate }: { sel: Selection; onNavigate: (layerId: number, neuron: number | null) => void }) {
-  const providers = useQuery("providers", api.providers);
+export function AssistantView({ sel, onNavigate }: { sel: { modelId: string | null; runId: string | null; layerId: number | null; neuron: number | null }; onNavigate: (layerId: number, neuron: number | null) => void }) {
+  const providers = useProviders();
+  const explain = useExplain();
   const [question, setQuestion] = useState("Why is this layer's bound loose, and what decided the verdict?");
   const [answer, setAnswer] = useState<ExplainResponse | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -17,7 +16,7 @@ export function AssistantView({ sel, onNavigate }: { sel: Selection; onNavigate:
     setErr(null);
     try {
       // The context is frozen at request time; later selection changes do not alter this answer.
-      setAnswer(await api.explain({ context: { model_id: sel.modelId, run_id: sel.runId, layer_id: sel.layerId, neuron: sel.neuron }, question }));
+      setAnswer(await explain.mutateAsync({ context: { model_id: sel.modelId, run_id: sel.runId, layer_id: sel.layerId, neuron: sel.neuron }, question }));
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
@@ -28,7 +27,7 @@ export function AssistantView({ sel, onNavigate }: { sel: Selection; onNavigate:
   return (
     <div className="assistant">
       <div className="note">
-        Providers: {providers.status === "ok" ? providers.data.providers.map((p) => `${p.name} (${p.kind}, ${p.availability})`).join(" · ") : "…"}
+        Providers: {providers.status === "success" ? providers.data.providers.map((p) => `${p.name} (${p.kind}, ${p.availability})`).join(" · ") : "…"}
       </div>
       <textarea value={question} onChange={(e) => setQuestion(e.target.value)} rows={3} aria-label="question" />
       <button className="primary" onClick={ask} disabled={busy || !sel.modelId || !question.trim()}>
