@@ -143,6 +143,14 @@ class LoadTorchRequest(Wire):
     source_id: str = Field(min_length=1, max_length=64)
     index: int = Field(ge=0, le=1_000_000)
     eps: float = Field(ge=0, le=1)
+    # Test images of a batch, one ACT input row each, fuzzed together; None = [index]. A batch net is fuzz-only.
+    indices: list[Annotated[int, Field(ge=0, le=1_000_000)]] | None = Field(default=None, min_length=1, max_length=64)
+
+    @model_validator(mode="after")
+    def _batch_starts_at_index(self) -> "LoadTorchRequest":
+        if self.indices is not None and (self.indices[0] != self.index or len(set(self.indices)) != len(self.indices)):
+            raise ValueError("indices must be distinct and start with index")
+        return self
 
 
 LoadModelRequest = Annotated[Union[LoadVnnlibRequest, LoadTorchRequest], Field(discriminator="kind")]
@@ -200,11 +208,36 @@ class ModelDescriptionOut(Wire):
     output_dim: int
 
 
+class FuzzMutationWeights(Wire):
+    """Relative selection weights of ACT's mutation operators (ACT normalizes them; 0 disables one)."""
+    gradient: float = Field(default=0.0, ge=0, le=1000)
+    pgd: float = Field(default=0.4, ge=0, le=1000)
+    activation: float = Field(default=0.3, ge=0, le=1000)
+    boundary: float = Field(default=0.2, ge=0, le=1000)
+    random: float = Field(default=0.1, ge=0, le=1000)
+
+    @model_validator(mode="after")
+    def _some_operator_enabled(self) -> "FuzzMutationWeights":
+        if self.gradient + self.pgd + self.activation + self.boundary + self.random <= 0:
+            raise ValueError("mutation weights must sum to > 0")
+        return self
+
+
 class FuzzOptions(Wire):
-    """ACTFuzzer budget for method "fuzz"; other settings come from ACT's pipeline.yaml."""
+    """ACTFuzzer settings for method "fuzz". Defaults other than max_iterations equal the fuzzing section of
+    the pinned ACT act/config/pipeline.yaml (drift-checked in test_service.py); the browser reads them from
+    GET /api/fuzz/defaults. Output, tracing and reporting stay owned by engine_bridge."""
     max_iterations: int = Field(default=100000, ge=1, le=1_000_000)
     rng_seed: int = Field(default=0, ge=0, le=2**31 - 1)
     stop_on_first: bool = False
+    coverage_strategy: Literal["GlobalCov", "BestInputCov"] = "GlobalCov"
+    activation_threshold: float = Field(default=0.0001, ge=0, le=1000)
+    mutation_weights: FuzzMutationWeights = Field(default_factory=FuzzMutationWeights)
+    perturb_mode: Literal["adaptive_scalar", "adaptive_perdim", "fixed"] = "adaptive_scalar"
+    perturb_scale: float = Field(default=0.1, gt=0, le=1)
+    seed_selection_strategy: Literal["energy", "random"] = "energy"
+    pgd_restarts: int = Field(default=1, ge=1, le=100)
+    pgd_restarts_binarized: int = Field(default=40, ge=1, le=200)
 
 
 class RunRequest(Wire):

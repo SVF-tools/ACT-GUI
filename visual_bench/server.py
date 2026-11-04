@@ -48,6 +48,10 @@ def create_app(records_root: Path | None = None, secrets_root: Path | None = Non
     def engine() -> S.EngineInfoOut:
         return wb.engine_out()
 
+    @app.get("/api/fuzz/defaults", response_model=S.FuzzOptions)
+    def fuzz_defaults() -> S.FuzzOptions:
+        return S.FuzzOptions()
+
     @app.get("/api/models", response_model=list[S.ModelSummary])
     def models() -> list[S.ModelSummary]:
         return wb.models()

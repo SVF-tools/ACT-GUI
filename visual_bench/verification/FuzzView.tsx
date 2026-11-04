@@ -216,7 +216,7 @@ function Strategies({ f }: { f: FuzzingOut }) {
 }
 
 const MAX_DIMS = 64;
-const GALLERY = 8;
+const GALLERY = 5;
 type Box = { lb: number[]; ub: number[] } | null;
 
 // The spec's tensor shape when it matches the input length, else a C x S x S guess from the length alone.
@@ -293,14 +293,14 @@ function Inputs({ f, model }: { f: FuzzingOut; model: ModelDescriptionOut | null
   const [xlo, xhi] = box ? finiteRange([...box.lb, ...box.ub]) : finiteRange(seeds.flatMap((s) => s.input.map(num)));
   return (
     <>
-      <h3>Inputs <small>seeds are the model's INPUT rows; outputs from ACT's model forward</small></h3>
+      <h3>Inputs <small>seeds are the model's INPUT rows; outputs from ACT's model forward{seeds.length > 1 ? ` · ${seeds.length} rows, scroll to see all` : ""}</small></h3>
       <p className="note">
         {d} input dims{shape ? ` (drawn as ${shape.c}×${shape.h}×${shape.w})` : ""}
         {box ? ` · input box width ${wlo === whi ? fmt(wlo) : `${fmt(wlo)}…${fmt(whi)}`}, values in [${fmt(xlo)}, ${fmt(xhi)}]` : ""}
         {model?.output_spec ? ` · property: ${model.output_spec.text}` : ""}
       </p>
       {seeds.length === 0 ? <div className="note">This record has no seed outputs (written before they were captured). Re-run to see them.</div> : (
-        <div className="tblwrap"><table className="tbl">
+        <div className="tblwrap rowscroll"><table className="tbl">
           <thead><tr><th>row</th><th>input</th>{box && <th title="seed lies inside INPUT_SPEC">in box</th>}<th>output y</th>{expected.size > 0 && <><th>argmax</th><th>expected</th></>}<th>counterexamples</th></tr></thead>
           <tbody>
             {seeds.map((s) => {

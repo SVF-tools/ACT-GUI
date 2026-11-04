@@ -72,8 +72,20 @@ export type SeedInput1 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type SeedRow = number
 export type Strategy1 = (string | null)
 export type Violation = boolean
+export type Activation = number
+export type Boundary = number
+export type Gradient = number
+export type Pgd = number
+export type Random = number
+export type ActivationThreshold = number
+export type CoverageStrategy = ("GlobalCov" | "BestInputCov")
 export type MaxIterations = number
+export type PerturbMode = ("adaptive_scalar" | "adaptive_perdim" | "fixed")
+export type PerturbScale = number
+export type PgdRestarts = number
+export type PgdRestartsBinarized = number
 export type RngSeed = number
+export type SeedSelectionStrategy = ("energy" | "random")
 export type StopOnFirst = boolean
 export type Corpus = number
 export type Counterexamples = number
@@ -89,7 +101,7 @@ export type Violations = number
 export type Weight = number
 export type ActStatus = string
 export type CounterexampleCount = number
-export type CoverageStrategy = string
+export type CoverageStrategy1 = string
 export type Device = string
 export type ElapsedS3 = number
 export type Iterations = number
@@ -149,6 +161,7 @@ export type Onnx1 = string
 export type Vnnlib = string
 export type Eps = number
 export type Index1 = number
+export type Indices = ([number, ...(number)[]] | null)
 export type Kind7 = "torch"
 export type SourceId1 = string
 export type ActCommit = (string | null)
@@ -250,6 +263,7 @@ ExplainRequest?: ExplainRequest
 ExplainResponse?: ExplainResponse
 FuzzCounterexampleOut?: FuzzCounterexampleOut
 FuzzFrameOut?: FuzzFrameOut
+FuzzMutationWeights?: FuzzMutationWeights
 FuzzOptions?: FuzzOptions
 FuzzPointOut?: FuzzPointOut
 FuzzSeedOut?: FuzzSeedOut
@@ -447,14 +461,37 @@ strategy: Strategy1
 violation: Violation
 }
 /**
- * ACTFuzzer budget for method "fuzz"; other settings come from ACT's pipeline.yaml.
+ * Relative selection weights of ACT's mutation operators (ACT normalizes them; 0 disables one).
+ * 
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "FuzzMutationWeights".
+ */
+export interface FuzzMutationWeights {
+activation?: Activation
+boundary?: Boundary
+gradient?: Gradient
+pgd?: Pgd
+random?: Random
+}
+/**
+ * ACTFuzzer settings for method "fuzz". Defaults other than max_iterations equal the fuzzing section of
+ * the pinned ACT act/config/pipeline.yaml (drift-checked in test_service.py); the browser reads them from
+ * GET /api/fuzz/defaults. Output, tracing and reporting stay owned by engine_bridge.
  * 
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "FuzzOptions".
  */
 export interface FuzzOptions {
+activation_threshold?: ActivationThreshold
+coverage_strategy?: CoverageStrategy
 max_iterations?: MaxIterations
+mutation_weights?: FuzzMutationWeights
+perturb_mode?: PerturbMode
+perturb_scale?: PerturbScale
+pgd_restarts?: PgdRestarts
+pgd_restarts_binarized?: PgdRestartsBinarized
 rng_seed?: RngSeed
+seed_selection_strategy?: SeedSelectionStrategy
 stop_on_first?: StopOnFirst
 }
 /**
@@ -494,7 +531,7 @@ weight: Weight
 export interface FuzzSummaryOut {
 act_status: ActStatus
 counterexample_count: CounterexampleCount
-coverage_strategy: CoverageStrategy
+coverage_strategy: CoverageStrategy1
 device: Device
 elapsed_s: ElapsedS3
 iterations: Iterations
@@ -640,6 +677,7 @@ vnnlib: Vnnlib
 export interface LoadTorchRequest {
 eps: Eps
 index: Index1
+indices?: Indices
 kind: Kind7
 source_id: SourceId1
 }

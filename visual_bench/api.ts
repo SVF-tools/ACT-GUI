@@ -1,10 +1,22 @@
 // Typed browser client for the workbench service. Types are generated from Pydantic.
 import type {
-  CoverageOut, EngineInfoOut, ErrorResponse, ExplainRequest, ExplainResponse, FuzzingOut, LayerStatesOut,
+  CoverageOut, EngineInfoOut, ErrorResponse, ExplainRequest, ExplainResponse, FuzzingOut, FuzzOptions, LayerStatesOut,
   LoadModelBody, ModelDescriptionOut, ModelSummary, ProviderList, RunEvent, RunList, RunOut, RunRequest, SampleOut,
   SavedCounterexampleOut,
   SolverLicenseUpload, SolverStatusOut, SourcesOut,
 } from "./generated/wire";
+
+/** Batch order kept, consecutive runs of 3+ folded: [4024, 1, 9873, 3, 4, 5] -> "4024, 1, 9873, 3–5" (as sources.index_ranges). */
+export function indexRanges(xs: number[]): string {
+  const parts: string[] = [];
+  for (let i = 0; i < xs.length;) {
+    let j = i;
+    while (j + 1 < xs.length && xs[j + 1] === xs[j]! + 1) j++;
+    parts.push(j - i >= 2 ? `${xs[i]}–${xs[j]}` : xs.slice(i, j + 1).join(", "));
+    i = j + 1;
+  }
+  return parts.join(", ");
+}
 
 /** Mirrors schemas.WireNumber: finite float or an explicit non-finite marker. */
 export type WireNumber = number | "Infinity" | "-Infinity" | "NaN";
@@ -27,6 +39,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   engine: () => call<EngineInfoOut>("/api/engine"),
+  fuzzDefaults: () => call<FuzzOptions>("/api/fuzz/defaults"),
   models: () => call<ModelSummary[]>("/api/models"),
   model: (id: string) => call<ModelDescriptionOut>(`/api/models/${encodeURIComponent(id)}`),
   loadModel: (body: LoadModelBody) => call<ModelSummary>("/api/models", { method: "POST", body: JSON.stringify(body) }),

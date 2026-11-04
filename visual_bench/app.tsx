@@ -24,7 +24,7 @@ import type { RunRequest } from "./generated/wire";
 type Method = RunRequest["method"];
 
 // Run modes share the center column with the network; one is shown at a time.
-const MODES = ["Verification", "BaB", "Fuzzing"] as const;
+const MODES = ["Fuzzing", "Verification", "BaB"] as const;
 type Mode = (typeof MODES)[number];
 const TABS = ["Assistant", "Records", "Engine"] as const;
 type Tab = (typeof TABS)[number];
@@ -71,20 +71,18 @@ export function App() {
         {model.status === "error" && <div className="error">Model load failed: {model.message}</div>}
         {model.status === "ok" && (
           <>
-            <div className="netrow">
-              <section className="panel">
+            <section className="panel">
                 <h2>Network <small>{model.data.layers.length} layers · ACT {model.data.act_commit?.slice(0, 8)}</small></h2>
                 <ModelGraph model={model.data} selectedLayer={sel.layerId}
                   onSelectLayer={(layerId) => dispatch({ type: "selectLayer", layerId })} />
-              </section>
-              <RunsPanel
-                modelId={model.data.model_id}
-                method={METHOD_OF_MODE[mode]}
-                onMethod={(m) => setMode(MODE_OF_METHOD[m])}
-                onChanged={() => setRunsVersion((v) => v + 1)}
-                onSelect={(runId) => dispatch({ type: "selectRun", runId, modelId: model.data.model_id })}
-              />
-            </div>
+            </section>
+            <RunsPanel
+              modelId={model.data.model_id}
+              method={METHOD_OF_MODE[mode]}
+              onMethod={(m) => setMode(MODE_OF_METHOD[m])}
+              onChanged={() => setRunsVersion((v) => v + 1)}
+              onSelect={(runId) => dispatch({ type: "selectRun", runId, modelId: model.data.model_id })}
+            />
             <section className="panel modes">
               <nav className="tabs" role="tablist" aria-label="run mode">
                 {MODES.map((m) => (

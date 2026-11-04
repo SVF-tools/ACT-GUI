@@ -45,9 +45,11 @@ def _run(req: dict[str, Any], progress: IO[str], stop: threading.Event) -> dict[
     def emit_frame(fr: FuzzFrame) -> None:
         send("frame", fr)
 
-    opts = req["fuzz"]
-    fz = run_fuzzing(model, float(req["time_budget_s"]), int(opts["max_iterations"]), rng_seed=int(opts["rng_seed"]),
-                     stop_on_first=bool(opts["stop_on_first"]), on_progress=emit, on_frame=emit_frame,
+    opts = dict(req["fuzz"])
+    budget = {k: opts.pop(k) for k in ("max_iterations", "rng_seed", "stop_on_first")}
+    fz = run_fuzzing(model, float(req["time_budget_s"]), int(budget["max_iterations"]),
+                     rng_seed=int(budget["rng_seed"]), stop_on_first=bool(budget["stop_on_first"]),
+                     hyperparameters=opts, on_progress=emit, on_frame=emit_frame,
                      should_stop=stop.is_set)
     first = fz.counterexamples[0].input if fz.counterexamples else None
     summary = {k: getattr(fz, k) for k in ("iterations", "counterexample_count", "neuron_coverage",

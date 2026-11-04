@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { fmt, num } from "../api";
 import type { InputSpecOut, ModelDescriptionOut, OutputSpecOut } from "../generated/wire";
 import { classLabel, specImageShape } from "../workspace/pixels";
@@ -10,20 +11,7 @@ export function SpecPanel({ model, selectedLayer }: { model: ModelDescriptionOut
     <div className={images ? "split stack" : "split"}>
       <section className="panel">
         <h2>Specification</h2>
-        {model.input_specs.map((s) => {
-          const shape = specImageShape(s.shape, s.dataset);
-          return (
-            <div key={s.layer_id} className="spec">
-              <div className="label">Input domain · {s.kind} (layer {s.layer_id}){s.dataset ? ` · ${s.dataset}` : ""}</div>
-              {shape ? (
-                <>
-                  <InputDomain spec={s} shape={shape} />
-                  <details><summary className="note">numeric bounds</summary><BoundsTable s={s} /></details>
-                </>
-              ) : <BoundsTable s={s} />}
-            </div>
-          );
-        })}
+        {model.input_specs.map((s) => <InputSpecView key={s.layer_id} s={s} />)}
         {model.output_spec ? (
           <div className="spec">
             <div className="label">Output property · {model.output_spec.kind} (layer {model.output_spec.layer_id})</div>
@@ -55,6 +43,34 @@ export function SpecPanel({ model, selectedLayer }: { model: ModelDescriptionOut
           </>
         )}
       </section>
+    </div>
+  );
+}
+
+// A spec with several rows (a batch) is shown one row at a time; each row is one input of the batch.
+function InputSpecView({ s }: { s: InputSpecOut }) {
+  const rows = s.shape.length === 4 && s.shape[0]! > 1 ? s.shape[0]! : 1;
+  const [row, setRow] = useState(0);
+  const r = Math.min(row, rows - 1);
+  const per = s.lb.length / rows;
+  const cut = <T,>(xs: T[]) => xs.slice(r * per, (r + 1) * per);
+  const spec: InputSpecOut = rows === 1 ? s : { ...s, lb: cut(s.lb), ub: cut(s.ub), center: s.center ? cut(s.center) : null,
+    shape: [1, ...s.shape.slice(1)] };
+  const shape = specImageShape(spec.shape, spec.dataset);
+  return (
+    <div className="spec">
+      <div className="label">Input domain · {s.kind} (layer {s.layer_id}){s.dataset ? ` · ${s.dataset}` : ""}
+        {rows > 1 && <> · batch of {rows} rows{" "}
+          <select value={r} onChange={(e) => setRow(Number(e.target.value))} aria-label="batch row">
+            {Array.from({ length: rows }, (_, k) => <option key={k} value={k}>row {k}</option>)}
+          </select></>}
+      </div>
+      {shape ? (
+        <>
+          <InputDomain spec={spec} shape={shape} />
+          <details><summary className="note">numeric bounds</summary><BoundsTable s={spec} /></details>
+        </>
+      ) : <BoundsTable s={spec} />}
     </div>
   );
 }

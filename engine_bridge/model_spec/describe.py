@@ -10,7 +10,8 @@ from engine_bridge.contracts import (
 )
 from engine_bridge.engine_session import act_imports
 
-_MAX_SPEC_VALUES = 4096
+_MAX_SPEC_VALUES = 4096  # per input row of an INPUT_SPEC; whole tensor for ASSERT params
+_MAX_SPEC_ROWS = 64  # rows of a batched INPUT_SPEC (model_spec.sources.BATCH_LIMIT)
 
 
 def file_sha256(path: Path) -> str:
@@ -100,13 +101,17 @@ def describe_model(path: Path) -> ModelDescription:
         ))
         if layer.kind == "INPUT_SPEC":
             lb, ub = layer.params.get("lb"), layer.params.get("ub")
-            if isinstance(lb, torch.Tensor) and isinstance(ub, torch.Tensor) and lb.numel() <= _MAX_SPEC_VALUES:
+            rows = int(lb.shape[0]) if isinstance(lb, torch.Tensor) and lb.dim() >= 2 and lb.shape[0] > 0 else 1
+            if (isinstance(lb, torch.Tensor) and isinstance(ub, torch.Tensor) and rows <= _MAX_SPEC_ROWS
+                    and lb.numel() <= rows * _MAX_SPEC_VALUES):
                 center = layer.params.get("center")
                 center_vals = _flat(center) if isinstance(center, torch.Tensor) and center.numel() == lb.numel() else None
                 input_specs.append(InputSpec(int(layer.id), str(layer.params.get("kind")), _flat(lb), _flat(ub),
                                              tuple(int(s) for s in lb.shape), center_vals, dataset))
             else:
-                raise BridgeError("unsupported_spec", f"INPUT_SPEC layer {layer.id} has no box lb/ub this bridge can describe.")
+                size = f" of shape {tuple(lb.shape)}" if isinstance(lb, torch.Tensor) else ""
+                raise BridgeError("unsupported_spec", f"INPUT_SPEC layer {layer.id} has no box lb/ub this bridge can describe"
+                                  f"{size} (at most {_MAX_SPEC_VALUES} values per input row, {_MAX_SPEC_ROWS} rows).")
         if layer.kind == "ASSERT":
             output_spec = _describe_assert(layer)
     with act_imports():

@@ -2,15 +2,16 @@ import { useEffect, useState } from "react";
 import { api, followRun } from "../api";
 import type { RunOut, RunRequest } from "../generated/wire";
 import { useQuery } from "../workspace/useQuery";
+import { FuzzSettings, type FuzzSettingsValue } from "./FuzzSettings";
 
 type Method = RunRequest["method"];
 type Domain = NonNullable<RunRequest["domain"]>;
 const METHOD_LABEL: Record<Method, string> = {
-  interval: "verify (verify_once)", bab: "BaB (verify_bab_batched)", fuzz: "fuzz (ACTFuzzer)",
+  fuzz: "fuzz (ACTFuzzer)", interval: "verify (verify_once)", bab: "BaB (verify_bab_batched)",
 };
 // Abstract domains of verify_once; ACT selects them with its solver / transfer-function modes.
 const DOMAIN_LABEL: Record<Domain, string> = {
-  interval: "interval (IntervalTF)", dual: "dual (DualSolver)", hybridz: "hybridz (HybridzTF + HZSolver)",
+  interval: "interval", dual: "dual", hybridz: "hybridz",
 };
 
 // The method is owned by the center mode tabs: switching the mode switches it, and choosing it here switches the mode.
@@ -22,9 +23,10 @@ export function RunsPanel({ modelId, method, onMethod, onChanged, onSelect }: {
   const supported = methods.includes(method);
   const [budget, setBudget] = useState(30);
   const [domain, setDomain] = useState<Domain>("interval");
-  const [iterations, setIterations] = useState(100000);
-  const [rngSeed, setRngSeed] = useState(0);
-  const [stopOnFirst, setStopOnFirst] = useState(false);
+  const fuzzDefaults = useQuery("fuzz-defaults", api.fuzzDefaults);
+  const defaults = fuzzDefaults.status === "ok" ? fuzzDefaults.data as FuzzSettingsValue : null;
+  const [fuzzEdit, setFuzzEdit] = useState<FuzzSettingsValue | null>(null);
+  const fuzzSettings = fuzzEdit ?? defaults;
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -32,7 +34,7 @@ export function RunsPanel({ modelId, method, onMethod, onChanged, onSelect }: {
     setBusy(true);
     setErr(null);
     try {
-      const fuzz = method === "fuzz" ? { max_iterations: iterations, rng_seed: rngSeed, stop_on_first: stopOnFirst } : null;
+      const fuzz = method === "fuzz" ? fuzzSettings : null;
       const run = await api.startRun({
         model_id: modelId, method, time_budget_s: budget, client_request_id: crypto.randomUUID(), fuzz,
         domain: method === "interval" ? domain : null,
@@ -69,18 +71,11 @@ export function RunsPanel({ modelId, method, onMethod, onChanged, onSelect }: {
         </label>
         {method === "fuzz" && (
           <>
-            <label>Max iterations
-              <input type="number" min={1} max={1000000} value={iterations} onChange={(e) => setIterations(Number(e.target.value))} />
-            </label>
-            <label>Seed
-              <input type="number" min={0} value={rngSeed} onChange={(e) => setRngSeed(Number(e.target.value))} />
-            </label>
-            <label className="check">
-              <input type="checkbox" checked={stopOnFirst} onChange={(e) => setStopOnFirst(e.target.checked)} /> stop at first counterexample
-            </label>
+            {fuzzDefaults.status === "error" && <div className="error">Fuzz defaults unavailable: {fuzzDefaults.message}</div>}
+            {fuzzSettings && defaults && <FuzzSettings value={fuzzSettings} defaults={defaults} onChange={setFuzzEdit} />}
           </>
         )}
-        <button className="primary" disabled={busy || !supported} onClick={start}>{busy ? "Starting…" : "Run ACT"}</button>
+        <button className="primary" disabled={busy || !supported || (method === "fuzz" && !fuzzSettings)} onClick={start}>{busy ? "Starting…" : "Run ACT"}</button>
       </div>
       {!supported && models.status === "ok" && <div className="note">This model does not support {METHOD_LABEL[method]}.</div>}
       {err && <div className="error">{err}</div>}

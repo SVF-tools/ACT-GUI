@@ -281,6 +281,12 @@ def test_invalid_inputs_raise_structured_errors(tmp_path):
     with pytest.raises(BridgeError) as e3:
         run_fuzzing(model_path("bab_deep_mlp"), 5, 0)
     assert e3.value.code == "invalid_budget"
+    with pytest.raises(BridgeError) as e5:
+        run_fuzzing(model_path("bab_deep_mlp"), 5, 10, hyperparameters={"output_dir": "/tmp"})
+    assert e5.value.code == "invalid_options"
+    with pytest.raises(BridgeError) as e6:
+        run_fuzzing(model_path("bab_deep_mlp"), 5, 10, hyperparameters={"perturb_mode": "huge"})
+    assert e6.value.code == "invalid_options"
 
 
 def test_gurobi_probe_reports_gurobi_license_rejection(tmp_path):

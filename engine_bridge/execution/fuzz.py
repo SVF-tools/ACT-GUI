@@ -17,7 +17,7 @@ import math
 import random
 import tempfile
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -28,24 +28,42 @@ from engine_bridge.engine_session import act_imports
 from engine_bridge.model_spec.describe import load_net
 
 COUNTEREXAMPLE_LIMIT = 20
-SEED_LIMIT = 20
+SEED_LIMIT = 64  # every row of the largest batch (model_spec.sources.BATCH_LIMIT)
 TIMELINE_LIMIT = 600
 TIMELINE_EVERY_S = 0.2
 PROGRESS_EVERY_S = 0.5
 FRAME_LIMIT = 16  # recorded mutated-input frames; each holds two full inputs
+# FuzzingConfig fields a caller may override. Budget, early stop and seed have their own arguments;
+# output, tracing and reporting stay owned by this adapter (it observes the loop through them).
+TUNABLE = frozenset({"coverage_strategy", "activation_threshold", "mutation_weights", "perturb_mode",
+                     "perturb_scale", "seed_selection_strategy", "pgd_restarts", "pgd_restarts_binarized"})
 
 
 def _floats(t: Any) -> tuple[float, ...]:
     return tuple(float(x) for x in t.detach().reshape(-1).tolist())
 
 
+def fuzzing_defaults() -> dict[str, Any]:
+    """The TUNABLE fields of the pinned ACT's pipeline.yaml fuzzing section."""
+    with act_imports():
+        from act.config.config import read_fuzzing_section
+
+        section = read_fuzzing_section(None)
+    return {k: section[k] for k in TUNABLE if k in section}
+
+
 def run_fuzzing(model_path: Path, time_budget_s: float, max_iterations: int, rng_seed: int = 0,
-                stop_on_first: bool = False,
+                stop_on_first: bool = False, hyperparameters: Mapping[str, Any] | None = None,
                 on_progress: Callable[[FuzzProgress], None] | None = None,
                 on_frame: Callable[[FuzzFrame], None] | None = None,
                 should_stop: Callable[[], bool] | None = None) -> FuzzOutcome:
     """should_stop is polled after every iteration; once true, ACTFuzzer's own timeout check ends the
-    loop at the next iteration and the report covers the iterations run (FuzzOutcome.stopped)."""
+    loop at the next iteration and the report covers the iterations run (FuzzOutcome.stopped).
+    hyperparameters override TUNABLE FuzzingConfig fields; omitted ones keep ACT's pipeline.yaml values."""
+    overrides = dict(hyperparameters or {})
+    unknown = sorted(set(overrides) - TUNABLE)
+    if unknown:
+        raise BridgeError("invalid_options", f"not tunable ACTFuzzer settings: {', '.join(unknown)}")
     if not (0 < time_budget_s <= 3600):
         raise BridgeError("invalid_budget", "time_budget_s must be in (0, 3600]")
     if not (1 <= max_iterations <= 10_000_000):
@@ -77,9 +95,12 @@ def run_fuzzing(model_path: Path, time_budget_s: float, max_iterations: int, rng
                 cfg = FuzzingConfig.from_yaml(
                     max_iterations=int(max_iterations), timeout_seconds=float(time_budget_s),
                     stop_on_first_violation=bool(stop_on_first), save_counterexamples=False,
-                    output_dir=Path(tmp), report_interval=1, verbose=0, trace_level=0,
+                    output_dir=Path(tmp), report_interval=1, verbose=0, trace_level=0, **overrides,
                 )
-                fuzzer = ACTFuzzer(wrapped_model=model, initial_seeds=seeds, config=cfg)
+                try:
+                    fuzzer = ACTFuzzer(wrapped_model=model, initial_seeds=seeds, config=cfg)
+                except ValueError as exc:  # ACT rejects an invalid setting (e.g. weights summing to 0)
+                    raise BridgeError("invalid_options", f"ACTFuzzer rejected the settings: {exc}") from exc
                 return _fuzz(fuzzer, cfg, rng_seed, rows, on_progress, on_frame, should_stop)
         finally:
             VerifiableModel.set_strict_mode(strict)
@@ -92,10 +113,17 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
     import torch
 
     def forward(x: Any) -> Any:
-        # ACT's own rebuilt model, the same forward ACTFuzzer checks; display only, no verdict.
+        # ACT's own rebuilt model on a full batch (one lane per spec row), the same forward ACTFuzzer checks;
+        # display only, no verdict. Its OUTPUT spec maps lanes onto spec rows, so it needs every row.
         with torch.no_grad():
             out = fuzzer.model(x.to(fuzzer.device))
         return (out["output"] if isinstance(out, dict) else out).detach().cpu()  # as ACTFuzzer unpacks it
+
+    def forward_at(x: Any, row: int) -> Any:
+        # Output for input x placed in lane `row`; the other lanes hold the INPUT rows.
+        full = rows.clone()
+        full[row] = x.to(device=full.device, dtype=full.dtype)
+        return forward(full)[row]
 
     weights = {str(k): float(v) for k, v in cfg.mutation_weights.items()}
     selected = dict.fromkeys(weights, 0)
@@ -138,7 +166,7 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
             i = len(fuzzer.counterexamples) - 1
             ce = fuzzer.counterexamples[i]
             hit = to_ce(i, ce, found[i] if i < len(found) else (iteration, elapsed, name),
-                        forward(ce.seed_input.unsqueeze(0))[0])
+                        forward_at(ce.seed_input, int(ce.spec_row)))
         return FuzzFrame(iteration=iteration, elapsed_s=round(elapsed, 4), strategy=name,
                          seed_row=int(s.original_index[0]), depth=int(s.depth[0]) + 1, violation=violation,
                          input=_floats(x[0]), seed_input=_floats(s.original_tensor[0]), counterexample=hit)
@@ -195,10 +223,10 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
     observe(report.total_iterations, final=True)
 
     kept = report.counterexamples[:COUNTEREXAMPLE_LIMIT]
-    seed_outs = forward(torch.stack([ce.seed_input for ce in kept])) if kept else []
+    seed_outs = [forward_at(ce.seed_input, int(ce.spec_row)) for ce in kept]
     seed_rows = rows[:SEED_LIMIT]
     seeds = tuple(FuzzSeed(row=i, input=_floats(x), output=_floats(y))
-                  for i, (x, y) in enumerate(zip(seed_rows, forward(seed_rows), strict=True)))
+                  for i, (x, y) in enumerate(zip(seed_rows, forward(rows)[:SEED_LIMIT], strict=True)))
     ces = tuple(to_ce(i, ce, found[i], seed_outs[i]) for i, ce in enumerate(kept))
     n = len(report.counterexamples)
     config: dict[str, object] = {
@@ -206,6 +234,7 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
         "coverage_strategy": cfg.coverage_strategy, "activation_threshold": cfg.activation_threshold,
         "perturb_mode": cfg.perturb_mode, "perturb_scale": cfg.perturb_scale,
         "seed_selection_strategy": cfg.seed_selection_strategy, "pgd_restarts": cfg.pgd_restarts,
+        "pgd_restarts_binarized": cfg.pgd_restarts_binarized,  # mutation weights: FuzzOutcome.strategies
         "stop_on_first_violation": cfg.stop_on_first_violation, "batch_size": fuzzer.batch_size,
     }
     return FuzzOutcome(

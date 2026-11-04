@@ -1,11 +1,12 @@
 // Load a model from a VNN-LIB instance or build one from an image classifier with a chosen test image and eps (MSV-04).
 import { useEffect, useState } from "react";
-import { api, fmt } from "../api";
+import { api, fmt, indexRanges } from "../api";
 import type { ModelSummary, SourcesOut } from "../generated/wire";
 import { classLabel, Pixels } from "../workspace/pixels";
 import { useQuery } from "../workspace/useQuery";
 
 type Mode = "vnnlib" | "torch";
+const BATCH_LIMIT = 64; // engine_bridge.model_spec.sources.BATCH_LIMIT
 
 export function LoadPanel({ current, onLoaded }: { current: ModelSummary | null; onLoaded: (m: ModelSummary) => void }) {
   const sources = useQuery("sources", api.sources);
@@ -45,23 +46,43 @@ function useLoad(onLoaded: (m: ModelSummary) => void) {
 
 function TorchForm({ s, current, onLoaded }: { s: SourcesOut; current: ModelSummary | null; onLoaded: (m: ModelSummary) => void }) {
   const [sourceId, setSourceId] = useState(s.classifiers[0]?.source_id ?? "");
-  const [index, setIndex] = useState(0);
+  // One test image per batch slot; a batch of several is one ACT net with a row per image (fuzz-only).
+  const [indices, setIndices] = useState<number[]>([0]);
+  const [slot, setSlot] = useState(0);
   const [eps, setEps] = useState(2 / 255);
   useEffect(() => {
     if (!current) return;
     const p = current.params ?? {};
     if (typeof p.source_id === "string") setSourceId(p.source_id);
-    if (typeof p.index === "number") setIndex(p.index);
+    if (typeof p.indices === "string") setIndices(p.indices.split(",").map(Number));
+    else if (typeof p.index === "number") setIndices([p.index]);
+    setSlot(0);
     if (typeof p.eps === "number") setEps(p.eps);
   }, [current]);
   const src = s.classifiers.find((c) => c.source_id === sourceId) ?? null;
+  const index = indices[slot] ?? indices[0]!;
   const sample = useQuery(src ? `${src.dataset}:${index}` : null, () => api.sample(src!.dataset, index));
   const size = sample.status === "ok" ? sample.data.size : 10000;
   const load = useLoad(onLoaded);
   if (s.classifiers.length === 0) {
     return <div className="note">No classifier ONNX models or datasets found in the ACT checkout (literature/, data/torchvision/).</div>;
   }
-  const step = (d: number) => setIndex((i) => Math.min(size - 1, Math.max(0, i + d)));
+  const clamp = (i: number) => Math.min(size - 1, Math.max(0, Math.trunc(i) || 0));
+  const setIndex = (i: number) => setIndices((xs) => xs.map((x, k) => (k === slot ? clamp(i) : x)));
+  const step = (d: number) => setIndex(index + d);
+  // Growing the batch appends the next unused images after the last slot; shrinking drops the tail.
+  const resize = (n: number) => {
+    const want = Math.min(BATCH_LIMIT, Math.max(1, Math.trunc(n) || 1));
+    setIndices((xs) => {
+      if (want <= xs.length) return xs.slice(0, want);
+      const out = [...xs];
+      for (let i = (xs[xs.length - 1] ?? -1) + 1; out.length < want && i < size; i++) if (!out.includes(i)) out.push(i);
+      return out;
+    });
+    setSlot((k) => Math.min(k, want - 1));
+  };
+  const duplicate = indices.some((x, k) => indices.indexOf(x) !== k);
+  const batched = indices.length > 1;
   return (
     <div className="loadform">
       <label>Model
@@ -69,15 +90,38 @@ function TorchForm({ s, current, onLoaded }: { s: SourcesOut; current: ModelSumm
           {s.classifiers.map((c) => <option key={c.source_id} value={c.source_id}>{c.description}</option>)}
         </select>
       </label>
-      <label>Input: {src?.dataset} test image
+      <div className="batchrow">
+        <label>Batch size
+          <input type="number" min={1} max={BATCH_LIMIT} value={indices.length} onChange={(e) => resize(Number(e.target.value))} />
+        </label>
+        {batched && (
+          <label>Edit image
+            <select value={slot} onChange={(e) => setSlot(Number(e.target.value))}>
+              {indices.map((x, k) => <option key={k} value={k}>{k + 1} of {indices.length} · test image #{x}</option>)}
+            </select>
+          </label>
+        )}
+      </div>
+      <label>Input: {src?.dataset} test image{batched ? ` (image ${slot + 1} of ${indices.length})` : ""}
         <span className="stepper">
           <button onClick={() => step(-1)} disabled={index <= 0} aria-label="previous image">◀</button>
-          <input type="number" min={0} max={size - 1} value={index}
-            onChange={(e) => setIndex(Math.min(size - 1, Math.max(0, Math.trunc(Number(e.target.value) || 0))))} />
+          <input type="number" min={0} max={size - 1} value={index} onChange={(e) => setIndex(Number(e.target.value))} />
           <button onClick={() => step(1)} disabled={index >= size - 1} aria-label="next image">▶</button>
           <button onClick={() => setIndex(Math.floor(Math.random() * size))}>random</button>
         </span>
       </label>
+      {batched && (
+        <details className="batchchips">
+          <summary title={indexRanges(indices)}>{indices.length} images: {indexRanges(indices)}</summary>
+          <div className="chips" aria-label="batch images">
+            {indices.map((x, k) => (
+              <button key={k} className={k === slot ? "chip active" : indices.indexOf(x) !== k ? "chip warn" : "chip"}
+                onClick={() => setSlot(k)} title={`edit image ${k + 1}`}>#{x}</button>
+            ))}
+          </div>
+        </details>
+      )}
+      {duplicate && <div className="error">Each image of a batch must be a different test image.</div>}
       <div className="samplepreview">
         {sample.status === "ok" ? (
           <Pixels xs={sample.data.pixels} shape={{ c: sample.data.shape[0]!, h: sample.data.shape[1]!, w: sample.data.shape[2]! }}
@@ -90,12 +134,14 @@ function TorchForm({ s, current, onLoaded }: { s: SourcesOut; current: ModelSumm
           <input type="number" min={0} max={1} step={0.001} value={Number(eps.toFixed(4))} onChange={(e) => setEps(Math.min(1, Math.max(0, Number(e.target.value) || 0)))} aria-label="eps value" />
         </span>
       </label>
-      <button className="primary" disabled={load.busy || !src}
-        onClick={() => load.run({ source: { kind: "torch", source_id: sourceId, index, eps } })}>
+      <button className="primary" disabled={load.busy || !src || duplicate}
+        onClick={() => load.run({ source: { kind: "torch", source_id: sourceId, index: indices[0]!, eps,
+          ...(batched ? { indices: [indices[0]!, ...indices.slice(1)] as [number, ...number[]] } : {}) } })}>
         {load.busy ? "Building through ACT…" : current ? "Rebuild with these settings" : "Build and load"}
       </button>
       {load.error && <div className="error">{load.error}</div>}
-      <div className="note">Box = test image ± eps clipped to [0, 1]; property: the model keeps the dataset label (TOP1_ROBUST). Built by ACT's front end; each setting is its own model snapshot.</div>
+      <div className="note">Box = test image ± eps clipped to [0, 1]; property: the model keeps the dataset label (TOP1_ROBUST). Built by ACT's front end; each setting is its own model snapshot.
+        {batched ? " A batch is one net with a row per image that ACTFuzzer fuzzes together; ACT's verify_once does not accept it, so it is fuzz-only." : ""}</div>
     </div>
   );
 }

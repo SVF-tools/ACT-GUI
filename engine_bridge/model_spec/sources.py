@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import csv
 import threading
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -150,12 +151,21 @@ def build_vnnlib_net(inst: VnnlibInstance, out_path: Path) -> BuiltNet:
                     + (f" (query 1 of {len(pairs)})" if len(pairs) > 1 else ""), params)
 
 
-def build_classifier_net(source_id: str, index: int, eps: float, out_path: Path, target: str = "label") -> BuiltNet:
+BATCH_LIMIT = 64
+
+
+def build_classifier_net(source_id: str, index: int | Sequence[int], eps: float, out_path: Path,
+                         target: str = "label") -> BuiltNet:
     """L-inf box of radius eps around test image `index` (clipped to [0, 1]) with a TOP1_ROBUST assertion.
 
+    A sequence of indices builds one net with a row per image (ACT's batched INPUT / spec rows), which
+    ACTFuzzer fuzzes as one batch; ACT's verify_once does not accept such a net.
     target="label" asserts the dataset label (ACT TorchVision convention); "prediction" asserts the
     model's own prediction on the clean image (used for the pinned catalog nets).
     """
+    indices = [index] if isinstance(index, int) else list(index)
+    if not 1 <= len(indices) <= BATCH_LIMIT or len(set(indices)) != len(indices):
+        raise BridgeError("invalid_instance", f"a batch holds 1..{BATCH_LIMIT} distinct test images, got {indices}")
     if not 0.0 <= eps <= 1.0:
         raise BridgeError("invalid_instance", f"eps must lie in [0, 1], got {eps}")
     src = _classifier(source_id)
@@ -171,27 +181,53 @@ def build_classifier_net(source_id: str, index: int, eps: float, out_path: Path,
         onnx = act_root() / src.onnx
         model = convert_onnx_to_pytorch(onnx, simplify=True).eval()
         ds = _dataset(src.dataset)
-        if not 0 <= index < len(ds):
-            raise BridgeError("invalid_instance", f"{src.dataset} test index {index} is outside 0..{len(ds) - 1}")
-        image, label = ds[index]
+        bad = [i for i in indices if not 0 <= i < len(ds)]
+        if bad:
+            raise BridgeError("invalid_instance", f"{src.dataset} test index {bad[0]} is outside 0..{len(ds) - 1}")
+        samples = [ds[i] for i in indices]
+        labels = [int(label) for _, label in samples]
+        n = len(indices)
         model = model.to(device=device, dtype=dtype)
-        center = image.unsqueeze(0).to(device=device, dtype=dtype)
+        center = torch.stack([image for image, _ in samples]).to(device=device, dtype=dtype)
         shape = get_onnx_input_shape(onnx)
         if shape is not None:
-            dims = tuple(1 if d is None or int(d) <= 0 else int(d) for d in shape)
-            if int(torch.tensor(dims).prod()) == center.numel():
-                center = center.reshape(*dims)
+            dims = tuple(1 if d is None or int(d) <= 0 else int(d) for d in shape)[1:]
+            if n * int(torch.tensor(dims).prod()) == center.numel():
+                center = center.reshape(n, *dims)
         with torch.no_grad():
-            pred = int(torch.argmax(model(center).reshape(1, -1), dim=1).item())
-        y = int(label) if target == "label" else pred
-        y_true = torch.tensor([y], device=device)
+            preds = [int(p) for p in torch.argmax(model(center).reshape(n, -1), dim=1).tolist()]
+        ys = labels if target == "label" else preds
+        y_true = torch.tensor(ys, device=device)
         input_spec = InputSpec(kind=InKind.BOX, lb=torch.clamp(center - eps, 0.0, 1.0),
                                ub=torch.clamp(center + eps, 0.0, 1.0), center=center,
-                               eps=torch.tensor([eps], device=device, dtype=dtype))
+                               eps=torch.full((n,), eps, device=device, dtype=dtype))
         output_spec = OutputSpec(kind=OutKind.TOP1_ROBUST, y_true=y_true)
         net = _wrap_to_net(model, center, y_true, input_spec, output_spec, src.dataset)
         save_net_to_file(net, str(out_path))
-    params: dict[str, str | int | float] = {"source_id": src.source_id, "dataset": src.dataset, "index": index,
-                                            "eps": eps, "label": int(label), "predicted": pred, "target": y}
-    return BuiltNet(f"{src.description}, {src.dataset} test image {index} (label {int(label)}), L-inf eps={eps:g}", params)
+    params: dict[str, str | int | float] = {"source_id": src.source_id, "dataset": src.dataset, "index": indices[0],
+                                            "eps": eps}
+    if n == 1:
+        params |= {"label": labels[0], "predicted": preds[0], "target": ys[0]}
+        return BuiltNet(f"{src.description}, {src.dataset} test image {indices[0]} (label {labels[0]}), L-inf eps={eps:g}",
+                        params)
+    def joined(xs: Sequence[int]) -> str:
+        return ",".join(str(x) for x in xs)
+
+    params |= {"batch": n, "indices": joined(indices), "labels": joined(labels), "predictions": joined(preds),
+               "targets": joined(ys), "misclassified": sum(p != y for p, y in zip(preds, labels, strict=True))}
+    return BuiltNet(f"{src.description}, batch of {n} {src.dataset} test images {index_ranges(indices)}, L-inf eps={eps:g}",
+                    params)
+
+
+def index_ranges(indices: Sequence[int]) -> str:
+    """Batch order kept, consecutive runs of 3+ folded: [4024, 1, 9873, 3, 4, 5] -> "4024, 1, 9873, 3-5"."""
+    parts: list[str] = []
+    i = 0
+    while i < len(indices):
+        j = i
+        while j + 1 < len(indices) and indices[j + 1] == indices[j] + 1:
+            j += 1
+        parts.append(f"{indices[i]}-{indices[j]}" if j - i >= 2 else ", ".join(str(x) for x in indices[i:j + 1]))
+        i = j + 1
+    return ", ".join(parts)
 

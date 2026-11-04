@@ -152,7 +152,7 @@ class Workbench:
             if isinstance(req, S.LoadVnnlibRequest):
                 built = model_sources.build_vnnlib_net(VnnlibInstance(req.benchmark, req.onnx, req.vnnlib), tmp)
             else:
-                built = model_sources.build_classifier_net(req.source_id, req.index, req.eps, tmp)
+                built = model_sources.build_classifier_net(req.source_id, req.indices or req.index, req.eps, tmp)
         except BridgeError as err:
             tmp.unlink(missing_ok=True)
             raise _bridge_error(err, 404 if err.code == "source_not_found" else 422) from err
@@ -163,7 +163,9 @@ class Workbench:
             if created:
                 tmp.replace(self.models_root / f"{model_id}.json")
                 entry = {"id": model_id, "description": built.description, "act_path": f"workbench-models/{model_id}.json",
-                         "sha256": sha, "methods": ["interval", "bab"], "native": {}, "source": req.kind,
+                         # ACT's verify_once rejects a net with several input rows, so a batch is fuzz-only.
+                         "sha256": sha, "methods": [] if "batch" in built.params else ["interval", "bab"],
+                         "native": {}, "source": req.kind,
                          "params": built.params}
                 (self.models_root / f"{model_id}.meta.json").write_text(json.dumps(entry, indent=2))
                 self._derived[model_id] = entry

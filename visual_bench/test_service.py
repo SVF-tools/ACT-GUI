@@ -150,6 +150,32 @@ def test_stop_ends_a_verification_worker_without_a_verdict(client: TestClient):
     assert run["status"] == "failed" and run["error"]["code"] == "stopped" and run["result"] is None
 
 
+def test_fuzz_defaults_match_the_pinned_act_pipeline_yaml(client: TestClient):
+    from engine_bridge.execution import fuzzing_defaults
+
+    served = client.get("/api/fuzz/defaults").json()
+    act = fuzzing_defaults()
+    assert act and {k: served[k] for k in act} == act
+
+
+def test_fuzz_hyperparameters_reach_act_and_invalid_ones_are_rejected(client: TestClient):
+    zero = {k: 0 for k in ("gradient", "pgd", "activation", "boundary", "random")}
+    bad = client.post("/api/runs", json={"model_id": "unsafe_linear", "method": "fuzz",
+                                         "fuzz": {"mutation_weights": zero}})
+    assert bad.status_code == 422 and bad.json()["error"]["code"] == "invalid_request"
+    body = {"model_id": "unsafe_linear", "method": "fuzz", "time_budget_s": 10,
+            "fuzz": {"max_iterations": 20, "rng_seed": 1, "perturb_mode": "adaptive_perdim", "perturb_scale": 0.05,
+                     "seed_selection_strategy": "random", "coverage_strategy": "BestInputCov", "pgd_restarts": 2,
+                     "mutation_weights": {**zero, "random": 1}}}
+    run_id = client.post("/api/runs", json=body).json()["run_id"]
+    follow_to_end(client, run_id)
+    fz = client.get(f"/api/runs/{run_id}/fuzzing").json()
+    cfg = fz["config"]
+    assert (cfg["perturb_mode"], cfg["perturb_scale"], cfg["seed_selection_strategy"], cfg["coverage_strategy"],
+            cfg["pgd_restarts"]) == ("adaptive_perdim", 0.05, "random", "BestInputCov", 2)
+    assert {s["name"] for s in fz["strategies"] if s["selected"]} == {"random"}
+
+
 def test_fuzz_options_require_fuzz_method_and_other_runs_have_no_fuzzing(client: TestClient):
     bad = client.post("/api/runs", json={"model_id": "range_check", "method": "interval", "fuzz": {}})
     assert bad.status_code == 422 and bad.json()["error"]["code"] == "invalid_request"
@@ -295,6 +321,29 @@ def test_torch_model_load_is_idempotent_listed_runnable_and_persisted(client: Te
     assert m["model_id"] in [x["model_id"] for x in restarted.get("/api/models").json()]
 
 
+def test_torch_batch_is_one_fuzz_only_net_fuzzed_row_by_row(client: TestClient):
+    _sources_or_skip(client)
+    body = {"source": {"kind": "torch", "source_id": "mnist_conv_small", "index": 3, "eps": 0.3, "indices": [3, 0, 7]}}
+    m = client.post("/api/models", json=body).json()
+    assert (m["methods"], m["params"]["batch"], m["params"]["indices"]) == (["fuzz"], 3, "3,0,7")
+    d = client.get(f"/api/models/{m['model_id']}").json()
+    assert d["input_specs"][0]["shape"] == [3, 1, 28, 28]
+    full = {"source": {"kind": "torch", "source_id": "cifar10_conv_med", "index": 0, "eps": 0.01, "indices": list(range(64))}}
+    big = client.post("/api/models", json=full).json()
+    assert client.get(f"/api/models/{big['model_id']}").json()["input_specs"][0]["shape"] == [64, 3, 32, 32]
+    assert client.post("/api/runs", json={"model_id": m["model_id"], "method": "interval"}).status_code != 202
+
+    run_id = client.post("/api/runs", json={"model_id": m["model_id"], "method": "fuzz", "time_budget_s": 30,
+                                           "fuzz": {"max_iterations": 300, "rng_seed": 0}}).json()["run_id"]
+    follow_to_end(client, run_id)
+    fz = client.get(f"/api/runs/{run_id}/fuzzing").json()
+    assert fz["config"]["batch_size"] == 3 and [s["row"] for s in fz["seeds"]] == [0, 1, 2]
+    rows = {c["spec_row"] for c in fz["counterexamples"]}
+    assert rows and rows <= {0, 1, 2}  # recorded counterexamples are the first ones found (capped)
+    labels = [int(x) for x in m["params"]["targets"].split(",")]
+    assert all(c["true_class"] == labels[c["spec_row"]] for c in fz["counterexamples"])
+
+
 def test_vnnlib_instance_load_and_dataset_sample(client: TestClient):
     s = _sources_or_skip(client)
     cora = next(b for b in s["vnnlib"] if b["benchmark"] == "cora_2024")
@@ -313,6 +362,8 @@ def test_vnnlib_instance_load_and_dataset_sample(client: TestClient):
     ({"kind": "torch", "source_id": "nope", "index": 0, "eps": 0.1}, 404, "source_not_found"),
     ({"kind": "torch", "source_id": "mnist_conv_small", "index": 10_000, "eps": 0.1}, 422, "invalid_instance"),
     ({"kind": "torch", "source_id": "mnist_conv_small", "index": 0, "eps": 2}, 422, "invalid_request"),
+    ({"kind": "torch", "source_id": "mnist_conv_small", "index": 0, "eps": 0.1, "indices": [0, 1, 0]}, 422, "invalid_request"),
+    ({"kind": "torch", "source_id": "mnist_conv_small", "index": 0, "eps": 0.1, "indices": [0, 10_000]}, 422, "invalid_instance"),
     ({"kind": "vnnlib", "benchmark": "cora_2024", "onnx": "../../etc/x.onnx", "vnnlib": "v.vnnlib"}, 422, "invalid_request"),
     ({"kind": "vnnlib", "benchmark": "cora_2024", "onnx": "onnx/missing.onnx", "vnnlib": "vnnlib/mnist-img0.vnnlib"}, 404, "source_not_found"),
 ])
