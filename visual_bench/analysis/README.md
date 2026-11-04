@@ -16,6 +16,30 @@ Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 Tests: the layer-state route is covered by `../verification/test_verification.py` (BaB lifecycle, domain runs) and the bridge parity in `engine_bridge/inspection/test_inspection.py`.
 
+## Flow Diagram
+
+Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there. `layers.json` is written by verification from the worker output of `engine_bridge.inspection`.
+
+```mermaid
+flowchart LR
+  classDef ext stroke-dasharray: 4 3
+  AV["AnalysisView.tsx<br/>stepper, bars, interval box"]
+  H["hooks.ts, api.ts"]
+  R["routes.py<br/>/api/runs/id/layers"]
+  S["service.py<br/>AnalysisService"]
+  WS["workspace<br/>selection"]:::ext
+  VER["verification<br/>RunService"]:::ext
+  REC["records<br/>RecordStore"]:::ext
+  AS["assistant<br/>explain.py"]:::ext
+  AV --> H
+  AV -- "navigation: layer, value" --> WS
+  H -- "HTTP" --> R
+  R --> S
+  S -- "run status" --> VER
+  S -- "layers.json" --> REC
+  AS -- "layer evidence" --> S
+```
+
 ## 1. Subproblems and Objective
 
 Show input-to-output approximation propagation and support comparisons with explicit provenance.

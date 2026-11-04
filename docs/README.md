@@ -39,9 +39,29 @@ Mark unresolved items explicitly. Update the original decision when new evidence
 
 Link to the owning document instead of maintaining independent copies. READMEs define responsibility; AGENTS.md defines contributor behavior.
 
+## Flow Diagram
+
+Where a piece of information goes, following the ownership table above. Dashed arrows are summary-and-link references, never copies.
+
+```mermaid
+flowchart LR
+  In["Requirement, decision, constraint,<br/>or validation evidence"] --> Kind{"What does it describe?"}
+  Kind -- "navigation, startup" --> Root["README.md"]
+  Kind -- "contributor behavior" --> Agents["AGENTS.md"]
+  Kind -- "cross-module architecture, decisions" --> Design["docs/design.md"]
+  Kind -- "task index, integration order, validation" --> Plan["docs/plan.md"]
+  Kind -- "scope, module navigation" --> Parent["visual_bench/README.md<br/>engine_bridge/README.md"]
+  Kind -- "module files, flow, tasks, evidence" --> Module["module README.md"]
+  Module -. "summary, link" .-> Parent
+  Parent -. "summary, link" .-> Root
+  Plan -. "task IDs" .-> Module
+```
+
 ## Module README Structure
 
 Each defined module documents its status/owner, subproblems and objective, scope/non-goals, inputs/outputs/state, design patterns and rationale, dependencies and implementation placement, implementation sequence, acceptance tests, and future extraction criteria.
+
+Each README carries a `## Flow Diagram` section with a Mermaid flowchart of its current code path. Arrows point from caller to callee; nodes from other modules are dashed and named as in the parent diagram, and every cross-module edge in a module diagram also appears in the parent diagram (the parent `visual_bench` or `engine_bridge` README, and the root README above both). Update the diagram in the same change as the code it describes.
 
 Each module also includes a functional implementation specification: feature triggers/results, processing flow, proposed public operations, planned files, state/failure rules, and a task table with stable IDs, dependencies, and completion evidence. Proposed interfaces are labeled as design targets. Replace them with actual public interfaces and working commands when code exists. A pattern must explain the problem it solves; ordinary functions and small interfaces are sufficient unless a framework has demonstrated value.
 

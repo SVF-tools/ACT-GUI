@@ -16,6 +16,29 @@ Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 Tests: covered through `../verification/test_verification.py` (`bab.summary` event) and `../assistant/test_assistant.py` (coverage evidence).
 
+## Flow Diagram
+
+Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
+
+```mermaid
+flowchart LR
+  classDef ext stroke-dasharray: 4 3
+  BV["BabView.tsx"]
+  H["hooks.ts, api.ts"]
+  R["routes.py<br/>/api/runs/id/coverage"]
+  S["service.py<br/>BabService"]
+  VER["verification<br/>RunService"]:::ext
+  AS["assistant<br/>explain.py"]:::ext
+  EB["engine_bridge<br/>events"]:::ext
+  BV --> H
+  H -- "HTTP" --> R
+  R --> S
+  S -- "run, recorded bab_summary" --> VER
+  S -- "observation_coverage" --> EB
+  AS -- "coverage evidence" --> S
+  Plan["planned BAB-01..03:<br/>search tree from committed node events"] -. "needs ACT-03" .-> S
+```
+
 ## 1. Subproblems and Objective
 
 Expose search structure, selected paths, node state, and branching rationale.

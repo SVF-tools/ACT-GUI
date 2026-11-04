@@ -67,6 +67,46 @@ Test stale selection responses in workspace; variable/layer mapping in model_spe
 
 Detailed propagation navigation, set views, playback, and comparison requirements live in [analysis](analysis/README.md).
 
+## Flow Diagram
+
+Module wiring in current code (`workbench.py` builds the services, `app.tsx` composes the views). Arrows point from caller to callee. Each module README has a Flow Diagram that expands its box with the same node names, and every edge to another module there appears here. engine_bridge is expanded in the [engine_bridge diagram](../engine_bridge/README.md#flow-diagram).
+
+```mermaid
+flowchart LR
+  classDef ext stroke-dasharray: 4 3
+  subgraph Browser["Browser: app.tsx, main.tsx"]
+  WS["workspace<br/>selection, modes, layout"]
+  V["module views, hooks.ts"]
+  SH["shared/<br/>http.ts, queryClient.ts"]
+  end
+  subgraph Service["Service: server.py, workbench.py"]
+  EN["engine<br/>EngineService"]
+  MS["model_spec<br/>ModelService"]
+  VER["verification<br/>RunService"]
+  FZ["fuzzing<br/>FuzzingService, FuzzLive"]
+  BAB["bab<br/>BabService"]
+  AN["analysis<br/>AnalysisService"]
+  AS["assistant<br/>explain.py"]
+  REC["records<br/>RecordStore"]
+  end
+  W["run worker process<br/>verification/worker.py"]
+  EB["engine_bridge"]:::ext
+  WS --> V
+  V -- "navigation" --> WS
+  V --> SH
+  SH -- "HTTP /api, SSE" --> Service
+  MS --> EN
+  VER --> MS & EN & REC
+  VER -- "LiveObserver" --> FZ
+  FZ --> VER & REC & MS
+  AN --> VER & REC
+  BAB --> VER
+  AS --> MS & VER & BAB & AN
+  VER -- "spawn, progress pipe" --> W
+  W -- "fuzz: runner.py" --> FZ
+  EN & MS & FZ & BAB & W --> EB
+```
+
 ## Non-goals
 
 - Do not implement verification algorithms, bound solving, or scientific projections, or infer verdicts from pictures or model-generated text.

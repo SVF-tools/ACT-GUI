@@ -12,8 +12,29 @@ Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 | `modes.ts` (+ `modes.test.ts`) | Mode registry `{ id, label, method, View }` for Fuzzing, Verification, BaB; `app.tsx` renders modes and maps run methods to modes from it. Add a mode here, not in `app.tsx`. |
 | `layout.tsx` | Context bar and layout pieces used by `app.tsx`. |
 | `theme.tsx` | Light/dark theme toggle and persistence. |
+| `tour.tsx`, `tourSteps.ts` (+ `tourSteps.test.ts`) | Skippable onboarding tour. Starts automatically on the first visit (`localStorage` key `act-gui.tour.v1`), spotlights layout regions marked `data-tour="..."` in `app.tsx`, and replays from the topbar Guide button. Esc or Skip ends it; steps whose region is not on screen (no model selected) show a centered card with a hint. Add or reorder steps in `tourSteps.ts`. |
 
 Browser-wide infrastructure lives in [`../shared/`](../README.md#shared-browser-layer): HTTP client, wire-number helpers, the TanStack `QueryClient` with the query key factory, and shared UI (`Empty`, `StopButton`, image rendering). Tests: `npm test`.
+
+## Flow Diagram
+
+Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
+
+```mermaid
+flowchart LR
+  classDef ext stroke-dasharray: 4 3
+  App["app.tsx<br/>composition root"]
+  Sel["selection.ts<br/>reducer, stale-selection rules"]
+  Modes["modes.ts<br/>Fuzzing, Verification, BaB"]
+  Lay["layout.tsx, theme.tsx"]
+  V["module views, hooks.ts"]:::ext
+  SH["shared/<br/>queryClient.ts keys"]:::ext
+  U["user input"] --> App
+  App --> Sel & Modes & Lay
+  App -- "selection context, active mode" --> V
+  V -- "navigation" --> Sel
+  V -- "queries keyed by context" --> SH
+```
 
 ## 1. Subproblems and Objective
 

@@ -20,6 +20,39 @@ Run this module's tests: `.venv/bin/python -m pytest visual_bench/verification`.
 
 Dependencies: model_spec (`ModelService`: entry, methods, pinned path, native reference), engine (engine gate, commit, worker license env), records, and an injected `LiveObserver`. fuzzing, analysis, bab, and assistant read runs through `RunService`.
 
+## Flow Diagram
+
+Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
+
+```mermaid
+flowchart LR
+  classDef ext stroke-dasharray: 4 3
+  Views["RunsPanel, RunHistory,<br/>VerdictBanner, labels.ts"]
+  H["hooks.ts, api.ts"]
+  R["routes.py<br/>/api/runs, stop, events SSE"]
+  S["service.py<br/>RunService"]
+  Wk["worker.py<br/>separate process"]
+  SH["shared/<br/>http.ts followRun, queryClient.ts"]:::ext
+  MS["model_spec<br/>ModelService"]:::ext
+  EN["engine<br/>EngineService"]:::ext
+  REC["records<br/>RecordStore"]:::ext
+  FZ["fuzzing<br/>FuzzingService, FuzzLive"]:::ext
+  CAL["fuzzing, bab, analysis, assistant"]:::ext
+  EB["engine_bridge<br/>execution, inspection, events"]:::ext
+  Views --> H
+  H -- "SSE, invalidate run keys per event" --> SH
+  SH -- "HTTP" --> R
+  R --> S
+  S -- "entry, pinned path, methods" --> MS
+  S -- "engine gate, commit, worker license env" --> EN
+  S -- "manifest, events, sealed result/layers/fuzzing" --> REC
+  S -- "LiveObserver: progress lines" --> FZ
+  S -- "spawn, progress pipe" --> Wk
+  Wk -- "fuzz: runner.py" --> FZ
+  Wk -- "run_verification, interval_layer_states, bab_summary" --> EB
+  CAL -- "run state, request" --> S
+```
+
 ## 1. Subproblems and Objective
 
 Provide shared application query/command entry points for users and AI, and manage application run lifecycle.

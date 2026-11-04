@@ -2,7 +2,7 @@ import type { Selection } from "./selection";
 
 export function ContextBar({ sel }: { sel: Selection }) {
   return (
-    <div className="context" aria-label="research context">
+    <div className="context" aria-label="research context" data-tour="context">
       <Ctx label="model" value={sel.modelId} />
       <Ctx label="run" value={sel.runId} />
       <Ctx label="layer" value={sel.layerId} />

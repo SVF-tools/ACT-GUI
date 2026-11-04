@@ -15,6 +15,30 @@ Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 Tests: record integrity, torn-tail recovery, and export are exercised by `../verification/test_verification.py` and `../fuzzing/test_fuzzing.py` (saved annotations in the bundle).
 
+## Flow Diagram
+
+Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
+
+```mermaid
+flowchart LR
+  classDef ext stroke-dasharray: 4 3
+  RV["RecordsView.tsx"]
+  H["hooks.ts, api.ts"]
+  R["routes.py<br/>/api/runs/id/export"]
+  St["store.py<br/>RecordStore"]
+  Dir[("var/records/run-id/<br/>manifest, events.jsonl, artifacts,<br/>artifacts.json, annotations")]
+  VER["verification<br/>RunService"]:::ext
+  FZ["fuzzing<br/>FuzzingService"]:::ext
+  AN["analysis<br/>AnalysisService"]:::ext
+  RV --> H
+  H -- "HTTP: run query, export zip" --> R
+  R --> St
+  VER -- "create, append_event, write_artifact, seal" --> St
+  FZ -- "artifact, events, annotations" --> St
+  AN -- "layers.json" --> St
+  St -- "atomic writes, sha256 seal" --> Dir
+```
+
 ## 1. Subproblems and Objective
 
 Persist traceable runs and AI actions, supporting queries, replay, and reproducible exports.

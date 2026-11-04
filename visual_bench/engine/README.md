@@ -31,6 +31,32 @@ Run this module's tests: `.venv/bin/python -m pytest visual_bench/engine`.
 
 Dependencies: engine_bridge.engine_session (probe, probe_gurobi), `visual_bench.errors`. Used by model_spec and verification services (engine gate, commit, worker license env).
 
+## Flow Diagram
+
+Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
+
+```mermaid
+flowchart LR
+  classDef ext stroke-dasharray: 4 3
+  Views["EngineBadge, GurobiBadge,<br/>EngineView, GurobiLicensePanel"]
+  H["hooks.ts, api.ts"]
+  R["routes.py<br/>/api/engine, /api/solvers/gurobi"]
+  S["service.py<br/>EngineService"]
+  L["solver_license.py<br/>GurobiLicense"]
+  MS["model_spec<br/>ModelService"]:::ext
+  VER["verification<br/>RunService"]:::ext
+  EB["engine_bridge<br/>engine_session"]:::ext
+  Views --> H
+  H -- "HTTP" --> R
+  R --> S
+  S --> L
+  L -- "license file, 0600" --> Sec[("ACT_GUI_SECRETS")]
+  S -- "probe" --> EB
+  L -- "probe_gurobi" --> EB
+  MS -- "require_engine" --> S
+  VER -- "require_engine, commit, worker_env" --> S
+```
+
 ## 3. Tasks
 
 | ID | Deliverable | Depends on | Completion evidence |

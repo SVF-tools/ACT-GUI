@@ -13,6 +13,23 @@ Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 Used by: the run worker (BaB summary) and `visual_bench/bab` (coverage). No dedicated tests yet: the BaB summary path is exercised by `visual_bench/verification/test_verification.py`.
 
+## Flow Diagram
+
+Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there. This module does not import ACT: it reads metadata that execution already returned.
+
+```mermaid
+flowchart LR
+  classDef ext stroke-dasharray: 4 3
+  W["visual_bench verification<br/>worker.py"]:::ext
+  BAB["visual_bench bab<br/>BabService"]:::ext
+  C["coverage.py<br/>bab_summary(metadata)"]
+  O["coverage.py<br/>observation_coverage()"]
+  P["planned EVT-02/03:<br/>committed node and wave events"]
+  W -- "final-summary keys, BAB_SUMMARY_KEYS" --> C
+  BAB -- "what pinned ACT exposes of BaB" --> O
+  P -. "blocked on ACT-03" .-> ACT[("ACT commit hooks")]
+```
+
 ## 1. Subproblems and Objective
 
 Provide ACT committed events with identity, ordering, and coverage for observation and recording.

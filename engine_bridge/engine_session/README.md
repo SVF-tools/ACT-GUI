@@ -14,6 +14,28 @@ Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 Used by: every other bridge module (`act_imports`), `visual_bench/engine` (status, license check). Tests: `.venv/bin/python -m pytest engine_bridge/engine_session`.
 
+## Flow Diagram
+
+Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
+
+```mermaid
+flowchart LR
+  classDef ext stroke-dasharray: 4 3
+  VE["visual_bench engine<br/>EngineService, GurobiLicense"]:::ext
+  VMS["visual_bench model_spec<br/>act_root"]:::ext
+  BR["model_spec, execution, inspection"]:::ext
+  P["session.py<br/>probe(expected_commit)"]
+  PG["session.py<br/>probe_gurobi(license_file)"]
+  AI["session.py<br/>act_root, act_imports"]
+  ACT[("ACT checkout")]
+  VE -- "EngineInfo: commit, capabilities, diagnostics" --> P
+  VE -- "SolverStatus" --> PG
+  VMS --> AI
+  BR -- "act_imports: pinned ACT or act_missing" --> AI
+  P & AI --> ACT
+  PG --> GRB[("gurobipy license check")]
+```
+
 ## 1. Subproblems and Objective
 
 Establish an ACT integration context with explicit versions/capabilities and manage engine resource handles.

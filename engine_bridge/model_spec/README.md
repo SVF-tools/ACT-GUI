@@ -15,6 +15,27 @@ Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 Used by: `visual_bench/model_spec` (catalog, sources, descriptions), execution and inspection (`load_net`). Tests: `.venv/bin/python -m pytest engine_bridge/model_spec`.
 
+## Flow Diagram
+
+Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
+
+```mermaid
+flowchart LR
+  classDef ext stroke-dasharray: 4 3
+  VMS["visual_bench model_spec<br/>ModelService"]:::ext
+  EXIN["execution, inspection"]:::ext
+  ES["engine_session<br/>act_imports"]:::ext
+  D["describe.py<br/>describe_model, load_net, file_sha256"]
+  S["sources.py<br/>vnnlib_instances, classifier_sources,<br/>dataset_sample, build_*_net"]
+  VMS -- "ModelDescription" --> D
+  VMS -- "sources, samples, BuiltNet" --> S
+  EXIN -- "load_net" --> D
+  D & S -- "act_imports" --> ES
+  D -- "load_net_from_file" --> ACT[("ACT serialization,<br/>spec creators")]
+  S --> ACT
+  S --> Data[("ACT data/ and literature/")]
+```
+
 ## 1. Subproblems and Objective
 
 Obtain accurate, stable, read-only model/specification descriptions from ACT for workbench consumption.

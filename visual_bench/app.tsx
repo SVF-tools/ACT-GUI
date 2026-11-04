@@ -19,6 +19,8 @@ import { initialSelection, selectionReducer } from "./workspace/selection";
 import { modes, defaultMode, modeForId, modeForMethod, type ModeId } from "./workspace/modes";
 import { ContextBar } from "./workspace/layout";
 import { ThemeToggle } from "./workspace/theme";
+import { Tour } from "./workspace/tour";
+import { markTourDone, tourPending } from "./workspace/tourSteps";
 import { Empty } from "./shared/ui/Empty";
 
 const TABS = ["Assistant", "Records", "Engine"] as const;
@@ -27,6 +29,7 @@ export function App() {
   const [sel, dispatch] = useReducer(selectionReducer, initialSelection);
   const [mode, setMode] = useState<ModeId>(defaultMode);
   const [tab, setTab] = useState<Tab>("Assistant");
+  const [touring, setTouring] = useState(tourPending);
   const models = useModels();
   const model = useModel(sel.modelId);
   const fuzz = useFuzzConfiguration();
@@ -44,12 +47,19 @@ export function App() {
         <ContextBar sel={sel} />
         <EngineBadge />
         <GurobiBadge onOpen={() => setTab("Engine")} />
+        <button type="button" className="themetoggle" data-tour="guide" onClick={() => setTouring(true)}
+          title="Show the guided tour">? Guide</button>
         <ThemeToggle />
       </header>
+      {touring && <Tour onClose={() => { markTourDone(); setTouring(false); }} />}
       <aside className="sidebar">
-        <LoadPanel current={current}
-          onLoaded={(m) => { dispatch({ type: "selectModel", modelId: m.model_id }); }} />
-        <ModelList models={models} selected={sel.modelId} onSelect={(id) => dispatch({ type: "selectModel", modelId: id })} />
+        <div data-tour="load">
+          <LoadPanel current={current}
+            onLoaded={(m) => { dispatch({ type: "selectModel", modelId: m.model_id }); }} />
+        </div>
+        <div data-tour="models">
+          <ModelList models={models} selected={sel.modelId} onSelect={(id) => dispatch({ type: "selectModel", modelId: id })} />
+        </div>
       </aside>
       <main className="center">
         {sel.modelId === null && <Empty title="Select a model" text="Models are real ACT networks pinned by commit and sha256." />}
@@ -57,11 +67,12 @@ export function App() {
         {model.status === "error" && <div className="error">Model load failed: {model.error.message}</div>}
         {model.status === "success" && (
           <>
-            <section className="panel">
+            <section className="panel" data-tour="network">
                 <h2>Network <small>{model.data.layers.length} layers · ACT {model.data.act_commit?.slice(0, 8)}</small></h2>
                 <ModelGraph model={model.data} selectedLayer={sel.layerId}
                   onSelectLayer={(layerId) => dispatch({ type: "selectLayer", layerId })} />
             </section>
+            <div data-tour="runs">
             <RunsPanel
               modelId={model.data.model_id}
               method={activeMode.method}
@@ -73,7 +84,8 @@ export function App() {
               onMethod={(m) => setMode(modeForMethod(m).id)}
               onSelect={(runId) => dispatch({ type: "selectRun", runId, modelId: model.data.model_id })}
             />
-            <section className="panel modes">
+            </div>
+            <section className="panel modes" data-tour="modes">
               <nav className="tabs" role="tablist" aria-label="run mode">
                 {modes.map((m) => (
                   <button key={m.id} role="tab" aria-selected={mode === m.id} className={mode === m.id ? "tab active" : "tab"} onClick={() => setMode(m.id)}>{m.label}</button>
@@ -85,12 +97,14 @@ export function App() {
                   onSelectNeuron={(neuron) => dispatch({ type: "selectNeuron", neuron })} />
               </div>
             </section>
-            <SpecPanel model={model.data} selectedLayer={sel.layerId} />
+            <div data-tour="spec">
+              <SpecPanel model={model.data} selectedLayer={sel.layerId} />
+            </div>
           </>
         )}
       </main>
       <section className="inspector">
-        <div className="insptop">
+        <div className="insptop" data-tour="inspector">
         <nav className="tabs" role="tablist">
           {TABS.map((t) => (
             <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? "tab active" : "tab"} onClick={() => setTab(t)}>{t}</button>
@@ -112,7 +126,7 @@ export function App() {
         </div>
         </div>
         {model.status === "success" && (
-          <div className="insphistory">
+          <div className="insphistory" data-tour="history">
             <RunHistory
               modelId={model.data.model_id}
               method={activeMode.method}

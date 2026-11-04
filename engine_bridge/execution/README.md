@@ -16,6 +16,32 @@ Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 Used by: the run worker (`visual_bench/verification/worker.py`, `visual_bench/fuzzing/runner.py`) and `visual_bench/model_spec` (methods). Tests: `.venv/bin/python -m pytest engine_bridge/execution`.
 
+## Flow Diagram
+
+Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
+
+```mermaid
+flowchart LR
+  classDef ext stroke-dasharray: 4 3
+  W["visual_bench verification<br/>worker.py"]:::ext
+  FR["visual_bench fuzzing<br/>runner.py"]:::ext
+  VMS["visual_bench model_spec<br/>ModelService"]:::ext
+  VFZ["visual_bench fuzzing<br/>FuzzingService"]:::ext
+  MS["model_spec<br/>load_net"]:::ext
+  ES["engine_session<br/>act_imports"]:::ext
+  V["verify.py<br/>run_verification"]
+  F["fuzz.py<br/>split_options, run_fuzzing"]
+  M["methods.py<br/>verify_methods"]
+  W -- "RunOutcome: ACT VerifyStatus 1:1" --> V
+  FR -- "FuzzOutcome" --> F
+  VMS -- "supported methods" --> M
+  VFZ -- "FUZZ_PROVENANCE" --> F
+  V & F -- "load_net" --> MS
+  V & F -- "act_imports" --> ES
+  V -- "verify_once: interval, dual, hybridz;<br/>verify_bab_batched" --> ACT[("ACT")]
+  F -- "ACTFuzzer on ACTToTorch(net)" --> ACT
+```
+
 ## 1. Subproblems and Objective
 
 Faithfully invoke ACT verification and supported controls and report actual outcomes.

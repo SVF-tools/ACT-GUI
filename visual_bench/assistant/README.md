@@ -17,6 +17,31 @@ Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 Run this module's tests: `.venv/bin/python -m pytest visual_bench/assistant`.
 
+## Flow Diagram
+
+Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there. The assistant reaches other modules only through the same services the routes use.
+
+```mermaid
+flowchart LR
+  classDef ext stroke-dasharray: 4 3
+  AV["AssistantView.tsx"]
+  H["hooks.ts, api.ts"]
+  R["routes.py<br/>/api/assistant/providers, explain"]
+  E["explain.py<br/>freeze context, collect evidence,<br/>reject unresolved citations"]
+  P["FakeProvider<br/>deterministic"]
+  WS["workspace<br/>selection"]:::ext
+  MS["model_spec<br/>ModelService"]:::ext
+  VER["verification<br/>RunService"]:::ext
+  BAB["bab<br/>BabService"]:::ext
+  AN["analysis<br/>AnalysisService"]:::ext
+  AV --> H
+  AV -- "navigation: cited layer, value" --> WS
+  H -- "HTTP" --> R
+  R --> E
+  E -- "compose answer" --> P
+  E -- "typed evidence" --> MS & VER & BAB & AN
+```
+
 ## 1. Subproblems and Objective
 
 Use workbench context and ACT evidence to explain problems, propose plans, and call shared application use cases.

@@ -17,6 +17,36 @@ Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 Run this module's tests: `.venv/bin/python -m pytest visual_bench/model_spec`. The ACT-side loader and builders are [engine_bridge/model_spec](../../engine_bridge/model_spec/README.md).
 
+## Flow Diagram
+
+Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
+
+```mermaid
+flowchart LR
+  classDef ext stroke-dasharray: 4 3
+  Views["LoadPanel, ModelList, ModelGraph,<br/>SpecPanel, InputDomain"]
+  H["hooks.ts, api.ts"]
+  R["routes.py<br/>/api/models, /api/sources"]
+  S["service.py<br/>ModelService"]
+  WS["workspace<br/>selection"]:::ext
+  EN["engine<br/>EngineService"]:::ext
+  VER["verification<br/>RunService"]:::ext
+  FZ["fuzzing<br/>FuzzingService"]:::ext
+  AS["assistant<br/>explain.py"]:::ext
+  EB["engine_bridge<br/>model_spec, execution, engine_session"]:::ext
+  Views --> H
+  Views -- "navigation" --> WS
+  H -- "HTTP" --> R
+  R --> S
+  S -- "engine gate" --> EN
+  S -- "describe_model, sources, verify_methods, act_root" --> EB
+  S --> Cat["fixtures/catalog.json"]
+  S -- "load: content-addressed" --> Store[("var/models")]
+  VER -- "entry, path, methods, native" --> S
+  FZ -- "input shape" --> S
+  AS -- "model evidence" --> S
+```
+
 ## 1. Subproblems and Objective
 
 Help users understand the model and specification under verification and select objects for further analysis.

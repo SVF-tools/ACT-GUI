@@ -243,3 +243,13 @@ button.badge { background: transparent; color: inherit; }
 .banner.good { border-color: var(--good); } .banner.good b { color: var(--good); }
 .banner.warn { border-color: var(--warn); } .banner.warn b { color: var(--warn); }
 .banner.bad { border-color: var(--bad); background: var(--error-bg); } .banner.bad b { color: var(--error-text); }
+
+/* Onboarding tour (workspace/tour.tsx) */
+.tourblock { position: fixed; inset: 0; z-index: 1000; }
+.tourblock.dim { background: rgba(0, 0, 0, .55); }
+.tourspot { position: fixed; z-index: 1001; border-radius: 10px; border: 2px solid var(--accent); box-shadow: 0 0 0 9999px rgba(0, 0, 0, .55); pointer-events: none; transition: top .2s, left .2s, width .2s, height .2s; }
+.tourcard { position: fixed; z-index: 1002; width: min(360px, calc(100vw - 16px)); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
+.tourcard h3 { margin: 2px 0 6px; font-size: 15px; } .tourcard p { margin: 0 0 8px; line-height: 1.45; }
+.tourstep { font-size: 11px; color: var(--muted); }
+.touractions { display: flex; gap: 6px; align-items: center; margin-top: 10px; } .tourgrow { flex: 1; }
+.tourskip { background: transparent; border: 0; color: var(--muted); padding: 3px 0; font-size: 12px; cursor: pointer; } .tourskip:hover { color: var(--text); text-decoration: underline; }

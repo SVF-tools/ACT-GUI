@@ -14,6 +14,23 @@ Follow the [repository rules](../../AGENTS.md) and [parent scope](../README.md).
 
 Used by: the run worker, which records `layers.json` for `visual_bench/analysis`. Tests: `.venv/bin/python -m pytest engine_bridge/inspection`.
 
+## Flow Diagram
+
+Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there. The run supervisor (visual_bench verification) seals the result as `layers.json`, which visual_bench analysis reads.
+
+```mermaid
+flowchart LR
+  classDef ext stroke-dasharray: 4 3
+  W["visual_bench verification<br/>worker.py"]:::ext
+  MS["model_spec<br/>load_net"]:::ext
+  ES["engine_session<br/>act_imports"]:::ext
+  L["layers.py<br/>interval_layer_states"]
+  W -- "LayerStates: interval after-state per layer" --> L
+  L -- "load_net" --> MS
+  L -- "act_imports" --> ES
+  L -- "public analyze" --> ACT[("ACT")]
+```
+
 ## 1. Subproblems and Objective
 
 Read node, layer, and set evidence under an exact context for propagation views and AI queries.

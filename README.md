@@ -23,6 +23,22 @@ ACT-GUI/
 
 Top-level boundaries follow product responsibilities. Each module owns its data path end to end (wire schema, service, routes, browser client and TanStack Query hooks, views, tests), so contributors can work on different modules in parallel; see [docs/design.md section 3](docs/design.md#3-runtime-and-implementation-boundaries). Every module README lists its current files, routes, and test command, plus feature plans, dependency-linked tasks, and acceptance evidence.
 
+## Flow Diagram
+
+The runtime path of one request, from the browser to ACT. Arrows point from caller to callee. Each box is expanded in its scope's own Flow Diagram: [visual_bench](visual_bench/README.md#flow-diagram) and [engine_bridge](engine_bridge/README.md#flow-diagram).
+
+```mermaid
+flowchart LR
+  User["Researcher"] --> VBB["visual_bench browser<br/>app.tsx, module views, shared/"]
+  VBB -- "HTTP /api, SSE" --> VBS["visual_bench service<br/>server.py, workbench.py, module services"]
+  VBS -- "spawns one per run" --> W["run worker process<br/>verification/worker.py"]
+  VBS --> EB["engine_bridge<br/>five modules, contracts.py"]
+  W --> EB
+  EB --> ACT[("ACT, pinned commit")]
+  VBS -- "manifest, events, sealed artifacts" --> Rec[("var/records")]
+  VBS -- "pinned models" --> Cat["fixtures/catalog.json"]
+```
+
 ## Development
 
 Requirements: Linux with the ACT checkout and its conda environment (`act-py312`, see the ACT README), Node 22+, and [uv](https://docs.astral.sh/uv/).
