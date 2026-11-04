@@ -41,31 +41,28 @@ Dependencies: verification (`RunService` for run state and requests), model_spec
 Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
 
 ```mermaid
-flowchart LR
+flowchart TB
   classDef ext stroke-dasharray: 4 3
-  Set["FuzzSettings.tsx<br/>in RunsPanel"]
-  FV["FuzzView.tsx: timeline, mutations,<br/>counterexamples, saved, inputs, strategies"]
-  H["hooks.ts, api.ts, presentation.ts"]
-  R["routes.py<br/>/api/fuzz/defaults, /api/runs/id/fuzzing,<br/>saved-counterexamples"]
+  Set["FuzzSettings.tsx"]
+  FV["FuzzView.tsx<br/>and its parts"]
+  H["hooks.ts, api.ts"]
+  R["routes.py"]
   S["service.py<br/>FuzzingService"]
   Live["live.py<br/>FuzzLive"]
-  Run["runner.py<br/>in the run worker"]
-  VER["verification<br/>RunService, worker.py, hooks"]:::ext
-  REC["records<br/>RecordStore"]:::ext
-  MS["model_spec<br/>ModelService"]:::ext
+  Run["runner.py"]
+  VER["verification"]:::ext
+  REC["records"]:::ext
+  MS["model_spec"]:::ext
   EB["engine_bridge<br/>execution"]:::ext
-  Set -- "start run, method fuzz" --> VER
+  Set -- "start fuzz run" --> VER
   FV --> H
   H -- "HTTP" --> R
   R --> S
-  S -- "run state, request options" --> VER
-  S -- "fuzzing.json, fuzz.progress, saved annotations" --> REC
-  S -- "input shape for export" --> MS
-  S -- "latest frame, counterexamples" --> Live
-  S -- "FUZZ_PROVENANCE" --> EB
-  VER -- "LiveObserver: progress lines" --> Live
-  VER -- "fuzz request" --> Run
-  Run -- "split_options, run_fuzzing" --> EB
+  S --> VER & REC & MS & Live
+  S -- "provenance" --> EB
+  VER -- "LiveObserver" --> Live
+  VER -- "worker.py" --> Run
+  Run -- "run_fuzzing" --> EB
 ```
 
 ## 3. Tasks

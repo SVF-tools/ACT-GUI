@@ -19,21 +19,19 @@ Used by: every other bridge module (`act_imports`), `visual_bench/engine` (statu
 Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
 
 ```mermaid
-flowchart LR
+flowchart TB
   classDef ext stroke-dasharray: 4 3
-  VE["visual_bench engine<br/>EngineService, GurobiLicense"]:::ext
-  VMS["visual_bench model_spec<br/>act_root"]:::ext
-  BR["model_spec, execution, inspection"]:::ext
-  P["session.py<br/>probe(expected_commit)"]
-  PG["session.py<br/>probe_gurobi(license_file)"]
-  AI["session.py<br/>act_root, act_imports"]
-  ACT[("ACT checkout")]
-  VE -- "EngineInfo: commit, capabilities, diagnostics" --> P
-  VE -- "SolverStatus" --> PG
+  VE["visual_bench<br/>engine"]:::ext
+  VMS["visual_bench<br/>model_spec"]:::ext
+  BR["model_spec, execution,<br/>inspection"]:::ext
+  P["probe"]
+  PG["probe_gurobi"]
+  AI["act_root<br/>act_imports"]
+  VE --> P & PG
   VMS --> AI
-  BR -- "act_imports: pinned ACT or act_missing" --> AI
-  P & AI --> ACT
-  PG --> GRB[("gurobipy license check")]
+  BR --> AI
+  P & AI --> ACT[("ACT checkout")]
+  PG --> GRB[("gurobipy")]
 ```
 
 ## 1. Subproblems and Objective

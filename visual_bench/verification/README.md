@@ -25,32 +25,30 @@ Dependencies: model_spec (`ModelService`: entry, methods, pinned path, native re
 Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
 
 ```mermaid
-flowchart LR
+flowchart TB
   classDef ext stroke-dasharray: 4 3
-  Views["RunsPanel, RunHistory,<br/>VerdictBanner, labels.ts"]
+  Views["RunsPanel, RunHistory,<br/>VerdictBanner"]
   H["hooks.ts, api.ts"]
-  R["routes.py<br/>/api/runs, stop, events SSE"]
+  SH["shared/"]:::ext
+  R["routes.py"]
   S["service.py<br/>RunService"]
-  Wk["worker.py<br/>separate process"]
-  SH["shared/<br/>http.ts followRun, queryClient.ts"]:::ext
-  MS["model_spec<br/>ModelService"]:::ext
-  EN["engine<br/>EngineService"]:::ext
-  REC["records<br/>RecordStore"]:::ext
-  FZ["fuzzing<br/>FuzzingService, FuzzLive"]:::ext
-  CAL["fuzzing, bab, analysis, assistant"]:::ext
-  EB["engine_bridge<br/>execution, inspection, events"]:::ext
+  Wk["worker.py<br/>process"]
+  CAL["fuzzing, bab,<br/>analysis, assistant"]:::ext
+  MS["model_spec"]:::ext
+  EN["engine"]:::ext
+  REC["records"]:::ext
+  FZ["fuzzing"]:::ext
+  EB["engine_bridge"]:::ext
   Views --> H
-  H -- "SSE, invalidate run keys per event" --> SH
-  SH -- "HTTP" --> R
+  H -- "HTTP, SSE" --> SH
+  SH --> R
   R --> S
-  S -- "entry, pinned path, methods" --> MS
-  S -- "engine gate, commit, worker license env" --> EN
-  S -- "manifest, events, sealed result/layers/fuzzing" --> REC
-  S -- "LiveObserver: progress lines" --> FZ
-  S -- "spawn, progress pipe" --> Wk
-  Wk -- "fuzz: runner.py" --> FZ
-  Wk -- "run_verification, interval_layer_states, bab_summary" --> EB
-  CAL -- "run state, request" --> S
+  CAL --> S
+  S --> MS & EN & REC
+  S -- "LiveObserver" --> FZ
+  S -- "spawn" --> Wk
+  Wk -- "runner.py" --> FZ
+  Wk -- "verify, layers,<br/>BaB summary" --> EB
 ```
 
 ## 1. Subproblems and Objective

@@ -18,7 +18,7 @@ Used by: the run worker (BaB summary) and `visual_bench/bab` (coverage). No dedi
 Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there. This module does not import ACT: it reads metadata that execution already returned.
 
 ```mermaid
-flowchart LR
+flowchart TB
   classDef ext stroke-dasharray: 4 3
   W["visual_bench verification<br/>worker.py"]:::ext
   BAB["visual_bench bab<br/>BabService"]:::ext

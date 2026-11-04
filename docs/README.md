@@ -44,14 +44,14 @@ Link to the owning document instead of maintaining independent copies. READMEs d
 Where a piece of information goes, following the ownership table above. Dashed arrows are summary-and-link references, never copies.
 
 ```mermaid
-flowchart LR
-  In["Requirement, decision, constraint,<br/>or validation evidence"] --> Kind{"What does it describe?"}
-  Kind -- "navigation, startup" --> Root["README.md"]
-  Kind -- "contributor behavior" --> Agents["AGENTS.md"]
-  Kind -- "cross-module architecture, decisions" --> Design["docs/design.md"]
-  Kind -- "task index, integration order, validation" --> Plan["docs/plan.md"]
-  Kind -- "scope, module navigation" --> Parent["visual_bench/README.md<br/>engine_bridge/README.md"]
-  Kind -- "module files, flow, tasks, evidence" --> Module["module README.md"]
+flowchart TB
+  In["New information"] --> Kind{"What does<br/>it describe?"}
+  Kind -- "startup" --> Root["README.md"]
+  Kind -- "rules" --> Agents["AGENTS.md"]
+  Kind -- "architecture" --> Design["docs/design.md"]
+  Kind -- "task index" --> Plan["docs/plan.md"]
+  Kind -- "scope" --> Parent["visual_bench, engine_bridge<br/>README.md"]
+  Kind -- "module detail" --> Module["module<br/>README.md"]
   Module -. "summary, link" .-> Parent
   Parent -. "summary, link" .-> Root
   Plan -. "task IDs" .-> Module

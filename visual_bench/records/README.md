@@ -20,7 +20,7 @@ Tests: record integrity, torn-tail recovery, and export are exercised by `../ver
 Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
 
 ```mermaid
-flowchart LR
+flowchart TB
   classDef ext stroke-dasharray: 4 3
   RV["RecordsView.tsx"]
   H["hooks.ts, api.ts"]

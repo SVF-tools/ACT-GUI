@@ -72,38 +72,38 @@ Detailed propagation navigation, set views, playback, and comparison requirement
 Module wiring in current code (`workbench.py` builds the services, `app.tsx` composes the views). Arrows point from caller to callee. Each module README has a Flow Diagram that expands its box with the same node names, and every edge to another module there appears here. engine_bridge is expanded in the [engine_bridge diagram](../engine_bridge/README.md#flow-diagram).
 
 ```mermaid
-flowchart LR
+flowchart TB
   classDef ext stroke-dasharray: 4 3
-  subgraph Browser["Browser: app.tsx, main.tsx"]
-  WS["workspace<br/>selection, modes, layout"]
-  V["module views, hooks.ts"]
-  SH["shared/<br/>http.ts, queryClient.ts"]
+  subgraph Browser["Browser: app.tsx"]
+  WS["workspace"]
+  V["module views<br/>hooks.ts"]
+  SH["shared/"]
   end
   subgraph Service["Service: server.py, workbench.py"]
-  EN["engine<br/>EngineService"]
-  MS["model_spec<br/>ModelService"]
-  VER["verification<br/>RunService"]
-  FZ["fuzzing<br/>FuzzingService, FuzzLive"]
-  BAB["bab<br/>BabService"]
-  AN["analysis<br/>AnalysisService"]
-  AS["assistant<br/>explain.py"]
-  REC["records<br/>RecordStore"]
+  AS["assistant"]
+  BAB["bab"]
+  AN["analysis"]
+  FZ["fuzzing"]
+  VER["verification"]
+  MS["model_spec"]
+  REC["records"]
+  EN["engine"]
   end
-  W["run worker process<br/>verification/worker.py"]
+  W["run worker<br/>process"]
   EB["engine_bridge"]:::ext
   WS --> V
   V -- "navigation" --> WS
   V --> SH
-  SH -- "HTTP /api, SSE" --> Service
-  MS --> EN
-  VER --> MS & EN & REC
-  VER -- "LiveObserver" --> FZ
-  FZ --> VER & REC & MS
-  AN --> VER & REC
-  BAB --> VER
+  SH -- "HTTP, SSE" --> Service
   AS --> MS & VER & BAB & AN
-  VER -- "spawn, progress pipe" --> W
-  W -- "fuzz: runner.py" --> FZ
+  BAB --> VER
+  AN --> VER & REC
+  FZ --> VER & REC & MS
+  VER -- "LiveObserver" --> FZ
+  VER --> MS & EN & REC
+  MS --> EN
+  VER -- "spawn" --> W
+  W -- "runner.py" --> FZ
   EN & MS & FZ & BAB & W --> EB
 ```
 

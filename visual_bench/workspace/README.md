@@ -21,19 +21,15 @@ Browser-wide infrastructure lives in [`../shared/`](../README.md#shared-browser-
 Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
 
 ```mermaid
-flowchart LR
+flowchart TB
   classDef ext stroke-dasharray: 4 3
-  App["app.tsx<br/>composition root"]
-  Sel["selection.ts<br/>reducer, stale-selection rules"]
-  Modes["modes.ts<br/>Fuzzing, Verification, BaB"]
-  Lay["layout.tsx, theme.tsx"]
-  V["module views, hooks.ts"]:::ext
-  SH["shared/<br/>queryClient.ts keys"]:::ext
-  U["user input"] --> App
-  App --> Sel & Modes & Lay
-  App -- "selection context, active mode" --> V
+  U["user input"] --> App["app.tsx"]
+  App --> Sel["selection.ts"]
+  App --> Modes["modes.ts"]
+  App --> Lay["layout.tsx<br/>theme.tsx"]
+  App -- "context, mode" --> V["module views<br/>hooks.ts"]:::ext
   V -- "navigation" --> Sel
-  V -- "queries keyed by context" --> SH
+  V -- "query keys" --> SH["shared/"]:::ext
 ```
 
 ## 1. Subproblems and Objective

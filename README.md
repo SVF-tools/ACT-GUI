@@ -28,7 +28,7 @@ Top-level boundaries follow product responsibilities. Each module owns its data 
 The runtime path of one request, from the browser to ACT. Arrows point from caller to callee. Each box is expanded in its scope's own Flow Diagram: [visual_bench](visual_bench/README.md#flow-diagram) and [engine_bridge](engine_bridge/README.md#flow-diagram).
 
 ```mermaid
-flowchart LR
+flowchart TB
   User["Researcher"] --> VBB["visual_bench browser<br/>app.tsx, module views, shared/"]
   VBB -- "HTTP /api, SSE" --> VBS["visual_bench service<br/>server.py, workbench.py, module services"]
   VBS -- "spawns one per run" --> W["run worker process<br/>verification/worker.py"]

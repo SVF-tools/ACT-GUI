@@ -19,7 +19,7 @@ Used by: the run worker, which records `layers.json` for `visual_bench/analysis`
 Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there. The run supervisor (visual_bench verification) seals the result as `layers.json`, which visual_bench analysis reads.
 
 ```mermaid
-flowchart LR
+flowchart TB
   classDef ext stroke-dasharray: 4 3
   W["visual_bench verification<br/>worker.py"]:::ext
   MS["model_spec<br/>load_net"]:::ext

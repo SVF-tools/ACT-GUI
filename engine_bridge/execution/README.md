@@ -21,25 +21,26 @@ Used by: the run worker (`visual_bench/verification/worker.py`, `visual_bench/fu
 Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
 
 ```mermaid
-flowchart LR
+flowchart TB
   classDef ext stroke-dasharray: 4 3
-  W["visual_bench verification<br/>worker.py"]:::ext
-  FR["visual_bench fuzzing<br/>runner.py"]:::ext
-  VMS["visual_bench model_spec<br/>ModelService"]:::ext
-  VFZ["visual_bench fuzzing<br/>FuzzingService"]:::ext
-  MS["model_spec<br/>load_net"]:::ext
-  ES["engine_session<br/>act_imports"]:::ext
-  V["verify.py<br/>run_verification"]
-  F["fuzz.py<br/>split_options, run_fuzzing"]
-  M["methods.py<br/>verify_methods"]
-  W -- "RunOutcome: ACT VerifyStatus 1:1" --> V
-  FR -- "FuzzOutcome" --> F
-  VMS -- "supported methods" --> M
-  VFZ -- "FUZZ_PROVENANCE" --> F
+  W["worker.py"]:::ext
+  FR["runner.py"]:::ext
+  VMS["visual_bench<br/>model_spec"]:::ext
+  VFZ["visual_bench<br/>fuzzing"]:::ext
+  V["verify.py"]
+  F["fuzz.py"]
+  M["methods.py"]
+  MS["model_spec"]:::ext
+  ES["engine_session"]:::ext
+  ACT[("ACT")]
+  W -- "run_verification" --> V
+  FR -- "run_fuzzing" --> F
+  VFZ -- "provenance" --> F
+  VMS -- "verify_methods" --> M
   V & F -- "load_net" --> MS
   V & F -- "act_imports" --> ES
-  V -- "verify_once: interval, dual, hybridz;<br/>verify_bab_batched" --> ACT[("ACT")]
-  F -- "ACTFuzzer on ACTToTorch(net)" --> ACT
+  V -- "verify_once,<br/>BaB" --> ACT
+  F -- "ACTFuzzer" --> ACT
 ```
 
 ## 1. Subproblems and Objective

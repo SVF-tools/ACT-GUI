@@ -20,7 +20,7 @@ Used by: `visual_bench/model_spec` (catalog, sources, descriptions), execution a
 Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
 
 ```mermaid
-flowchart LR
+flowchart TB
   classDef ext stroke-dasharray: 4 3
   VMS["visual_bench model_spec<br/>ModelService"]:::ext
   EXIN["execution, inspection"]:::ext

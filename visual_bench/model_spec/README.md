@@ -22,29 +22,26 @@ Run this module's tests: `.venv/bin/python -m pytest visual_bench/model_spec`. T
 Arrows point from caller to callee and are labeled with what flows. Dashed nodes belong to other modules and use the same names as the [parent diagram](../README.md#flow-diagram); every edge to a dashed node also appears there.
 
 ```mermaid
-flowchart LR
+flowchart TB
   classDef ext stroke-dasharray: 4 3
-  Views["LoadPanel, ModelList, ModelGraph,<br/>SpecPanel, InputDomain"]
+  Views["LoadPanel, ModelList,<br/>ModelGraph, SpecPanel"]
   H["hooks.ts, api.ts"]
-  R["routes.py<br/>/api/models, /api/sources"]
+  R["routes.py"]
   S["service.py<br/>ModelService"]
-  WS["workspace<br/>selection"]:::ext
-  EN["engine<br/>EngineService"]:::ext
-  VER["verification<br/>RunService"]:::ext
-  FZ["fuzzing<br/>FuzzingService"]:::ext
-  AS["assistant<br/>explain.py"]:::ext
-  EB["engine_bridge<br/>model_spec, execution, engine_session"]:::ext
+  WS["workspace"]:::ext
+  CAL["verification, fuzzing,<br/>assistant"]:::ext
+  EN["engine"]:::ext
+  EB["engine_bridge"]:::ext
+  Cat["catalog.json"]
+  Store[("var/models")]
   Views --> H
   Views -- "navigation" --> WS
   H -- "HTTP" --> R
   R --> S
+  CAL --> S
   S -- "engine gate" --> EN
-  S -- "describe_model, sources, verify_methods, act_root" --> EB
-  S --> Cat["fixtures/catalog.json"]
-  S -- "load: content-addressed" --> Store[("var/models")]
-  VER -- "entry, path, methods, native" --> S
-  FZ -- "input shape" --> S
-  AS -- "model evidence" --> S
+  S -- "describe, sources" --> EB
+  S --> Cat & Store
 ```
 
 ## 1. Subproblems and Objective

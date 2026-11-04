@@ -60,16 +60,16 @@ Run all bridge tests with `.venv/bin/python -m pytest engine_bridge` (needs the 
 How workbench callers reach ACT through the five modules (current code). Arrows point from caller to callee; dashed nodes are visual_bench callers, named as in the [visual_bench diagram](../visual_bench/README.md#flow-diagram). Every module returns `contracts.py` types, never ACT objects. Each module README expands its own box.
 
 ```mermaid
-flowchart LR
+flowchart TB
   classDef ext stroke-dasharray: 4 3
-  VBS["visual_bench services<br/>engine, model_spec, fuzzing, bab"]:::ext
-  W["run worker<br/>verification/worker.py, fuzzing/runner.py"]:::ext
-  ES["engine_session<br/>probe, probe_gurobi, act_imports"]
-  MS["model_spec<br/>describe_model, load_net, sources"]
-  EX["execution<br/>run_verification, run_fuzzing, verify_methods"]
-  IN["inspection<br/>interval_layer_states"]
-  EV["events<br/>observation_coverage, bab_summary"]
-  ACT[("ACT, pinned checkout")]
+  VBS["visual_bench services<br/>engine, model_spec,<br/>fuzzing, bab"]:::ext
+  W["run worker<br/>worker.py, runner.py"]:::ext
+  EX["execution"]
+  IN["inspection"]
+  EV["events"]
+  MS["model_spec"]
+  ES["engine_session"]
+  ACT[("ACT")]
   VBS --> ES & MS & EX & EV
   W --> EX & IN & EV
   EX & IN -- "load_net" --> MS
