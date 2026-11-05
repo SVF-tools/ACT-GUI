@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { fmt, indexRanges } from "../shared/wire";
 import type { ModelSummary, SourcesOut } from "../generated/wire";
 import { classLabel, Pixels } from "../shared/ui/pixels";
-import { useSources, useSample, useLoadModel } from "./hooks";
+import { fileStem, useSources, useSample, useLoadModel } from "./hooks";
 import type { LoadModelBody } from "../generated/wire";
 import { useCapabilities } from "../engine/hooks";
 
@@ -153,41 +153,89 @@ function TorchForm({ s, current, onLoaded }: { s: SourcesOut; current: ModelSumm
 
 function VnnlibForm({ s, current, onLoaded }: { s: SourcesOut; current: ModelSummary | null; onLoaded: (m: ModelSummary) => void }) {
   const [bench, setBench] = useState(s.vnnlib.find((b) => b.benchmark === "cora_2024")?.benchmark ?? s.vnnlib[0]?.benchmark ?? "");
-  const [inst, setInst] = useState(0);
+  // Instance positions in the benchmark, one per batch slot; every slot uses the first slot's network (ONNX file).
+  const [picks, setPicks] = useState<number[]>([0]);
+  const [slot, setSlot] = useState(0);
   useEffect(() => {
     if (!current) return;
     const p = current.params ?? {};
     const b = s.vnnlib.find((x) => x.benchmark === p.benchmark);
     if (!b) return;
+    const props = typeof p.vnnlibs === "string" ? p.vnnlibs.split(",") : [String(p.vnnlib)];
+    const found = props.map((v) => b.instances.findIndex((i) => i.onnx === p.onnx && i.vnnlib === v)).filter((k) => k >= 0);
     setBench(b.benchmark);
-    setInst(Math.max(0, b.instances.findIndex((i) => i.onnx === p.onnx && i.vnnlib === p.vnnlib)));
+    setPicks(found.length > 0 ? found : [0]);
+    setSlot(0);
   }, [current, s]);
   const load = useLoad(onLoaded);
   if (s.vnnlib.length === 0) return <div className="note">No VNN-LIB benchmarks found under {s.vnnlib_root}.</div>;
   const b = s.vnnlib.find((x) => x.benchmark === bench) ?? s.vnnlib[0]!;
-  const i = b.instances[Math.min(inst, b.instances.length - 1)]!;
+  const valid = picks.filter((k) => k < b.instances.length);
+  const ks = valid.length > 0 ? valid : [0];
+  const net = b.instances[ks[0]!]!.onnx;
+  const sameNet = b.instances.flatMap((x, k) => (x.onnx === net ? [k] : []));
+  const batched = ks.length > 1;
+  const at = Math.min(slot, ks.length - 1);
+  const limit = Math.min(BATCH_LIMIT, sameNet.length);
+  // Growing the batch appends the network's next unused properties after the last slot; shrinking drops the tail.
+  const resize = (n: number) => {
+    const want = Math.min(limit, Math.max(1, Math.trunc(n) || 1));
+    if (want <= ks.length) setPicks(ks.slice(0, want));
+    else {
+      const start = sameNet.indexOf(ks[ks.length - 1]!) + 1;
+      const rest = [...sameNet.slice(start), ...sameNet.slice(0, start)].filter((k) => !ks.includes(k));
+      setPicks([...ks, ...rest.slice(0, want - ks.length)]);
+    }
+    setSlot((k) => Math.min(k, want - 1));
+  };
+  const pick = (k: number) => setPicks(batched ? ks.map((x, j) => (j === at ? k : x)) : [k]);
+  const duplicate = ks.some((x, j) => ks.indexOf(x) !== j);
+  const props = ks.map((k) => b.instances[k]!.vnnlib);
   return (
     <div className="loadform">
       <label>Benchmark
-        <select value={b.benchmark} onChange={(e) => { setBench(e.target.value); setInst(0); }}>
+        <select value={b.benchmark} onChange={(e) => { setBench(e.target.value); setPicks([0]); setSlot(0); }}>
           {s.vnnlib.map((x) => <option key={x.benchmark} value={x.benchmark}>{x.benchmark} ({x.instances.length})</option>)}
         </select>
       </label>
-      <label>Instance (ONNX model · VNN-LIB property)
-        <select value={inst} onChange={(e) => setInst(Number(e.target.value))}>
-          {b.instances.map((x, k) => <option key={k} value={k}>{shortName(x.onnx)} · {shortName(x.vnnlib)}</option>)}
+      <div className="batchrow">
+        <label title={`properties on ${fileStem(net)}: ${sameNet.length}`}>Batch size
+          <input type="number" min={1} max={limit} value={ks.length} onChange={(e) => resize(Number(e.target.value))} />
+        </label>
+        {batched && (
+          <label>Edit property
+            <select value={at} onChange={(e) => setSlot(Number(e.target.value))}>
+              {ks.map((k, j) => <option key={j} value={j}>{j + 1} of {ks.length} · {fileStem(b.instances[k]!.vnnlib)}</option>)}
+            </select>
+          </label>
+        )}
+      </div>
+      <label>{batched ? `Property ${at + 1} of ${ks.length} (network ${fileStem(net)})` : "Instance (ONNX model · VNN-LIB property)"}
+        <select value={ks[at]} onChange={(e) => pick(Number(e.target.value))}>
+          {(batched ? sameNet : b.instances.map((_, k) => k)).map((k) => (
+            <option key={k} value={k}>{batched ? "" : `${fileStem(b.instances[k]!.onnx)} · `}{fileStem(b.instances[k]!.vnnlib)}</option>))}
         </select>
       </label>
-      <button className="primary" disabled={load.busy}
-        onClick={() => load.run({ source: { kind: "vnnlib", benchmark: b.benchmark, onnx: i.onnx, vnnlib: i.vnnlib } })}>
-        {load.busy ? "Loading through ACT…" : "Load instance"}
+      {batched && (
+        <details className="batchchips">
+          <summary title={props.map(fileStem).join(", ")}>{ks.length} properties on {fileStem(net)}</summary>
+          <div className="chips" aria-label="batch properties">
+            {ks.map((k, j) => (
+              <button key={j} className={j === at ? "chip active" : ks.indexOf(k) !== j ? "chip warn" : "chip"}
+                onClick={() => setSlot(j)} title={`edit property ${j + 1}`}>{fileStem(b.instances[k]!.vnnlib)}</button>
+            ))}
+          </div>
+        </details>
+      )}
+      {duplicate && <div className="error">Each property of a batch must be a different VNN-LIB file.</div>}
+      <button className="primary" disabled={load.busy || duplicate}
+        onClick={() => load.run({ source: { kind: "vnnlib", benchmark: b.benchmark, onnx: net, vnnlib: props[0]!,
+          ...(batched ? { vnnlibs: [props[0]!, ...props.slice(1)] as [string, ...string[]] } : {}) } })}>
+        {load.busy ? "Loading through ACT…" : batched ? `Load batch of ${ks.length}` : "Load instance"}
       </button>
       {load.error && <div className="error">{load.error}</div>}
-      <div className="note">ACT converts the ONNX model and parses the VNN-LIB file; its first query becomes the input box and property.</div>
+      <div className="note">ACT converts the ONNX model and parses the VNN-LIB file; its first query becomes the input box and property.
+        {batched ? " A batch is one net on this network with a row per property, merged by ACT's model synthesis: ACTFuzzer fuzzes the rows together. ACT merges only properties of the same kind and constraint shape; BaB needs a single property." : ""}</div>
     </div>
   );
-}
-
-function shortName(path: string): string {
-  return path.split("/").at(-1)!.replace(/\.(onnx|vnnlib)$/, "");
 }

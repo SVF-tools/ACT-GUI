@@ -6,7 +6,9 @@ and fuzzes a built net exactly like a catalog net.
 """
 from __future__ import annotations
 
+import contextlib
 import csv
+import io
 import threading
 from collections.abc import Sequence
 from pathlib import Path
@@ -114,44 +116,97 @@ def _wrap_to_net(model: Any, center: Any, label: Any, input_spec: Any, output_sp
     return TorchToACT(wrapped, sample_input=center).run()
 
 
-def build_vnnlib_net(inst: VnnlibInstance, out_path: Path) -> BuiltNet:
-    """ONNX + VNN-LIB through ACT's create_specs_from_paths; the first query becomes the net's spec."""
-    bench = vnnlib_root() / inst.benchmark
-    onnx, vnn = bench / inst.onnx, bench / inst.vnnlib
-    if not (onnx.is_file() and vnn.is_file()):
-        raise BridgeError("source_not_found", f"VNN-LIB instance files missing: {inst.benchmark}/{inst.onnx}, {inst.vnnlib}")
-    dataset = _dataset_hint(Path(inst.onnx).stem) or _dataset_hint(Path(inst.vnnlib).stem) or inst.benchmark
+BATCH_LIMIT = 64
+
+
+def build_vnnlib_net(inst: VnnlibInstance | Sequence[VnnlibInstance], out_path: Path) -> BuiltNet:
+    """ONNX + VNN-LIB through ACT's create_specs_from_paths; the first query of each property becomes its spec.
+
+    A sequence of properties on one network (same benchmark and ONNX file) builds one net with a row per
+    property, merged by ACT's own model synthesis (synthesize_models_and_seeds_from_specs), which ACTFuzzer
+    fuzzes as one batch. ACT merges properties with the same input/output kind and output constraint
+    (cd_group="shape": UNSAFE_LINEAR properties that differ only in their thresholds d, as ACT's fuzzing
+    pipeline groups them); others, or per-property thresholds on an ACT engine whose encode_linear
+    cannot take them, raise incompatible_batch.
+    """
+    insts = [inst] if isinstance(inst, VnnlibInstance) else list(inst)
+    if not 1 <= len(insts) <= BATCH_LIMIT or len({i.vnnlib for i in insts}) != len(insts):
+        raise BridgeError("invalid_instance", f"a batch holds 1..{BATCH_LIMIT} distinct VNN-LIB properties, got {len(insts)}")
+    first = insts[0]
+    if any((i.benchmark, i.onnx) != (first.benchmark, first.onnx) for i in insts):
+        raise BridgeError("invalid_instance", "every property of a batch must use the same network (benchmark and ONNX file)")
+    bench = vnnlib_root() / first.benchmark
+    for i in insts:
+        if not ((bench / i.onnx).is_file() and (bench / i.vnnlib).is_file()):
+            raise BridgeError("source_not_found", f"VNN-LIB instance files missing: {i.benchmark}/{i.onnx}, {i.vnnlib}")
+    dataset = _dataset_hint(Path(first.onnx).stem) or _dataset_hint(Path(first.vnnlib).stem) or first.benchmark
     with _lock, act_imports():
         from act.back_end.serialization.serialization import save_net_to_file
         from act.front_end.spec_creator_base import LabeledInputTensor
         from act.front_end.vnnlib_loader.create_specs import create_specs_from_paths
         from act.util.device_manager import get_default_device, get_default_dtype
 
-        try:
-            _cat, _name, model, labeled, pairs = create_specs_from_paths(onnx, vnn, category=inst.benchmark)
-        except SystemExit as exc:  # ACT's single-instance entry point exits on unsupported specs
-            raise BridgeError("unsupported_spec", str(exc)) from exc
-        except Exception as exc:
-            raise BridgeError("model_load_failed", f"ACT could not load {inst.onnx} / {inst.vnnlib}: {exc}") from exc
         device, dtype = get_default_device(), get_default_dtype()
-        lt = labeled[0]
-        center = lt.tensor.to(device=device, dtype=dtype)
-        label = lt.label.to(device=device) if lt.label is not None else None
-        input_spec, output_spec = pairs[0]
-        for spec in (input_spec, output_spec):
-            for attr, value in vars(spec).items():
-                if hasattr(value, "to") and hasattr(value, "dtype"):
-                    integral = not value.dtype.is_floating_point
-                    setattr(spec, attr, value.to(device=device) if integral else value.to(device=device, dtype=dtype))
-        net = _wrap_to_net(model.eval().to(device=device, dtype=dtype), center, label, input_spec, output_spec, dataset)
+        parsed = []
+        for i in insts:
+            try:
+                _cat, _name, model, labeled, pairs = create_specs_from_paths(bench / i.onnx, bench / i.vnnlib,
+                                                                              category=i.benchmark)
+            except SystemExit as exc:  # ACT's single-instance entry point exits on unsupported specs
+                raise BridgeError("unsupported_spec", f"{i.vnnlib}: {exc}") from exc
+            except Exception as exc:
+                raise BridgeError("model_load_failed", f"ACT could not load {i.onnx} / {i.vnnlib}: {exc}") from exc
+            lt = labeled[0]
+            input_spec, output_spec = pairs[0]
+            for spec in (input_spec, output_spec):
+                for attr, value in vars(spec).items():
+                    if hasattr(value, "to") and hasattr(value, "dtype"):
+                        integral = not value.dtype.is_floating_point
+                        setattr(spec, attr, value.to(device=device) if integral else value.to(device=device, dtype=dtype))
+            parsed.append((model, LabeledInputTensor(lt.tensor.to(device=device, dtype=dtype),
+                                                     lt.label.to(device=device) if lt.label is not None else None),
+                           input_spec, output_spec, len(pairs)))
+        model = parsed[0][0].eval().to(device=device, dtype=dtype)
+        if len(parsed) == 1:
+            _, lt, input_spec, output_spec, _ = parsed[0]
+            net = _wrap_to_net(model, lt.tensor, lt.label, input_spec, output_spec, dataset)
+        else:
+            net = _merge_vnnlib_batch(model, parsed, insts, dataset, device, dtype)
         save_net_to_file(net, str(out_path))
-    params: dict[str, str | int | float] = {"benchmark": inst.benchmark, "onnx": inst.onnx, "vnnlib": inst.vnnlib,
-                                            "queries": len(pairs), "dataset": dataset}
-    return BuiltNet(f"VNN-LIB {inst.benchmark}: {Path(inst.onnx).name} + {Path(inst.vnnlib).name}"
-                    + (f" (query 1 of {len(pairs)})" if len(pairs) > 1 else ""), params)
+    queries = [p[4] for p in parsed]
+    params: dict[str, str | int | float] = {"benchmark": first.benchmark, "onnx": first.onnx, "vnnlib": first.vnnlib,
+                                            "queries": queries[0], "dataset": dataset}
+    if len(insts) == 1:
+        return BuiltNet(f"VNN-LIB {first.benchmark}: {Path(first.onnx).name} + {Path(first.vnnlib).name}"
+                        + (f" (query 1 of {queries[0]})" if queries[0] > 1 else ""), params)
+    params |= {"batch": len(insts), "vnnlibs": ",".join(i.vnnlib for i in insts)}
+    multi = sum(q > 1 for q in queries)
+    return BuiltNet(f"VNN-LIB {first.benchmark}: {Path(first.onnx).name}, batch of {len(insts)} properties"
+                    + (f" (query 1 of each; {multi} have more)" if multi else ""), params, input_rows=len(insts))
 
 
-BATCH_LIMIT = 64
+def _merge_vnnlib_batch(model: Any, parsed: list[tuple[Any, ...]], insts: Sequence[VnnlibInstance], dataset: str,
+                        device: Any, dtype: Any) -> Any:
+    """One batched ACT net from per-property specs on one model, grouped and merged by ACT's model synthesis."""
+    from act.front_end.model_synthesis import synthesize_models_and_seeds_from_specs
+    from act.pipeline.verification.torch2act import TorchToACT
+
+    # One model object for every property: ACT groups specs by model identity.
+    spec_results = [(dataset, Path(i.vnnlib).stem, model, [lt], [(in_spec, out_spec)])
+                    for i, (_, lt, in_spec, out_spec, _) in zip(insts, parsed, strict=True)]
+    with contextlib.redirect_stdout(io.StringIO()):  # synthesis prints a progress summary
+        models, seeds = synthesize_models_and_seeds_from_specs(spec_results, cd_group="shape")
+    if len(models) != 1:
+        owner = {id(p[1]): Path(i.vnnlib).stem for i, p in zip(insts, parsed, strict=True)}
+        groups = "; ".join(", ".join(owner[id(lt)] for lt in group) for group in seeds.values())
+        raise BridgeError("incompatible_batch",
+                          f"ACT batches only properties with the same input kind, output kind and output constraint; "
+                          f"these {len(insts)} properties form {len(models)} groups: {groups}")
+    vm = next(iter(models.values())).to(device=device, dtype=dtype)
+    try:
+        return TorchToACT(vm, sample_input=vm.input_layer.input_tensor).run()
+    except ValueError as exc:  # e.g. an ACT whose encode_linear takes only thresholds shared by every lane
+        raise BridgeError("incompatible_batch", f"this ACT engine cannot encode the batch as one net: {exc}") from exc
 
 
 def build_classifier_net(source_id: str, index: int | Sequence[int], eps: float, out_path: Path,

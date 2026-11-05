@@ -3,6 +3,7 @@ import { fmt, indexRanges } from "../shared/wire";
 import type { ModelSummary } from "../generated/wire";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { builtWithLabel } from "./RebuildNotice";
+import { batchRows } from "./hooks";
 
 export function ModelList({ models, selected, onSelect }: {
   models: UseQueryResult<ModelSummary[]>; selected: string | null; onSelect: (id: string) => void;
@@ -27,6 +28,8 @@ export function ModelList({ models, selected, onSelect }: {
                   <span className="chips">
                     {m.source && m.source !== "catalog" && <span className="chip">{m.source === "torch" ? "torch" : "vnn-lib"}</span>}
                     {m.source === "torch" && <TorchChips p={m.params ?? {}} />}
+                    {m.source === "vnnlib" && typeof m.params?.batch === "number" && (
+                      <span className="chip" title={`properties ${batchRows(m.params)?.labels.join(", ")}`}>batch {m.params.batch}</span>)}
                     <EngineChip m={m} />
                     {Object.entries(m.native).map(([method, r]) => (
                       <span key={method} className={`chip v-${r.status.toLowerCase()}`} title="recorded native ACT result (fixtures/catalog.json)">

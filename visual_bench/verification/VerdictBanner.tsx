@@ -3,7 +3,7 @@
 import { fmt, indexRanges } from "../shared/wire";
 import { runDomainLabel } from "./labels";
 import type { ModelDescriptionOut, RowVerdictOut, RunOut } from "../generated/wire";
-import { useModels } from "../model_spec/hooks";
+import { useBatchRows } from "../model_spec/hooks";
 import { useState } from "react";
 import { downloadBlob, imagePng, Pixels, specImageShape, type Shape } from "../shared/ui/pixels";
 import { savedCounterexampleUrl } from "./api";
@@ -53,42 +53,43 @@ export function VerdictBanner({ runId, model }: {
         {run.matches_native === true && <span className="chip good" title="matches the recorded native ACT result">= native</span>}
         {run.matches_native === false && <span className="chip warn" title={`native: ${run.native_reference?.status}`}>≠ native</span>}
       </div>
-      <div>{rows.length > 0 ? `Batch of ${rows.length} images: the verdict holds for the whole batch only when it holds for every image. ` : ""}{v.text}</div>
+      <div>{rows.length > 0 ? <BatchNote n={rows.length} modelId={run.model_id} /> : ""}{v.text}</div>
       {rows.length > 0 && <RowVerdicts rows={rows} modelId={run.model_id} />}
       {r.verdict === "falsified" && r.counterexample && <Counterexample xs={r.counterexample} run={run} model={model} />}
     </div>
   );
 }
 
-// Test-image index of each batch row, from the loaded model's parameters ("3,0,7").
-function useBatchImages(modelId: string): number[] | null {
-  const models = useModels();
-  const p = models.status === "success" ? models.data.find((m) => m.model_id === modelId)?.params : undefined;
-  return typeof p?.indices === "string" ? p.indices.split(",").map(Number) : null;
+function BatchNote({ n, modelId }: { n: number; modelId: string }) {
+  const noun = useBatchRows(modelId)?.noun ?? "row";
+  const plural = noun === "property" ? "properties" : `${noun}s`;
+  return <>Batch of {n} {plural}: the verdict holds for the whole batch only when it holds for every {noun}. </>;
 }
 
-// ACT's verdict per batch row: counts per verdict with the image indices compressed to ranges, rows listed on demand.
+// ACT's verdict per batch row: counts per verdict (image indices compressed to ranges), rows listed on demand.
 function RowVerdicts({ rows, modelId }: { rows: RowVerdictOut[]; modelId: string }) {
-  const images = useBatchImages(modelId);
-  const image = (row: number) => images?.[row] ?? row;
-  const groups = Object.keys(VERDICT).map((k) => ({ k, xs: rows.filter((x) => x.verdict === k).map((x) => image(x.row)) }))
-    .filter((g) => g.xs.length > 0);
+  const batch = useBatchRows(modelId);
+  const label = (row: number) => batch?.labels[row] ?? `row ${row + 1}`;
+  const groups = Object.keys(VERDICT).map((k) => ({ k, rs: rows.filter((x) => x.verdict === k).map((x) => x.row) }))
+    .filter((g) => g.rs.length > 0);
+  const title = (rs: number[]) => batch?.images
+    ? `test images ${indexRanges(rs.map((r) => batch.images![r]!))}` : rs.map(label).join(", ");
   return (
     <details className="batchchips">
       <summary>
-        {groups.map((g) => <span key={g.k} className={`chip ${VERDICT[g.k]!.cls}`} title={`test images ${indexRanges(g.xs)}`}>
-          {VERDICT[g.k]!.title.toLowerCase()} {g.xs.length}</span>)}
+        {groups.map((g) => <span key={g.k} className={`chip ${VERDICT[g.k]!.cls}`} title={title(g.rs)}>
+          {VERDICT[g.k]!.title.toLowerCase()} {g.rs.length}</span>)}
       </summary>
-      <div className="chips" aria-label="verdict per batch image">
+      <div className="chips" aria-label="verdict per batch row">
         {rows.map((x) => <span key={x.row} className={`chip ${VERDICT[x.verdict]?.cls ?? ""}`} title={`row ${x.row + 1}: ${x.act_status}`}>
-          #{image(x.row)} {x.act_status}</span>)}
+          {label(x.row)} {x.act_status}</span>)}
       </div>
     </details>
   );
 }
 
 function Counterexample({ xs, run, model }: { xs: number[]; run: RunOut; model: ModelDescriptionOut }) {
-  const images = useBatchImages(run.model_id);
+  const batch = useBatchRows(run.model_id);
   const row = run.result?.counterexample_row ?? null;
   const spec = model.model_id === run.model_id ? model.input_specs[0] : undefined;
   const s = spec ? specImageShape(spec.shape, spec.dataset) : null;
@@ -97,7 +98,7 @@ function Counterexample({ xs, run, model }: { xs: number[]; run: RunOut; model: 
   const unit = lo >= 0 && hi <= 1;
   return (
     <div className="verdictce">
-      {shape && <Pixels xs={xs} shape={shape} lo={unit ? 0 : lo} hi={unit ? 1 : hi} label={row === null ? "counterexample input" : `counterexample · test image #${images?.[row] ?? row}`} size="big" />}
+      {shape && <Pixels xs={xs} shape={shape} lo={unit ? 0 : lo} hi={unit ? 1 : hi} label={row === null ? "counterexample input" : `counterexample · ${batch?.noun === "image" ? "test image " : ""}${batch?.labels[row] ?? `row ${row + 1}`}`} size="big" />}
       <span className="mono muted">
         x = [{xs.slice(0, 8).map((v) => fmt(v, 3)).join(", ")}{xs.length > 8 ? `, … (${xs.length})` : ""}]
       </span>

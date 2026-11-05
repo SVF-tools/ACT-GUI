@@ -201,6 +201,7 @@ export type Benchmark = string
 export type Kind8 = "vnnlib"
 export type Onnx1 = string
 export type Vnnlib = string
+export type Vnnlibs = ([string, ...(string)[]] | null)
 export type Eps = number
 export type Index1 = number
 export type Indices = ([number, ...(number)[]] | null)
@@ -922,6 +923,7 @@ benchmark: Benchmark
 kind: Kind8
 onnx: Onnx1
 vnnlib: Vnnlib
+vnnlibs?: Vnnlibs
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema

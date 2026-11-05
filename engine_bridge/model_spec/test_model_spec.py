@@ -100,6 +100,36 @@ def test_vnnlib_source_matches_act_spec_creation(tmp_path):
     assert d.output_spec.true_class == int(out_spec.y_true.reshape(-1)[0].item())
     assert built.params["dataset"] == d.input_specs[0].dataset == "mnist"
 
+def test_vnnlib_batch_merges_properties_of_one_network_through_act_synthesis(tmp_path):
+    from engine_bridge.contracts import VnnlibInstance
+    from engine_bridge.model_spec import sources
+
+    require_sources()
+    props = [f"vnnlib/mnist-img{k}.vnnlib" for k in range(3)]
+    insts = [VnnlibInstance("cora_2024", "onnx/mnist-point.onnx", v) for v in props]
+    built = sources.build_vnnlib_net(insts, tmp_path / "b.json")
+    single_lbs = []
+    for k, i in enumerate(insts):
+        sources.build_vnnlib_net(i, tmp_path / f"s{k}.json")
+        single_lbs += describe_model(tmp_path / f"s{k}.json").input_specs[0].lb
+    d = describe_model(tmp_path / "b.json")
+    assert (built.input_rows, built.params["vnnlibs"], d.input_specs[0].shape) == (3, ",".join(props), (3, 784))
+    assert d.input_specs[0].lb == pytest.approx(single_lbs)
+
+    mixed = [insts[0], VnnlibInstance("cora_2024", "onnx/mnist-relu.onnx", props[1])]
+    with pytest.raises(BridgeError) as err:
+        sources.build_vnnlib_net(mixed, tmp_path / "m.json")
+    assert err.value.code == "invalid_instance"
+    if not (sources.vnnlib_root() / "acasxu_2023").is_dir():
+        pytest.skip("ACT checkout has no acasxu_2023 benchmark")
+    # Same network, UNSAFE_LINEAR properties with 1 and 4 rows: no ACT synthesis merges them.
+    props = [VnnlibInstance("acasxu_2023", "onnx/ACASXU_run2a_1_1_batch_2000.onnx", f"vnnlib/prop_{k}.vnnlib")
+             for k in (1, 2)]
+    with pytest.raises(BridgeError) as err:
+        sources.build_vnnlib_net(props, tmp_path / "u.json")
+    assert err.value.code == "incompatible_batch"
+    assert not (tmp_path / "u.json").exists()
+
 def test_model_sources_reject_bad_instances(tmp_path):
     from engine_bridge.contracts import VnnlibInstance
     from engine_bridge.model_spec import sources

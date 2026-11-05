@@ -65,16 +65,22 @@ class SampleOut(Wire):
     shape: list[int]
     pixels: list[float]  # CHW in [0, 1]
 
+BenchmarkPath = Annotated[str, Field(min_length=1, max_length=512, pattern=r"^[A-Za-z0-9_./-]+$")]
+
 class LoadVnnlibRequest(Wire):
     kind: Literal["vnnlib"]
     benchmark: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_.-]+$")
-    onnx: str = Field(min_length=1, max_length=512, pattern=r"^[A-Za-z0-9_./-]+$")
-    vnnlib: str = Field(min_length=1, max_length=512, pattern=r"^[A-Za-z0-9_./-]+$")
+    onnx: BenchmarkPath
+    vnnlib: BenchmarkPath
+    # Properties of a batch on this one network, one ACT input row each, fuzzed together; None = [vnnlib].
+    vnnlibs: list[BenchmarkPath] | None = Field(default=None, min_length=1, max_length=64)
 
     @model_validator(mode="after")
     def _relative_paths(self) -> "LoadVnnlibRequest":
-        if any(p.startswith("/") or ".." in p.split("/") for p in (self.onnx, self.vnnlib)):
+        if any(p.startswith("/") or ".." in p.split("/") for p in (self.onnx, self.vnnlib, *(self.vnnlibs or ()))):
             raise ValueError("onnx and vnnlib must be paths inside the benchmark directory")
+        if self.vnnlibs is not None and (self.vnnlibs[0] != self.vnnlib or len(set(self.vnnlibs)) != len(self.vnnlibs)):
+            raise ValueError("vnnlibs must be distinct and start with vnnlib")
         return self
 
 class LoadTorchRequest(Wire):

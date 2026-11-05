@@ -138,3 +138,21 @@ def test_torch_batch_is_one_net_fuzzed_row_by_row(client: TestClient):
     assert rows and rows <= {0, 1, 2}  # recorded counterexamples are the first ones found (capped)
     labels = [int(x) for x in m["params"]["targets"].split(",")]
     assert all(c["true_class"] == labels[c["spec_row"]] for c in fz["counterexamples"])
+
+def test_vnnlib_properties_on_one_network_are_one_net_fuzzed_row_by_row(client: TestClient):
+    s = sources_or_skip(client)
+    cora = next(b for b in s["vnnlib"] if b["benchmark"] == "cora_2024")
+    props = [i["vnnlib"] for i in cora["instances"] if i["onnx"] == "onnx/mnist-point.onnx"][:3]
+    body = {"source": {"kind": "vnnlib", "benchmark": "cora_2024", "onnx": "onnx/mnist-point.onnx",
+                       "vnnlib": props[0], "vnnlibs": props}}
+    m = client.post("/api/models", json=body).json()
+    assert (m["methods"], m["params"]["batch"], m["params"]["vnnlibs"]) == (["interval", "fuzz"], 3, ",".join(props))
+    assert client.get(f"/api/models/{m['model_id']}").json()["input_specs"][0]["shape"] == [3, 784]
+
+    run_id = client.post("/api/runs", json={"model_id": m["model_id"], "method": "fuzz", "time_budget_s": 30,
+                                           "fuzz": {"max_iterations": 50, "rng_seed": 0}}).json()["run_id"]
+    follow_to_end(client, run_id)
+    fz = client.get(f"/api/runs/{run_id}/fuzzing").json()
+    assert fz["config"]["batch_size"] == 3 and [s["row"] for s in fz["seeds"]] == [0, 1, 2]
+    rebuilt = client.post(f"/api/models/{m['model_id']}/rebuild").json()
+    assert rebuilt["model_id"] == m["model_id"]

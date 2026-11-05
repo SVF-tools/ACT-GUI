@@ -114,7 +114,8 @@ class ModelService:
         tmp = self.models_root / f".build-{uuid.uuid4().hex}.json"
         try:
             if isinstance(req, S.LoadVnnlibRequest):
-                built = model_sources.build_vnnlib_net(VnnlibInstance(req.benchmark, req.onnx, req.vnnlib), tmp)
+                built = model_sources.build_vnnlib_net(
+                    [VnnlibInstance(req.benchmark, req.onnx, v) for v in req.vnnlibs or [req.vnnlib]], tmp)
             else:
                 built = model_sources.build_classifier_net(req.source_id, req.indices or req.index, req.eps, tmp)
         except BridgeError as err:
@@ -150,7 +151,8 @@ class ModelService:
                     indices=indices)
             elif entry.get("source") == "vnnlib":
                 req = S.LoadVnnlibRequest(kind="vnnlib", benchmark=str(p["benchmark"]), onnx=str(p["onnx"]),
-                                          vnnlib=str(p["vnnlib"]))
+                                          vnnlib=str(p["vnnlib"]),
+                                          vnnlibs=str(p["vnnlibs"]).split(",") if "vnnlibs" in p else None)
             else:
                 raise AppError(422, "not_rebuildable", f"{model_id} is a pinned catalog model, not built by the workbench")
         except (KeyError, ValueError) as err:
