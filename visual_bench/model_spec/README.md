@@ -1,0 +1,129 @@
+# Model and Specification View
+
+**Current responsibility and status.** This module lists pinned and built models, loads supported VNN-LIB and classifier sources, serves ACT-backed model descriptions and dataset samples, and renders the network and input or output specification. MSV-01 and MSV-04 are implemented. MSV-02 and MSV-03 remain backlog. C owns the views, B integrates the service, and A reviews variable and constraint semantics.
+
+The module owns presentation and content addressed model snapshots. It does not reinterpret ACT semantics, calculate bounds, or replace unsupported specifications with boxes. ACT-side loading and description are [engine_bridge/model_spec](../../engine_bridge/model_spec/README.md). Run creation is [verification](../verification/README.md), engine readiness is [engine](../engine/README.md), and selection is [workspace](../workspace/README.md). See the [parent flow diagram](../README.md#flow-diagram) and [project development entry point](../../README.md#choose-a-development-task).
+
+## Change Guide
+
+| Goal | Required edits | Conditional edits / reused path |
+| --- | --- | --- |
+| Show a new description field | [schemas.py](schemas.py), [service.py](service.py) mapping, consuming view/tests; generate wire.ts | [bridge model_spec](../../engine_bridge/model_spec/README.md#change-guide) only if the neutral description lacks the field. Routes/hooks/API only for endpoint/query changes. |
+| Support a new source | [bridge source builder](../../engine_bridge/model_spec/sources.py), [schemas.py](schemas.py), [service.py](service.py), [LoadPanel.tsx](LoadPanel.tsx), source tests | Existing POST /api/models transport can remain if its operation is unchanged. |
+| Change graph or input-image presentation | [ModelGraph.tsx](ModelGraph.tsx), [SpecPanel.tsx](SpecPanel.tsx), [InputDomain.tsx](InputDomain.tsx) as relevant | Shared pixels helpers only when reusable rendering changes; no ACT or model-identity change for presentation. |
+| Change content identity or persistence | [service.py](service.py), persistence/hash tests | [verification](../verification/README.md#change-guide) only when its model ID/path contract changes. |
+| Add editable specification drafts | MSV-03 backlog: define validation and new immutable model references first | No general draft API exists today. Preserve old runs' pinned snapshots. |
+
+## Flow Diagram
+
+Arrows are labeled as calls, results, or events. Neighboring modules are named explicitly and linked in the block tables. HTTP transport may be grouped; views use hooks or props, never direct fetch calls.
+
+### List and describe a model
+
+```mermaid
+flowchart TB
+  View["ModelList and ModelGraph"] --> Hooks["model_spec/hooks.ts"]
+  Hooks -- "GET models and description" --> Routes["model_spec/routes.py"]
+  Routes --> Service["ModelService"]
+  Service -- "engine gate" --> Engine["engine.EngineService"]
+  Service -- "path and sha256" --> Catalog["catalog.json or var/models"]
+  Service -- "describe_model" --> Bridge["engine_bridge/model_spec"]
+  Bridge -- "neutral description" --> Service
+  Service -- "ModelSummary or ModelDescriptionOut" --> View
+  View -- "selected layer" --> Workspace["workspace"]
+```
+
+| Block | Code entry | Contract or artifact | Neighbor handoff |
+| --- | --- | --- | --- |
+| List | `ModelService.models` | Catalog and derived model summaries with methods and sha256 | [Verification](../verification/README.md) uses method list |
+| Describe | `ModelService.describe` | `ModelDescriptionOut` with stable layer IDs, shapes, input bounds, and output constraints | [Analysis](../analysis/README.md) and [workspace](../workspace/README.md) use IDs |
+| Select | [ModelGraph.tsx](ModelGraph.tsx) | Layer selection is presentation state, not ACT computation | [Workspace](../workspace/README.md) owns global selection |
+
+### Load and persist a source
+
+```mermaid
+flowchart TB
+  Load["LoadPanel.tsx"] -- "source request" --> Hooks["useLoadModel"]
+  Hooks -- "POST /api/models" --> Routes["model_spec/routes.py"]
+  Routes --> Service["ModelService.load"]
+  Service -- "engine gate" --> Engine["EngineService"]
+  Service -- "build source" --> Bridge["engine_bridge/model_spec"]
+  Bridge -- "ACT net temp file" --> Service
+  Service -- "sha256 and metadata" --> Store[("var/models")]
+  Service -- "201 new or 200 existing ModelSummary" --> Load
+```
+
+| Block | Code entry | Contract or artifact | Neighbor handoff |
+| --- | --- | --- | --- |
+| Source request | `LoadVnnlibRequest`, `LoadTorchRequest` | Relative VNN-LIB paths, classifier source, index or indices, eps | Bridge validates source availability |
+| Build | `ModelService.load` | Content addressed `<kind>-<sha12>` model and `.meta.json` | Derived model can be used by [verification](../verification/README.md) |
+| Repeat load | `model_id` from sha256 | Same content returns 200 and existing model | No duplicate build is required |
+
+### Render an input specification
+
+```mermaid
+flowchart TB
+  App["app.tsx"] -->|"Selected model ID"| Hook["useModel query"]
+  Hook -->|"GET model description"| API["routes / ModelService"]
+  API -->|"ModelDescriptionOut"| Hook
+  Hook -->|"Model props via app.tsx"| View["SpecPanel / InputDomain"]
+  View -->|"Display-only samples and bounds"| Pixels["Input images and numeric detail"]
+```
+
+| Block | Code entry | Contract or artifact | Neighbor handoff |
+| --- | --- | --- | --- |
+| Description | `InputSpecOut`, `OutputSpecOut` | ACT shape, bounds, center, dataset, constraint text, and true class | No browser reinterpretation of constraints |
+| Image view | [InputDomain.tsx](InputDomain.tsx) | Clean, bounds, heat map, and sampled display perturbations | Samples are visual only, not verification evidence |
+| Navigation | [ModelGraph.tsx](ModelGraph.tsx) | Stable layer ID | [Workspace](../workspace/README.md) and [analysis](../analysis/README.md) consume selection |
+
+## Validation
+
+Run the module's real ACT tests:
+
+```bash
+.venv/bin/python -m pytest visual_bench/model_spec
+```
+
+Acceptance is observable when catalog models list their pinned sha256 and methods, a valid VNN-LIB or classifier source returns 201 then 200 for the same content, the model survives service restart, descriptions preserve ACT layer IDs and shapes, samples return the requested dataset row, and invalid paths or sources return structured errors.
+
+Run `npm run gen:types` after changing `schemas.py`, then `npm run check:types`. Do not hand edit `visual_bench/generated/wire.ts`. Do not claim tests were run unless the command and result are recorded.
+
+## Reference and Backlog
+
+<details>
+<summary>Current files, routes and contracts</summary>
+
+## Current Files and Contracts
+
+| Layer | Entry | Contract or artifact | Owner for handoff |
+| --- | --- | --- | --- |
+| Wire | [schemas.py](schemas.py) | Model summaries, source requests, samples, layers, input and output specs | `generated/wire.ts` is generated from Pydantic models |
+| Service | [service.py](service.py) | `models`, `sources`, `sample`, `load`, `describe`; content addressed built models | Engine gate is `engine.EngineService`; ACT description is bridge owned |
+| HTTP | [routes.py](routes.py) | `/api/models`, `/api/models/{id}`, `/api/sources`, `/api/sources/sample` | Verification consumes model IDs and methods |
+| Browser data | [api.ts](api.ts), [hooks.ts](hooks.ts) | Queries for models, descriptions, sources, samples; load invalidates model list | Shared query keys own cache identity |
+| Views | [LoadPanel.tsx](LoadPanel.tsx), [ModelList.tsx](ModelList.tsx), [ModelGraph.tsx](ModelGraph.tsx), [SpecPanel.tsx](SpecPanel.tsx), [InputDomain.tsx](InputDomain.tsx) | Load, graph, spec, image-domain, and sample presentation | Workspace owns selection and navigation |
+| Tests | [test_model_spec.py](test_model_spec.py) | Real ACT loads, idempotency, persistence, descriptions, samples, structured errors | Bridge loader tests cover ACT source adaptation |
+
+
+</details>
+
+<details>
+<summary>Task acceptance and planned capabilities</summary>
+
+## Tasks
+
+<a id="3-tasks"></a>
+
+The task IDs and dependencies remain stable. MSV-04 is the implemented loading slice and appears in the parent task index.
+
+| ID | Deliverable | Depends on | Completion evidence |
+| --- | --- | --- | --- |
+| MSV-01 | Deliver real description list/detail UI | VER-01, WS-02 | A real sample shows correct layer shapes, tensor edges, and specification variables with loading/error states. |
+| MSV-02 | Evaluate and wrap the network renderer | MSV-01 | Show stable IDs, external selection, node callbacks, resize, worker/assets, and browser findings; document a fallback if the candidate fails. |
+| MSV-03 | Validate specification drafts | MSV-01, MSB-03 | Invalid variable mappings are explained; a valid change creates a new reference and cannot mutate an existing run. |
+| MSV-04 | Load models from VNN-LIB and torch sources | MSB-04, MSV-01 | `LoadPanel.tsx` in the sidebar: VNN-LIB tab (benchmark, instance) and Torch tab (classifier, test-image index with preview and label, eps slider, batch size with a per-image picker: a batch of several test images builds one fuzz-only net with a row per image, and the Specification panel shows it one row at a time). `POST /api/models` builds through the bridge and returns the content-addressed model (201 new, 200 existing); loaded models appear under "Loaded" with their parameters, and selecting one prefills the form so a new image/eps rebuilds a new snapshot. Flat VNN-LIB image vectors of known datasets are drawn as H x W x C (cora_2024 convention). |
+
+
+MSV-02's renderer evaluation and MSV-03's editable draft validation are not current capabilities. Proposed `ModelSpecView.tsx`, `view_model.ts`, and `network_renderer.ts` are design references only. Keep unsupported specifications visible with their actual representation and reason.
+
+</details>

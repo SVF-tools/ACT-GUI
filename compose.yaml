@@ -1,0 +1,26 @@
+# ACT-GUI workbench. Start:            docker compose up -d   -> http://127.0.0.1:8080
+# With NVIDIA GPUs:                     docker compose -f compose.yaml -f compose.gpu.yaml up -d
+# With a mounted Gurobi license file:   add -f compose.gurobi.yaml (or upload it in the Engine tab)
+# Build from source first:              scripts/docker_build.sh
+name: act-gui
+
+services:
+  workbench:
+    image: ${ACT_GUI_IMAGE:-act-gui:0.1.0}
+    build:
+      context: .
+      additional_contexts:
+        act: ./build/act
+      args:
+        GUROBIPY_VERSION: ${GUROBIPY_VERSION:-13.0.0}
+    ports:
+      - "127.0.0.1:${ACT_GUI_PORT:-8080}:8080"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - act-gui-data:/data
+    restart: unless-stopped
+
+volumes:
+  act-gui-data:
