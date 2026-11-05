@@ -250,6 +250,7 @@ from visual_bench.verification.worker import main  # noqa: E402
 
 request = json.loads((here / "request.json").read_text())
 request["model_path"] = str(here / request["model_path"])
+request["record_directory"] = str(here / "reproduced_records")
 with tempfile.TemporaryDirectory() as tmp:
     req_file, out_file = Path(tmp) / "request.json", Path(tmp) / "output.json"
     req_file.write_text(json.dumps(request))
@@ -323,7 +324,9 @@ def snapshot_zip(run_id: str, run_dir: Path, manifest: dict[str, Any], status: s
     }
     if model_file is not None:
         files[model_name] = model_file.read_bytes()
-    for name in ("manifest.json", "events.jsonl", "result.json", "fuzzing.json", "artifacts.json"):
+    for name in ("manifest.json", "events.jsonl", "result.json", "fuzzing.json", "artifacts.json",
+                 "layers.json", "propagation.json",
+                 *(p.relative_to(run_dir).as_posix() for p in (run_dir / "blobs").glob("*.f32"))):
         if (run_dir / name).is_file():
             files[f"run/{name}"] = (run_dir / name).read_bytes()
     for name in ("diagnostics.json", "act_stdout.log", "worker_stderr.log"):

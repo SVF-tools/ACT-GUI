@@ -65,6 +65,12 @@ Import callers are model_spec, execution and inspection through `act_imports`, p
 
 ## Operation Notes
 
+`observe.propagation` is optional on older ACT checkouts. Its requirements include `observe`, `emit`,
+`RecordKey`, `LayerBounds`, `Relaxation`, `DualBackward`, `SpecBound`, and the existing `verify_once`
+requirements. Only checkouts satisfying all of them advertise availability; verification otherwise
+keeps the existing recorded interval-state fallback. The observation API is checked independently
+of the solver/domain capability needed to start a run.
+
 ### Change the ACT probe or capability list
 
 Edit [session.py](session.py):

@@ -65,6 +65,13 @@ def requirements() -> dict[str, tuple[Requirement, ...]]:
                       Requirement(f"{_VERIFIER}:get_output_ids", positional=1)),
         "verify.interval": _VERIFY_ONCE,
         "verify.dual": _VERIFY_ONCE,
+        "observe.propagation": (
+            *_VERIFY_ONCE,
+            Requirement("act.back_end.observe:observe", positional=1),
+            Requirement("act.back_end.observe:emit", positional=1),
+            *(Requirement(f"act.back_end.observe:{name}") for name in
+              ("RecordKey", "LayerBounds", "Relaxation", "DualBackward", "SpecBound")),
+        ),
         "verify.hybridz": (
             *_VERIFY_ONCE,
             Requirement(f"{_VERIFIER}:verify_once", ("timelimit", "hybridz_tolerance"), positional=1),

@@ -180,11 +180,11 @@ export type Kind7 = string
 export type LayerId4 = number
 export type Lb1 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type Shape2 = number[]
-export type Stage = "after"
+export type Stage = ("after" | "pre")
 export type Ub1 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type Availability2 = ("available" | "pending" | "not_recorded" | "unsupported")
 export type Layers = LayerStateOut[]
-export type Method = ("interval" | null)
+export type Method = (("interval" | "dual" | "hybridz") | null)
 export type RunId4 = string
 export type Source1 = (LoadVnnlibRequest | LoadTorchRequest)
 export type Benchmark = string
@@ -233,8 +233,52 @@ export type Online = number
  * Seconds a heartbeat keeps a browser counted
  */
 export type WindowS = number
-export type Availability3 = ("available" | "not_configured")
-export type Kind11 = ("fake" | "real")
+export type Availability3 = ("available" | "pending" | "unavailable" | "not_recorded")
+export type Complete = boolean
+export type Domain = (("interval" | "dual" | "hybridz") | null)
+export type IgnoredRecords = number
+export type Domain1 = ("interval" | "dual" | "hybridz")
+export type LayerId6 = number
+export type Origin = string
+export type Parent = (string | null)
+export type Pass = string
+export type Scope = string
+export type Stage1 = string
+export type Version1 = number
+export type LatestRecordId = number
+export type LayerKind = (string | null)
+export type OutputShape1 = number[]
+export type RecordCount = number
+export type Layers2 = PropagationLayerSummaryOut[]
+export type Kind11 = ("PhaseEvent" | "LayerBounds" | "Relaxation" | "DualBackward" | "SpecBound")
+export type LayerKind1 = (string | null)
+export type OutputShape2 = number[]
+export type RecordId = number
+export type Shape3 = number[]
+export type TMs = number
+export type Dtype = "float32"
+export type Sha2562 = string
+export type Shape4 = number[]
+export type Phases = PropagationRecordOut[]
+export type Records = PropagationRecordOut[]
+export type RunId5 = string
+export type ValueLimit = number
+export type Availability4 = ("available" | "pending" | "unavailable" | "not_recorded")
+export type Domain2 = (("interval" | "dual" | "hybridz") | null)
+export type LayerId7 = number
+export type Neuron2 = (number | null)
+export type OutputShape3 = number[]
+export type Kind12 = ("PhaseEvent" | "LayerBounds" | "Relaxation" | "DualBackward" | "SpecBound")
+export type LayerKind2 = (string | null)
+export type OutputShape4 = number[]
+export type RecordId1 = number
+export type Shape5 = number[]
+export type TMs1 = number
+export type Records1 = PropagationLayerRecordOut[]
+export type RunId6 = string
+export type ValueLimit1 = number
+export type Availability5 = ("available" | "not_configured")
+export type Kind13 = ("fake" | "real")
 export type Name4 = string
 export type Note = string
 export type Providers = ProviderOut[]
@@ -247,15 +291,18 @@ export type Location = (string | null)
 export type Messages = string[]
 export type Warnings = number
 export type At = string
-export type Kind12 = ("run.queued" | "run.started" | "run.stop_requested" | "run.completed" | "run.failed" | "bab.summary" | "fuzz.progress")
-export type RunId5 = string
+export type Kind14 = ("run.queued" | "run.started" | "run.stop_requested" | "run.completed" | "run.failed" | "bab.summary" | "fuzz.progress" | "verify.propagation")
+export type Payload = ({
+[k: string]: string | number | boolean | null
+} | PropagationRecordOut)
+export type RunId7 = string
 export type Seq = number
 export type Status3 = ("queued" | "running" | "completed" | "failed")
 export type ActCommit1 = (string | null)
 export type ClientRequestId = (string | null)
 export type CounterexampleSavedAt = (string | null)
 export type CreatedAt = string
-export type Domain = (("interval" | "dual" | "hybridz") | null)
+export type Domain3 = (("interval" | "dual" | "hybridz") | null)
 export type FinishedAt = (string | null)
 export type LastSeq = number
 export type MatchesNative = (boolean | null)
@@ -274,13 +321,13 @@ export type Device1 = (string | null)
 export type ElapsedS5 = number
 export type Rows1 = RowVerdictOut[]
 export type Verdict1 = ("certified" | "falsified" | "unknown" | "timeout" | "error")
-export type RunId6 = string
+export type RunId8 = string
 export type StartedAt = (string | null)
 export type Status4 = ("queued" | "running" | "completed" | "failed")
 export type TimeBudgetS = number
 export type Runs = RunOut[]
 export type ClientRequestId1 = (string | null)
-export type Domain1 = (("interval" | "dual" | "hybridz") | null)
+export type Domain4 = (("interval" | "dual" | "hybridz") | null)
 export type Method2 = ("interval" | "bab" | "fuzz")
 export type ModelId4 = string
 export type TimeBudgetS1 = number
@@ -288,7 +335,7 @@ export type Dataset2 = string
 export type Index2 = number
 export type Label1 = number
 export type Pixels = number[]
-export type Shape3 = number[]
+export type Shape6 = number[]
 export type Size = number
 export type Index3 = number
 export type Content = string
@@ -299,7 +346,7 @@ export type LicenseUpdatedAt = (string | null)
 export type Message2 = string
 export type Solver = "gurobi"
 export type UsedByMethods = ("interval" | "bab" | "fuzz")[]
-export type Version1 = (string | null)
+export type Version2 = (string | null)
 export type Classifiers = ClassifierSourceOut[]
 export type Benchmark1 = string
 export type Onnx2 = string
@@ -352,6 +399,13 @@ OutputSpecOut?: OutputSpecOut
 ParamOut?: ParamOut
 PresenceHeartbeat?: PresenceHeartbeat
 PresenceOut?: PresenceOut
+PropagationIndexOut?: PropagationIndexOut
+PropagationKeyOut?: PropagationKeyOut
+PropagationLayerOut?: PropagationLayerOut
+PropagationLayerRecordOut?: PropagationLayerRecordOut
+PropagationLayerSummaryOut?: PropagationLayerSummaryOut
+PropagationRecordOut?: PropagationRecordOut
+PropagationTensorOut?: PropagationTensorOut
 ProviderList?: ProviderList
 ProviderOut?: ProviderOut
 RowVerdictOut?: RowVerdictOut
@@ -918,6 +972,127 @@ window_s: WindowS
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "PropagationIndexOut".
+ */
+export interface PropagationIndexOut {
+availability: Availability3
+complete: Complete
+domain: Domain
+ignored_records: IgnoredRecords
+layers: Layers2
+phases: Phases
+records: Records
+run_id: RunId5
+value_limit: ValueLimit
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "PropagationLayerSummaryOut".
+ */
+export interface PropagationLayerSummaryOut {
+counts: Counts
+key: PropagationKeyOut
+latest_record_id: LatestRecordId
+layer_kind: LayerKind
+output_shape: OutputShape1
+record_count: RecordCount
+}
+export interface Counts {
+[k: string]: number
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "PropagationKeyOut".
+ */
+export interface PropagationKeyOut {
+domain: Domain1
+layer_id: LayerId6
+origin: Origin
+parent: Parent
+pass_: Pass
+scope: Scope
+stage: Stage1
+version: Version1
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "PropagationRecordOut".
+ */
+export interface PropagationRecordOut {
+counts: Counts1
+key: (PropagationKeyOut | null)
+kind: Kind11
+layer_kind: LayerKind1
+metadata: Metadata
+output_shape: OutputShape2
+record_id: RecordId
+shape: Shape3
+t_ms: TMs
+tensors: Tensors
+}
+export interface Counts1 {
+[k: string]: number
+}
+export interface Metadata {
+[k: string]: string | number | boolean | null
+}
+export interface Tensors {
+[k: string]: PropagationTensorOut
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "PropagationTensorOut".
+ */
+export interface PropagationTensorOut {
+dtype: Dtype
+sha256: Sha2562
+shape: Shape4
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "PropagationLayerOut".
+ */
+export interface PropagationLayerOut {
+availability: Availability4
+domain: Domain2
+layer_id: LayerId7
+neuron?: Neuron2
+output_shape: OutputShape3
+records: Records1
+run_id: RunId6
+value_limit: ValueLimit1
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "PropagationLayerRecordOut".
+ */
+export interface PropagationLayerRecordOut {
+counts: Counts2
+key: (PropagationKeyOut | null)
+kind: Kind12
+layer_kind: LayerKind2
+metadata: Metadata1
+output_shape: OutputShape4
+record_id: RecordId1
+shape: Shape5
+t_ms: TMs1
+tensors: Tensors1
+values: Values
+}
+export interface Counts2 {
+[k: string]: number
+}
+export interface Metadata1 {
+[k: string]: string | number | boolean | null
+}
+export interface Tensors1 {
+[k: string]: PropagationTensorOut
+}
+export interface Values {
+[k: string]: (number | ("Infinity" | "-Infinity" | "NaN"))[]
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "ProviderList".
  */
 export interface ProviderList {
@@ -928,8 +1103,8 @@ providers: Providers
  * via the `definition` "ProviderOut".
  */
 export interface ProviderOut {
-availability: Availability3
-kind: Kind11
+availability: Availability5
+kind: Kind13
 name: Name4
 note: Note
 }
@@ -961,14 +1136,11 @@ warnings: Warnings
  */
 export interface RunEvent {
 at: At
-kind: Kind12
+kind: Kind14
 payload: Payload
-run_id: RunId5
+run_id: RunId7
 seq: Seq
 status: Status3
-}
-export interface Payload {
-[k: string]: string | number | boolean | null
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -987,7 +1159,7 @@ client_request_id: ClientRequestId
 counterexample_saved_at?: CounterexampleSavedAt
 created_at: CreatedAt
 diagnostics?: (RunDiagnosticsOut | null)
-domain: Domain
+domain: Domain3
 error: (ErrorBody | null)
 finished_at: FinishedAt
 last_seq: LastSeq
@@ -997,7 +1169,7 @@ model_id: ModelId3
 model_sha256: ModelSha256
 native_reference: (NativeResult | null)
 result: (RunResultOut | null)
-run_id: RunId6
+run_id: RunId8
 started_at: StartedAt
 status: Status4
 time_budget_s: TimeBudgetS
@@ -1015,11 +1187,11 @@ counterexample_output_error?: CounterexampleOutputError
 counterexample_row?: CounterexampleRow
 device?: Device1
 elapsed_s: ElapsedS5
-metadata: Metadata
+metadata: Metadata2
 rows?: Rows1
 verdict: Verdict1
 }
-export interface Metadata {
+export interface Metadata2 {
 [k: string]: string | number | boolean | null
 }
 /**
@@ -1028,7 +1200,7 @@ export interface Metadata {
  */
 export interface RunRequest {
 client_request_id?: ClientRequestId1
-domain?: Domain1
+domain?: Domain4
 fuzz?: (FuzzOptions | null)
 method: Method2
 model_id: ModelId4
@@ -1043,7 +1215,7 @@ dataset: Dataset2
 index: Index2
 label: Label1
 pixels: Pixels
-shape: Shape3
+shape: Shape6
 size: Size
 }
 /**
@@ -1074,7 +1246,7 @@ license_updated_at: LicenseUpdatedAt
 message: Message2
 solver: Solver
 used_by_methods: UsedByMethods
-version: Version1
+version: Version2
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema

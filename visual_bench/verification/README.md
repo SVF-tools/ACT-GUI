@@ -119,6 +119,24 @@ Acceptance is observable when start returns without waiting for ACT completion, 
 
 Use `visual_bench/fuzzing/test_fuzzing.py` for fuzz stop and saved counterexamples. Use `npm test` for browser selection and query behavior. Do not claim checks were run unless the command and result are recorded.
 
+Propagation validation on 2026-11-05:
+
+- `.venv/bin/python -m pytest`: 126 passed, 6 observer-capability skips, 3 known failures:
+  `test_probe_version_mismatch_is_a_warning` (tracked-change and optional-API diagnostics),
+  `test_run_verdict_matches_recorded_native_act[mnist_relu_6_100_eps015-bab]`
+  (`FALSIFIED` versus recorded `UNKNOWN`), and
+  `test_classifier_builder_reproduces_the_pinned_catalog_net` (SHA256 mismatch).
+  The previously documented torch model-load idempotency issue did not fail in this run.
+- `npm run check:types`, `npm run typecheck`: passed. `npm test`: 23 tests in 6 files passed
+  at this backend verification snapshot; concurrent browser work has its own final checks.
+- `ACT_CODE_ROOT=/data1/guanqin/ACT-wt/act-gui-match ACT_GUI_ENGINES=/tmp/act-gui-propagation-test-engines .venv/bin/python -m pytest engine_bridge/inspection/test_propagation.py visual_bench/verification/test_propagation.py visual_bench/analysis/test_propagation.py`:
+  15 passed. The temporary engine directory contained an `active.json` with
+  `{"path":"/data1/guanqin/ACT-wt/act-gui-match","source":{"kind":"branch","branch":"act-gui-match"}}`.
+  EngineService restores this selection; setting only `ACT_CODE_ROOT` is insufficient for service tests.
+- After the final ASSERT shape correction, the same command restricted to
+  `engine_bridge/inspection/test_propagation.py visual_bench/verification/test_propagation.py`
+  passed 9 tests. There is no pending ACT instrumentation blocker for these tested native networks.
+
 ## Reference and Backlog
 
 <details>
@@ -130,7 +148,8 @@ Use `visual_bench/fuzzing/test_fuzzing.py` for fuzz stop and saved counterexampl
 | --- | --- | --- | --- |
 | Wire | [schemas.py](schemas.py) | `RunRequest`, `RunOut`, `RunResultOut`, `RunEvent` | `visual_bench/schemas.py` re-exports wire models for generation |
 | Service | [service.py](service.py) | `RunService.start`, `stop`, `get`, `list`, `request`, `save_counterexample`, `saved_counterexample_file`; `vnncomp_sat` formats VNN-COMP witnesses for this module and fuzzing; records are authoritative | `workbench.py` injects records, model, engine, and live collaborators |
-| Worker | [worker.py](worker.py) | Executes one request in a child process, writes output (with `diagnostics`) atomically, sends fuzz lines on an inherited pipe | Bridge owns ACT invocation; fuzzing shapes its method result |
+| Worker | [worker.py](worker.py) | Executes one request in a child process, writes output (with `diagnostics`) atomically, sends fuzz or propagation index entries on an inherited pipe; records full propagation through `records/propagation.py` | Bridge owns ACT invocation; fuzzing shapes its method result |
+| Propagation tests | [test_propagation.py](test_propagation.py) | Real observer-capable ACT worker, pipe, `verify.propagation` SSE, own-domain layer states, index/detail queries and sealed blobs in interval/HybridZ/dual runs | Skipped on checkouts without `observe.propagation`; synthetic storage coverage is in analysis |
 | Diagnostics | [diagnostics.py](diagnostics.py) | `Capture`, `scrubber`, `summary`, `printed_problems`, `snapshot_zip`; `RunDiagnosticsOut` on `RunOut.diagnostics`; `GET /api/runs/{id}/snapshot` | records stores the diagnostics files; RunHistory offers the download |
 | HTTP | [routes.py](routes.py) | `/api/runs`, `/api/runs/{id}`, `/stop`, `/events`, `POST /saved-counterexample`, `GET /saved-counterexample/vnnlib` | Browser uses HTTP; assistant uses the same RunService directly |
 | Browser data | [api.ts](api.ts), [hooks.ts](hooks.ts) | Start, stop and save-counterexample mutations, run queries, one SSE subscription per active run | `shared` owns HTTP and query keys |
@@ -160,6 +179,7 @@ Dependencies are acceptance prerequisites, not code-import instructions. Moved t
 | VER-11 | Save and export verify_once/BaB counterexamples like fuzz ones | VER-07, EXE-01 | The bridge adds `counterexample_output` (ACT's ACTToTorch model at ACT's counterexample, in its batch row; a failure is reported as `counterexample_output_error` and only disables the export). `POST /api/runs/{id}/saved-counterexample` saves it on the run record (`saved_counterexamples.json` annotation, idempotent, 201 then 200); `GET .../saved-counterexample/vnnlib` returns the VNN-COMP witness in the same format as fuzz exports (`vnncomp_sat`, X shaped as one input row). The verdict banner offers Save, then Export counterexample (VNN-LIB 2.0) and, for image inputs, Export image (.png). Evidence: `test_verification.py::test_falsified_run_reports_act_counterexample`, `engine_bridge/execution/test_execution.py::test_bab_counterexample_carries_the_output_of_acts_rebuilt_model`. |
 | VER-12 | Capture run diagnostics and offer a reproduction snapshot | VER-02, REC-01 | Every run that reaches a worker records `diagnostics.json` and scrubbed worker logs before its terminal event: Python warnings, WARNING+ log records, ACT's printed `[WARN]`/`[ERROR]` lines, the exception chain with the innermost ACT frame as error location, process exit, the engine snapshot (commit, branch source, tracked changes, Python/torch/CUDA, capabilities, failing API checks) and the worker request. `RunOut.diagnostics` summarizes them; Run History shows warnings and location and downloads `GET /api/runs/{id}/snapshot`. Evidence: `test_diagnostics.py::test_failed_act_call_leaves_a_snapshot_that_reproduces_it` (real ACT load failure located at `<ACT>/act/back_end/layer_util.py`, replayed by the bundled reproduce.py), `::test_capture_records_warnings_logs_and_the_failing_frame`, `::test_snapshot_waits_for_the_run_to_end`. |
 | VER-04 | Implement the shared command gateway | VER-03, EXE-03 | Same-ID retry cannot apply twice; changed parameters, stale revision, unsupported actions, and expired authority are rejected. |
+| VER-13 | Stream propagation records live and store them | VER-02, INSP-04 | Implemented in `worker.py`, `service.py`, and `records/propagation.py`: all `interval` methods (interval/HybridZ/dual domains) run under the sink when `observe.propagation` passes. Full float32 tensor envelopes are content-addressed and the complete `propagation.json` index plus blobs are sealed. Pipe lines `{"propagation": <index entry>}` become `verify.propagation` SSE events; notifications coalesce to at most 10/s plus a final flush, while stored history stays complete. Final layer states come from the run's own forward records, including labeled dual pre-activation bounds. Older ACT records `availability: unavailable` and retains INSP-01 fallback. `test_propagation.py` exercises the real worker/pipe/SSE/API flow for all domains when the active ACT supports observation; otherwise those tests skip. |
 
 
 The original design targets `run_state.py` and `commands.py` are not current files. Add them only with VER-03 or VER-04 work. Scientific snapshots, command receipts, pause, step, split, and live ACT handles require the corresponding engine capabilities and committed event contract.

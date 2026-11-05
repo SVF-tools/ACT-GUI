@@ -1,0 +1,95 @@
+.propagation, .neuron-detail {
+  --prop-s1: 4px; --prop-s2: 8px; --prop-s3: 12px; --prop-s4: 16px; --prop-s6: 24px;
+  --prop-radius: 6px; --prop-body: 14px; --prop-small: 12px; --prop-heading: 18px;
+  font-size: var(--prop-body); line-height: 1.5; min-width: 0; font-variant-numeric: tabular-nums;
+}
+.propagation h3, .neuron-detail h3 { font-size: var(--prop-heading); margin: 0 0 var(--prop-s2); color: var(--text); }
+.neuron-detail h4 { font-size: var(--prop-body); margin: var(--prop-s6) 0 var(--prop-s2); }
+.neuron-detail h4 small { font-weight: normal; color: var(--muted); }
+.propagation p, .neuron-detail p { overflow-wrap: anywhere; }
+.prop-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--prop-s3); margin-bottom: var(--prop-s3); }
+.prop-heading h3 { margin: 0; }
+.prop-playback, .prop-controls, .prop-breadcrumb { display: flex; flex-wrap: wrap; gap: var(--prop-s2); align-items: end; }
+.propagation button, .propagation select, .neuron-detail select, .propagation input[type="number"] { min-height: 32px; }
+.propagation button:focus-visible, .propagation select:focus-visible, .propagation input:focus-visible,
+.propagation canvas:focus-visible, .neuron-detail select:focus-visible, .neuron-detail summary:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+.propagation button:active { background: var(--line); }
+.propagation button:disabled { opacity: 1; color: var(--muted); }
+.propagation ::selection, .neuron-detail ::selection { background: var(--box-fill); color: var(--text); }
+.propagation input, .neuron-detail select { caret-color: var(--accent); }
+.propagation label, .prop-field { display: flex; flex-direction: column; gap: var(--prop-s1); font-size: var(--prop-small); color: var(--muted); }
+.propagation input, .propagation select { min-width: 0; max-width: 100%; }
+.prop-controls input[type="number"] { width: 100px; }
+.prop-playback > button { min-width: calc(var(--prop-s4) * 5); }
+.prop-scrub { flex: 1; min-width: 120px; }
+.prop-scrub input { width: 100%; margin: 0; padding: var(--prop-s1) 0; accent-color: var(--accent); }
+.prop-playback > label:last-of-type { max-width: 132px; }
+.prop-split { display: grid; grid-template-columns: minmax(0, 28fr) minmax(0, 72fr); gap: var(--prop-s4); margin-top: var(--prop-s4); align-items: start; }
+.prop-network, .prop-layer { min-width: 0; }
+.prop-layer .prop-controls { margin-bottom: var(--prop-s3); }
+.prop-dag { display: block; width: 100%; overflow: visible; }
+.prop-dag text { font-size: var(--prop-small); fill: var(--text); }
+.prop-block-label, .prop-dag .prop-node-meta { fill: var(--muted); }
+.prop-edge { fill: none; stroke: var(--edge); stroke-width: 1.5; }
+.prop-node { cursor: pointer; }
+.prop-node > rect { fill: var(--panel2); stroke: var(--line); }
+.prop-node > rect.mostly-unstable { fill: color-mix(in srgb, var(--warn) 15%, var(--panel)); }
+.prop-node > rect.mostly-stable { fill: color-mix(in srgb, var(--good) 12%, var(--panel)); }
+.prop-node.selected > rect:first-child { fill: var(--box-fill); }
+.prop-node.evaluating text:first-of-type { font-weight: 700; }
+.prop-node:hover > rect:first-child { stroke: var(--line-hover); }
+.prop-node:focus { outline: none; }
+.prop-node:focus-visible > rect:first-child { stroke: var(--accent); stroke-width: 2px; }
+.prop-node rect.prop-share { stroke: none; }
+.prop-node .prop-share.active, .prop-swatch.active { fill: var(--good); background: var(--good); }
+.prop-node .prop-share.inactive, .prop-swatch.inactive { fill: var(--violet); background: var(--violet); }
+.prop-node .prop-share.unstable, .prop-swatch.unstable { fill: var(--warn); background: var(--warn); }
+.prop-swatch.unknown { background: var(--muted); }
+.prop-legend { display: flex; flex-wrap: wrap; gap: var(--prop-s2); font-size: var(--prop-small); margin: var(--prop-s3) 0; }
+.prop-swatch { display: inline-block; width: var(--prop-s2); height: var(--prop-s2); margin-right: var(--prop-s1); }
+.prop-trend { margin: var(--prop-s4) 0; }
+.prop-trend figcaption, .neuron-channel figcaption { font-size: var(--prop-small); color: var(--muted); margin-bottom: var(--prop-s2); }
+.prop-trend svg { width: 100%; max-height: 110px; }
+.prop-trend text, .relaxation-plot text { font-size: 11px; fill: var(--muted); }
+.prop-axis { stroke: var(--edge); stroke-width: 1; }
+.prop-trend-line { fill: none; stroke: var(--warn); stroke-width: 2; }
+.prop-trend-dot { fill: var(--warn); }
+.neuron-channels { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 108px), 1fr)); gap: var(--prop-s3); }
+.neuron-channel { margin: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--prop-s1); }
+.neuron-channel canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; cursor: crosshair; background: var(--well); border-radius: var(--prop-radius); }
+.neuron-dense canvas { max-width: 480px; }
+.neuron-channel small { font-size: var(--prop-small); color: var(--muted); }
+.propagation .pix figcaption { font-size: var(--prop-small); }
+.prop-breadcrumb, .prop-mobile-detail { display: none; }
+.prop-bound { display: grid; grid-template-columns: auto 1fr; gap: var(--prop-s2); margin: var(--prop-s3) 0; }
+.prop-bound b { text-align: right; font-weight: normal; overflow-wrap: anywhere; }
+.prop-bound svg { width: 100%; grid-column: 1 / -1; height: 18px; }
+.prop-bound-line { stroke: var(--accent); stroke-width: 5; }
+.relaxation-plot { width: 100%; background: var(--well); border-radius: var(--prop-radius); }
+.relax-box { fill: var(--box-fill); stroke: var(--accent); }
+.relu-line { fill: none; stroke: var(--text); stroke-width: 2; }
+.envelope { fill: none; stroke-width: 2; stroke-dasharray: 5 3; }
+.envelope.lower { stroke: var(--violet); } .envelope.upper { stroke: var(--accent); }
+.split-point { fill: var(--warn); }
+.prop-values { display: grid; grid-template-columns: auto 1fr; gap: var(--prop-s2); }
+.prop-values dd { margin: 0; text-align: right; }
+.prop-provenance { margin-top: var(--prop-s6); }
+.prop-provenance summary { cursor: pointer; min-height: 32px; color: var(--muted); }
+@media (min-width: 1101px) {
+  .shell.propagation-open { grid-template-columns: 240px minmax(0, 1fr) 330px; }
+  .propagation-open .insptop { flex-basis: 70%; }
+  .propagation-open .insphistory { flex-basis: 30%; }
+}
+@media (max-width: 899px) {
+  .prop-split { display: block; }
+  .prop-breadcrumb { display: flex; margin-top: var(--prop-s4); align-items: center; }
+  .propagation:not(.level-network) .prop-network, .propagation:not(.level-layer) .prop-layer { display: none; }
+  .propagation.level-neuron .prop-mobile-detail { display: block; }
+  .prop-dag { max-width: 300px; margin-inline: auto; }
+  .propagation button, .propagation select, .propagation input[type="number"], .neuron-detail select { min-height: 44px; }
+  .propagation .prop-playback { align-items: end; }
+  .propagation .prop-playback > label:last-of-type { max-width: 100%; }
+  .propagation .note, .neuron-detail .note { font-size: var(--prop-small); }
+}

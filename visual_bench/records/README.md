@@ -66,6 +66,8 @@ Observable behavior: the Records tab shows verification's selected run metadata,
 | File | Responsibility |
 | --- | --- |
 | [store.py](store.py) | `RecordStore`: per-run directories, atomic writes, ordered `events.jsonl`, sealed artifact hashes, mutable annotations, event waiting, and zip export. |
+| [propagation.py](propagation.py) | `PropagationWriter`: full propagation index, deduplicated float32 blobs, atomic live publication, and progress coalescing at 10 notifications/s plus the final flush. |
+| [../analysis/test_propagation.py](../analysis/test_propagation.py) | Synthetic storage/index/API tests: deduplication, throttling without history loss, seal/blob corruption, export and explicit size limits. |
 | [routes.py](routes.py) | `GET /api/runs/{run_id}/export`, owned by records. Returns a zip only for a sealed run. |
 | [api.ts](api.ts) | Export URL helper. Run metadata query is imported from verification's client path. |
 | [hooks.ts](hooks.ts) | Run record query shared with verification and the export action. |
@@ -80,6 +82,8 @@ manifest.json                 immutable request and provenance
 events.jsonl                  ordered lifecycle events
 result.json                   final ACT result
 layers.json                   recorded interval layer states
+propagation.json              full observation index, live atomic snapshots then sealed on completion
+blobs/<sha256>.f32             propagation tensor envelopes, deduplicated within this run and sealed
 fuzzing.json                  fuzzing result when applicable
 artifacts.json                sha256 seal for available artifacts
 saved_counterexamples.json    mutable user annotation, included in export
@@ -90,6 +94,17 @@ worker_stderr.log             scrubbed tail of the worker's stderr
 
 Diagnostics files are written once when a run ends, for failed runs too, so they are not sealed; `write_diagnostic` accepts only these names. The export zip includes them; the reproduction snapshot is verification's `GET /api/runs/{id}/snapshot`, not this module's export.
 
+Propagation is scientific evidence and joins the artifact seal. A blob contains canonical compact JSON
+`{"dtype":"float32","shape":[...]}`, a newline, and full little-endian float32 bytes; SHA256 covers the
+metadata and bytes together. Identical bytes with different shapes are different tensors. The filename
+is that digest; live reads verify it, and completed reads additionally require its `artifacts.json`
+entry. The worker writes blobs before atomically publishing the index, then notifies the supervisor.
+Progress can be coalesced; `propagation.json` retains every record. A failed/interrupted run may retain
+an explicitly partial, unsealed index (`complete: false`); this is accessible for inspection but never
+exported as a sealed completed result. The final index and all tensor blobs are included in export and
+reproduction snapshots. The legacy layer detail limit does not limit recording.
+
+Focused storage and API check: `.venv/bin/python -m pytest visual_bench/analysis/test_propagation.py`.
 
 </details>
 

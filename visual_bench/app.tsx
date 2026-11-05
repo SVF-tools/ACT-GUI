@@ -26,8 +26,11 @@ import { Tour } from "./workspace/tour";
 import { PresenceBar } from "./workspace/Presence";
 import { markTourDone, tourPending } from "./workspace/tourSteps";
 import { Empty } from "./shared/ui/Empty";
+import { usePropagation } from "./analysis/hooks";
+import { PropagationProvider } from "./analysis/PropagationContext";
+import { PropagationInspector } from "./analysis/PropagationView";
 
-const TABS = ["Engine", "Records", "Assistant"] as const;
+const TABS = ["Neuron", "Engine", "Records", "Assistant"] as const;
 type Tab = (typeof TABS)[number];
 export function App() {
   const [sel, dispatch] = useReducer(selectionReducer, initialSelection);
@@ -38,6 +41,8 @@ export function App() {
   const model = useModel(sel.modelId);
   const fuzz = useFuzzConfiguration();
   const activeMode = modeForId(mode);
+  const propagation = usePropagation(mode === "Verification" ? sel.runId : null);
+  const inspecting = mode === "Verification" && (propagation.data?.availability === "available" || propagation.data?.availability === "pending");
   const lacks = useCapabilities();
   // After an ACT switch, leave a mode the new checkout cannot run.
   const fallbackMode = lacks(activeMode.capability) ? modes.find((m) => !lacks(m.capability))?.id : undefined;
@@ -46,7 +51,8 @@ export function App() {
   const current = models.status === "success" ? models.data.find((m) => m.model_id === sel.modelId) ?? null : null;
 
   return (
-    <div className="shell">
+    <PropagationProvider key={`${sel.modelId}-${sel.runId}`}>
+    <div className={`shell${inspecting ? " propagation-open" : ""}`}>
       <header className="topbar">
         <div className="brand">
           <span className="logo">ACT</span>
@@ -79,11 +85,11 @@ export function App() {
           : <div className="error">Model load failed: {model.error.message}</div>)}
         {model.status === "success" && (
           <>
-            <section className="panel" data-tour="network">
+            {!inspecting && <section className="panel" data-tour="network">
                 <h2>Network <small>{model.data.layers.length} layers · ACT {model.data.act_commit?.slice(0, 8)}</small></h2>
                 <ModelGraph model={model.data} selectedLayer={sel.layerId}
                   onSelectLayer={(layerId) => dispatch({ type: "selectLayer", layerId })} />
-            </section>
+            </section>}
             <div data-tour="runs">
             <RunsPanel
               modelId={model.data.model_id}
@@ -109,7 +115,7 @@ export function App() {
                 {lacks(activeMode.capability) && <div className="banner warn"><b>Disabled on this ACT checkout.</b> {lacks(activeMode.capability)}</div>}
                 <activeMode.View sel={sel} model={model.data}
                   onSelectLayer={(layerId) => dispatch({ type: "selectLayer", layerId })}
-                  onSelectNeuron={(neuron) => dispatch({ type: "selectNeuron", neuron })} />
+                  onSelectNeuron={(neuron) => { dispatch({ type: "selectNeuron", neuron }); if (neuron !== null) setTab("Neuron"); }} />
               </div>
             </section>
             <div data-tour="spec">
@@ -126,6 +132,7 @@ export function App() {
           ))}
         </nav>
         <div className="tabbody">
+          {tab === "Neuron" && <PropagationInspector sel={sel} model={model.data ?? null} />}
           {tab === "Assistant" && (
             <AssistantView sel={sel}
               onNavigate={(layerId, neuron) => {
@@ -153,6 +160,7 @@ export function App() {
         <PresenceBar />
       </section>
     </div>
+    </PropagationProvider>
   );
 }
 

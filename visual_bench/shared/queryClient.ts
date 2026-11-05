@@ -18,6 +18,10 @@ export const keys = {
   runs: () => ["runs", "list"] as const,
   run,
   layers: (id: string | null) => [...run(id), "layers"] as const,
+  propagation: (id: string | null) => [...run(id), "propagation"] as const,
+  propagationLayer: (id: string | null, layer: number | null, scope: string, pass: string, stage: string, version: number,
+    fields: string | null = null, neuron: number | null = null) =>
+    [...run(id), "propagation-layer", layer, scope, pass, stage, version, fields, neuron] as const,
   coverage: (id: string | null) => [...run(id), "coverage"] as const,
   fuzzing: (id: string | null) => [...run(id), "fuzzing"] as const,
   fuzzDefaults: () => ["fuzz", "defaults"] as const,

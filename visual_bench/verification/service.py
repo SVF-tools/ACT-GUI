@@ -172,9 +172,12 @@ class RunService:
                 worker_req = {"model_path": str(model_path), "method": req.method,
                               "time_budget_s": req.time_budget_s, "domain": req.domain,
                               "record_layers": self.engine.capability_available("inspect.layer_bounds.interval"),
+                              "record_propagation": self.engine.capability_available("observe.propagation"),
+                              "record_directory": str(self.records.run_dir(run_id).resolve()),
                               "fuzz": req.fuzz.model_dump() if req.fuzz else None}
                 req_file.write_text(json.dumps(worker_req))
-                captured["request"] = {**worker_req, "model_path": f"model/{req.model_id}.json"}
+                captured["request"] = {**worker_req, "model_path": f"model/{req.model_id}.json",
+                                       "record_directory": "reproduced_records"}
                 captured["tmp"] = tmp
                 read_fd, write_fd = os.pipe()
                 with open(err_file, "w") as stderr, open(std_file, "w") as stdout:
@@ -202,7 +205,9 @@ class RunService:
                     try:
                         with os.fdopen(read_fd) as progress:
                             for line in progress:  # ends at EOF: worker exited or was killed
-                                event = self.live.observe(run_id, json.loads(line))
+                                msg = json.loads(line)
+                                event = (("verify.propagation", msg["propagation"]) if "propagation" in msg
+                                         else self.live.observe(run_id, msg))
                                 if event is not None:
                                     self.records.append_event(run_id, event[0], "running", event[1])
                         proc.wait()
@@ -278,6 +283,8 @@ class RunService:
             self.records.write_artifact(run_id, "layers.json", out["layer_states"])
         if "fuzzing" in out:
             self.records.write_artifact(run_id, "fuzzing.json", out["fuzzing"])
+        if "propagation" in out:
+            self.records.write_artifact(run_id, "propagation.json", out["propagation"])
         hashes = self.records.seal(run_id)
         if result["bab_summary"] is not None:
             self.records.append_event(run_id, "bab.summary", "running", result["bab_summary"])

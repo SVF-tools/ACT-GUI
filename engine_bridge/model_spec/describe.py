@@ -48,6 +48,10 @@ def _param(name: str, value: Any) -> ParamInfo:
 
 
 def _output_shape(layer: Any) -> tuple[int, ...] | None:
+    # Current ACT stores layout in the schema parameters; older checkouts expose a method.
+    shp = layer.params.get("output_shape")
+    if shp is not None:
+        return tuple(int(s) for s in shp)
     try:
         shp = layer.get_output_shape()
     except Exception:

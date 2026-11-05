@@ -158,7 +158,7 @@ class ModelDescription:
 class LayerState:
     layer_id: int
     kind: str
-    stage: Literal["after"]
+    stage: Literal["after", "pre"]
     lb: tuple[float, ...]
     ub: tuple[float, ...]
     shape: tuple[int, ...]
@@ -167,7 +167,7 @@ class LayerState:
 
 @dataclass(frozen=True)
 class LayerStates:
-    method: Literal["interval"]
+    method: Domain
     availability: Availability
     layers: tuple[LayerState, ...]
     provenance: dict[str, str] = field(default_factory=dict)
