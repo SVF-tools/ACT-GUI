@@ -6,6 +6,8 @@
 
 ACT-GUI is the visualization and interaction workbench for [ACT](https://github.com/SVF-tools/ACT). ACT computes verification results; this repository loads inputs, runs experiments, displays evidence, and saves records.
 
+**Online (v0.1):** ACT-GUI now supports online use at [https://act-online.au](https://act-online.au).
+
 **Available:** real model loading, verification, BaB final summaries, live fuzzing, recorded interval-layer views, and record export. **Not available:** node-level BaB history/controls, geometry beyond interval boxes, and a real AI provider. The assistant currently uses a deterministic fake provider.
 
 ## Choose a Development Task
