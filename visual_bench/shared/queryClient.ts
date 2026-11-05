@@ -24,4 +24,5 @@ export const keys = {
   engine: () => ["engine"] as const,
   gurobi: () => ["engine", "gurobi"] as const,
   providers: () => ["assistant", "providers"] as const,
+  presence: () => ["presence"] as const,
 };

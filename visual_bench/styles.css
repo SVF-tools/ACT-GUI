@@ -214,6 +214,14 @@ a.button.secondary { background: var(--panel2); color: inherit; border: 1px soli
 .bar.shift { background: var(--bad); opacity: .3; } .outrow .tags { display: flex; gap: 3px; }
 .insptop { flex: 1 1 50%; min-height: 0; display: flex; flex-direction: column; }
 .insphistory { flex: 1 1 50%; min-height: 0; overflow: auto; border-top: 1px solid var(--line); padding: 12px; }
+/* Online-visitor bar under Run history (workspace/Presence.tsx) */
+.presence { flex: none; display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--line); padding: 8px 12px; font-size: 12px; color: var(--muted); }
+.presence b { color: var(--text); font-variant-numeric: tabular-nums; animation: presencepop .4s ease-out; }
+.presencedot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 0 var(--good); animation: presencepulse 2s ease-out infinite; }
+.presencedot.off { background: var(--muted); animation: none; }
+@keyframes presencepulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 60%, transparent); } 100% { box-shadow: 0 0 0 6px transparent; } }
+@keyframes presencepop { 0% { opacity: .3; } 100% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .presencedot, .presence b { animation: none; } }
 
 @media (max-width: 1100px) {
   .shell { grid-template-columns: 260px minmax(0, 1fr); grid-template-areas: "top top" "side center" "insp insp"; grid-template-rows: auto minmax(0, 1fr) auto; height: auto; min-height: 100vh; }

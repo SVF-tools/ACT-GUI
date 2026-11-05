@@ -187,6 +187,15 @@ export type Nodes = (number | null)
 export type Status2 = string
 export type Sha2561 = string
 export type Source2 = ("catalog" | "vnnlib" | "torch")
+export type ClientId = string
+/**
+ * Browsers with a heartbeat inside the window
+ */
+export type Online = number
+/**
+ * Seconds a heartbeat keeps a browser counted
+ */
+export type WindowS = number
 export type Availability3 = ("available" | "not_configured")
 export type Kind9 = ("fake" | "real")
 export type Name3 = string
@@ -283,6 +292,8 @@ ModelSummary?: ModelSummary
 NativeResult?: NativeResult
 OutputSpecOut?: OutputSpecOut
 ParamOut?: ParamOut
+PresenceHeartbeat?: PresenceHeartbeat
+PresenceOut?: PresenceOut
 ProviderList?: ProviderList
 ProviderOut?: ProviderOut
 RunEvent?: RunEvent
@@ -736,6 +747,23 @@ status: Status2
 }
 export interface Params1 {
 [k: string]: string | number | boolean | null
+}
+/**
+ * One browser's heartbeat; client_id is a random id kept in that browser's localStorage.
+ * 
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "PresenceHeartbeat".
+ */
+export interface PresenceHeartbeat {
+client_id: ClientId
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "PresenceOut".
+ */
+export interface PresenceOut {
+online: Online
+window_s: WindowS
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema

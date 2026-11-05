@@ -20,6 +20,7 @@ import { modes, defaultMode, modeForId, modeForMethod, type ModeId } from "./wor
 import { ContextBar } from "./workspace/layout";
 import { ThemeToggle } from "./workspace/theme";
 import { Tour } from "./workspace/tour";
+import { PresenceBar } from "./workspace/Presence";
 import { markTourDone, tourPending } from "./workspace/tourSteps";
 import { Empty } from "./shared/ui/Empty";
 
@@ -135,6 +136,7 @@ export function App() {
             />
           </div>
         )}
+        <PresenceBar />
       </section>
     </div>
   );

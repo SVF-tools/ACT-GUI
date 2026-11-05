@@ -10,7 +10,7 @@ Choose the owner of the behavior, then follow the linked module guide for files 
 
 | Goal / module | Current responsibility and entry guide | Neighbor handoff |
 | --- | --- | --- |
-| **workspace** | [Selection, modes, layout, theme, tour](workspace/README.md#change-guide) | Passes selection to views; no HTTP service of its own. |
+| **workspace** | [Selection, modes, layout, theme, tour](workspace/README.md#change-guide) | Passes selection to views; its only HTTP route is the online-visitor heartbeat. |
 | **model_spec** | [Load models and inspect graph/spec/input images](model_spec/README.md#change-guide) | Provides model ID, verified path, supported methods to verification; source adaptation goes through bridge model_spec. |
 | **verification** | [Start/stop runs, supervise workers, expose lifecycle/SSE](verification/README.md#change-guide) | Accepts RunRequest; returns run_id/RunOut; persists results through records. |
 | **fuzzing** | [Options, live images, saved counterexamples and export](fuzzing/README.md#change-guide) | Uses verification lifecycle; provides runner.py and FuzzLive; serves FuzzingOut. |
@@ -114,7 +114,7 @@ These are commands to run, not a claim that a new test run occurred. ACT-backed 
 
 ### Module Slice and Boundaries
 
-A data-serving module normally has schemas.py, service.py, routes.py, api.ts, hooks.ts, views, and nearby tests. Exceptions reflect actual responsibilities: workspace is browser-only; assistant uses explain.py; records uses store.py. The module's file inventory is authoritative.
+A data-serving module normally has schemas.py, service.py, routes.py, api.ts, hooks.ts, views, and nearby tests. Exceptions reflect actual responsibilities: workspace is mostly browser-side, with a server slice only for presence; assistant uses explain.py; records uses store.py. The module's file inventory is authoritative.
 
 Views obtain server data through hooks, not direct fetch calls. Services receive collaborators through constructors, not another module's routes. Composition roots may assemble views from several modules. AI explanations never override ACT verdicts. Workers belong to verification; ACT integration belongs to engine_bridge.
 

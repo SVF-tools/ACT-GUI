@@ -7,6 +7,7 @@ Development: scripts/dev.sh runs this on 127.0.0.1:18765 behind the Vite dev ser
 """
 from __future__ import annotations
 
+import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -25,8 +26,11 @@ from visual_bench.records import routes as records_routes
 from visual_bench.verification import routes as verification_routes
 from visual_bench.wire import ErrorBody, ErrorResponse, HealthOut
 from visual_bench.workbench import Workbench
+from visual_bench.workspace import routes as workspace_routes
+from visual_bench.workspace.service import PresenceService
 
 VERSION = "0.1.0"
+INSTANCE = uuid.uuid4().hex[:12]
 
 
 def create_app(records_root: Path | None = None, secrets_root: Path | None = None) -> FastAPI:
@@ -47,7 +51,7 @@ def create_app(records_root: Path | None = None, secrets_root: Path | None = Non
 
     @app.get("/api/health", response_model=HealthOut)
     def health() -> HealthOut:
-        return HealthOut(status="ok", service="act-gui-workbench", version=VERSION)
+        return HealthOut(status="ok", service="act-gui-workbench", version=VERSION, instance=INSTANCE)
 
     app.include_router(engine_routes.router(wb.engine))
     app.include_router(model_spec_routes.router(wb.models))
@@ -57,6 +61,7 @@ def create_app(records_root: Path | None = None, secrets_root: Path | None = Non
     app.include_router(bab_routes.router(wb.bab))
     app.include_router(records_routes.router(wb.records))
     app.include_router(assistant_routes.router(wb))
+    app.include_router(workspace_routes.router(PresenceService()))
 
     if config.WEB_DIST.is_dir():  # production build served from the same origin (npm run build)
         from fastapi.staticfiles import StaticFiles

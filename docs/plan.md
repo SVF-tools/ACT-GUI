@@ -29,7 +29,7 @@ BASE-02 does not wait for ACT; only BASE-03 needs the pinned engine. Development
 
 | Module | Owner | Task IDs | Detailed plan |
 | --- | --- | --- | --- |
-| visual_bench/workspace | C | WS-01, WS-02, WS-03 | [README](../visual_bench/workspace/README.md) |
+| visual_bench/workspace | C | WS-01, WS-02, WS-03, WS-04 | [README](../visual_bench/workspace/README.md) |
 | visual_bench/model_spec | C | MSV-01, MSV-02, MSV-03, MSV-04 | [README](../visual_bench/model_spec/README.md) |
 | visual_bench/verification | B | VER-01, VER-02, VER-03, VER-04, VER-07 (stop, verdict banner) | [README](../visual_bench/verification/README.md) |
 | visual_bench/fuzzing | B (service), C (views) | VER-06, VER-07 (saved counterexamples) | [README](../visual_bench/fuzzing/README.md) |
@@ -113,6 +113,7 @@ Recorded 2026-11-03 against ACT `deff2fb0c031` (branch CLIMB, tracked tree clean
 | REC-01 | First version | Manifest, hashed artifacts, sealed records, hash-checked reads, zip export without absolute paths. |
 | REC-02/03 | Partial | Atomic writes, torn-tail recovery, interrupted-run marking, event replay. No commit batches (needs EVT-02). REC-04 export only, no import. |
 | WS-01/02 | First version | Selection reducer + latest-request guard (vitest). WS-03 not started. |
+| WS-04 | Implemented | Online-visitor bar: `POST /api/presence` heartbeat, in-memory 90 s window (pytest `visual_bench/workspace`). |
 | MSV-01 | First version | Model list, SVG DAG, spec and layer detail on real data; image-shaped specs render as images with sampled perturbations. MSV-02 renderer evaluation and MSV-03 drafts not started. |
 | ANA-01 | First version | Stepper over recorded layer states, before/after bars, value selection. ANA-02: interval-box 2-D projection only. ANA-03 not started. |
 | BAB-01..03 | Not started | Blocked on committed node events (ACT-03); the BaB tab shows coverage and the summary only. |
