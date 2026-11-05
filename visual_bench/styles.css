@@ -96,8 +96,8 @@ a.button.secondary { background: var(--panel2); color: inherit; border: 1px soli
 .danger { background: transparent; color: var(--bad); border: 1px solid var(--bad); border-radius: 6px; padding: 3px 10px; font-weight: 600; }
 .danger:hover:not(:disabled) { background: var(--error-bg); }
 .runitem.live { display: flex; gap: 6px; align-items: stretch; } .runitem.live .item { flex: 1; min-width: 0; }
-.runitem.tools { display: flex; gap: 6px; align-items: flex-start; } .runitem.tools .item { flex: 1; min-width: 0; }
-.runitem .snapshot { flex: none; margin-top: 4px; text-decoration: none; }
+.runitem.tools { position: relative; } .runitem.tools .item .title { padding-right: 76px; }
+.runitem .snapshot { position: absolute; top: 6px; right: 8px; text-decoration: none; }
 .bannerrow { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
 .verdict { font-size: 13px; display: flex; flex-direction: column; gap: 6px; margin-top: 0; }
 .verdict.bannerrow { flex-direction: row; }
@@ -107,7 +107,7 @@ a.button.secondary { background: var(--panel2); color: inherit; border: 1px soli
 .ceactions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; } .cecard.saved { border-color: var(--good); }
 
 /* margin:auto centers a narrow graph yet keeps a wide one scrollable from its first layer. */
-.graphwrap { overflow: auto; } .graphwrap .graph { display: block; margin: 0 auto; }
+.graphwrap { overflow: auto; max-height: min(40vh, 420px); overscroll-behavior: contain; } .graphwrap .graph { display: block; margin: 0 auto; }
 .modes { padding: 0; } .modes .tabs { padding: 0 6px; } .modebody { padding: 12px; }
 .graph .edge { fill: none; stroke: var(--edge); stroke-width: 1.5; } .arrowhead { fill: var(--edge); }
 .node { cursor: pointer; } .node rect { fill: var(--panel2); stroke: var(--line); stroke-width: 1.5; }

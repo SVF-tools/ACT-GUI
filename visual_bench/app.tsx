@@ -45,6 +45,9 @@ export function App() {
   const verify = useVerifyConfiguration();
   const [domain, setDomain] = useState<Domain>("interval");
   const activeMode = modeForId(mode);
+  // Neuron inspection belongs to a selected verification or BaB run: hidden for fuzzing and before any run.
+  const tabs = TABS.filter((t) => t !== "Neuron" || (mode !== "Fuzzing" && sel.runId !== null));
+  const shownTab: Tab = tabs.includes(tab) ? tab : "Engine";
   const propagation = usePropagation(mode === "Verification" ? sel.runId : null);
   const inspecting = mode === "Verification" && (propagation.data?.availability === "available" || propagation.data?.availability === "pending");
   const lacks = useCapabilities();
@@ -132,13 +135,13 @@ export function App() {
       <section className="inspector">
         <div className="insptop" data-tour="inspector">
         <nav className="tabs" role="tablist">
-          {TABS.map((t) => (
-            <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? "tab active" : "tab"} onClick={() => setTab(t)}>{t}</button>
+          {tabs.map((t) => (
+            <button key={t} role="tab" aria-selected={shownTab === t} className={shownTab === t ? "tab active" : "tab"} onClick={() => setTab(t)}>{t}</button>
           ))}
         </nav>
         <div className="tabbody">
-          {tab === "Neuron" && <PropagationInspector sel={sel} model={model.data ?? null} />}
-          {tab === "Assistant" && (
+          {shownTab === "Neuron" && <PropagationInspector sel={sel} model={model.data ?? null} />}
+          {shownTab === "Assistant" && (
             <AssistantView sel={sel}
               onNavigate={(layerId, neuron) => {
                 dispatch({ type: "selectLayer", layerId });
@@ -146,8 +149,8 @@ export function App() {
                 setMode("Verification");
               }} />
           )}
-          {tab === "Records" && <RecordsView runId={sel.runId} />}
-          {tab === "Engine" && (
+          {shownTab === "Records" && <RecordsView runId={sel.runId} />}
+          {shownTab === "Engine" && (
             <EngineView />
           )}
         </div>

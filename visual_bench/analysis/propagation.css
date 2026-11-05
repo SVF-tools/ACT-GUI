@@ -28,6 +28,10 @@
 .prop-playback > label:last-of-type { max-width: 132px; }
 .prop-split { display: grid; grid-template-columns: minmax(0, 28fr) minmax(0, 72fr); gap: var(--prop-s4); margin-top: var(--prop-s4); align-items: start; }
 .prop-network, .prop-layer { min-width: 0; }
+/* Each column scrolls on its own so the selected layer's neurons stay beside the layer list. */
+@media (min-width: 900px) {
+  .prop-network, .prop-layer { max-height: 75vh; overflow: auto; overscroll-behavior: contain; padding-right: var(--prop-s1); }
+}
 .prop-layer .prop-controls { margin-bottom: var(--prop-s3); }
 .prop-dag { display: block; width: 100%; overflow: visible; }
 .prop-dag text { font-size: var(--prop-small); fill: var(--text); }

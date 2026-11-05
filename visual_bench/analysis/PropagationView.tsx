@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ModelDescriptionOut, PropagationIndexOut, PropagationRecordOut } from "../generated/wire";
 import { Empty } from "../shared/ui/Empty";
 import { Pixels, shapeFromTensor } from "../shared/ui/pixels";
@@ -52,6 +52,8 @@ export function PropagationView({ sel, model, index, onSelectLayer, onSelectNeur
   const { selected, detail, neuron, before, layer, lanes, lane, count, geometry, statuses } = evidence;
   const [playing, setPlaying] = useState(false);
   const [timing, setTiming] = useState("normalized");
+  const layerPane = useRef<HTMLDivElement>(null);
+  useEffect(() => { layerPane.current?.scrollTo({ top: 0 }); }, [sel.layerId]);
   const records = useMemo(() => [...new Map([...index.records, ...index.phases].map((r) => [r.record_id, r])).values()]
     .sort((a, b) => a.record_id - b.record_id), [index.records, index.phases]);
   const position = state.cursor === null ? records.length - 1 : records.findIndex((r) => r.record_id === state.cursor);
@@ -101,7 +103,7 @@ export function PropagationView({ sel, model, index, onSelectLayer, onSelectNeur
       <div className="prop-network">
         {model && <BlockNetwork model={model} selected={selected} layerId={sel.layerId} active={active} onSelect={chooseLayer} pass={state.pass} />}
       </div>
-      <div className="prop-layer">
+      <div className="prop-layer" ref={layerPane}>
         {!layer ? <Empty title="Select a layer" text="Choose a network layer to see its neurons." /> : <>
           <h3>Layer {layer.layer_id} <small>{layer.kind}</small></h3>
           <div className="prop-controls">
@@ -157,11 +159,13 @@ function BlockNetwork({ model, selected, layerId, active, onSelect, pass }: {
   model: ModelDescriptionOut; selected: PropagationRecordOut[]; layerId: number | null; active?: number;
   onSelect: (id: number) => void; pass: Pass;
 }) {
+  const svg = useRef<SVGSVGElement>(null);
+  useEffect(() => { svg.current?.querySelector(".prop-node.selected")?.scrollIntoView({ block: "nearest" }); }, [layerId]);
   const blocks = groupLayers(model.layers);
   const positions = new Map<number, number>();
   let y = 8;
   const groups = blocks.map((block) => { const top = y; y += 22; for (const l of block.layers) { positions.set(l.layer_id, y); y += 56; } y += 12; return { ...block, top }; });
-  return <svg className="prop-dag" viewBox={`0 0 216 ${y}`} role="group" aria-label="Block network">
+  return <svg ref={svg} className="prop-dag" viewBox={`0 0 216 ${y}`} role="group" aria-label="Block network">
     {model.layers.flatMap((l) => l.preds.filter((p) => positions.has(p)).map((p) =>
       <path key={`${p}-${l.layer_id}`} className="prop-edge" d={`M28 ${positions.get(p)! + 38} C8 ${positions.get(p)! + 50},8 ${positions.get(l.layer_id)!},28 ${positions.get(l.layer_id)! + 12}`} />))}
     {groups.map((block) => <g key={block.layers[0]!.layer_id}>
