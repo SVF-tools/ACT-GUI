@@ -1,6 +1,6 @@
 # Workspace
 
-Current responsibility: own the browser's shared model, run, layer, and neuron selection, mode registry, layout context, theme, and onboarding tour. The first slice is implemented in `selection.ts`, `modes.ts`, `layout.tsx`, `theme.tsx`, and the tour files. WS-03, pinning and layout restoration, is not started. It also owns the online-visitor bar under Run history (WS-04), its only server slice: `schemas.py` → `service.py` → `routes.py` and `api.ts` → `hooks.ts` → `Presence.tsx`. It does not own run data, solver state, or ACT commands. See the [parent scope](../README.md), the [repository rules](../../AGENTS.md), and the [development task guide](../../README.md#choose-a-development-task).
+Current responsibility: own the browser's shared model, run, layer, and neuron selection, mode registry, layout context, theme, and onboarding tour. The first slice is implemented in `selection.ts`, `modes.ts`, `layout.tsx`, `theme.tsx`, and the tour files. WS-03, pinning and layout restoration, is not started. It also owns the online-visitor bar under Run history (WS-04), its only server slice: `schemas.py` → `service.py` → `routes.py` and `api.ts` → `hooks.ts` → `Presence.tsx` (hover shows a per-country world map, `WorldMap.tsx`). It does not own run data, solver state, or ACT commands. See the [parent scope](../README.md), the [repository rules](../../AGENTS.md), and the [development task guide](../../README.md#choose-a-development-task).
 
 ## Change Guide
 
@@ -10,7 +10,7 @@ Current responsibility: own the browser's shared model, run, layer, and neuron s
 | Add or remap a center mode | [modes.ts](modes.ts), its owning view, [modes.test.ts](modes.test.ts) | Existing app composition uses the registry. A new engine method also needs verification/bridge support; a display-only mode does not. |
 | Change tour wording or order | [tourSteps.ts](tourSteps.ts) | Copy-only changes need no prose-pinning tests. Change [tour.tsx](tour.tsx) for interaction; [app.tsx](../app.tsx) only for region targets or composition. |
 | Change tour placement | placeCard in [tourSteps.ts](tourSteps.ts) and its placement tests | Keep viewport-boundary cases in [tourSteps.test.ts](tourSteps.test.ts); render desktop/mobile. |
-| Change the online-visitor bar | [Presence.tsx](Presence.tsx), [hooks.ts](hooks.ts) (interval), [service.py](service.py) (window) | Wire changes go through [schemas.py](schemas.py) and `npm run gen:types`; keep [test_workspace.py](test_workspace.py) green. |
+| Change the online-visitor bar or its country map | [Presence.tsx](Presence.tsx), [WorldMap.tsx](WorldMap.tsx), [hooks.ts](hooks.ts) (interval), [service.py](service.py) (window, country grouping) | Wire changes go through [schemas.py](schemas.py) and `npm run gen:types`; keep [test_workspace.py](test_workspace.py) green. |
 | Change context bar or theme | [layout.tsx](layout.tsx), [theme.tsx](theme.tsx), relevant [styles.css](../styles.css) | Other feature modules only if their public selection/navigation contract changes. |
 
 Pinning and restoration are WS-03 future work, not an existing docking API.
@@ -34,8 +34,10 @@ The online-visitor bar is a heartbeat loop, independent of selection:
 flowchart TB
   Bar["Presence.tsx"] --> Hook["hooks.ts<br/>usePresence, every 20 s"]
   Hook -->|"POST /api/presence<br/>browser id"| Route["routes.py"]
+  CF["Cloudflare<br/>CF-IPCountry header"] --> Route
   Route --> Svc["service.py<br/>PresenceService"]
-  Svc -->|"browsers seen in last 90 s"| Bar
+  Svc -->|"count + per-country totals"| Bar
+  Bar -->|"hover"| Map["WorldMap.tsx<br/>lazy-loaded atlas"]
 ```
 
 The context bar and theme are independent presentation helpers in layout.tsx and theme.tsx. The tour has its own path:
@@ -56,7 +58,7 @@ flowchart TB
 | Modes | `modes`, `modeForMethod`, and `modeForId` in [modes.ts](modes.ts). Maps `fuzz`, `interval`, and `bab` to visible center views. |
 | Layout and theme | `ContextBar` in [layout.tsx](layout.tsx) and theme state in [theme.tsx](theme.tsx). Renders shared context; it does not fetch. |
 | Tour | `Tour` in [tour.tsx](tour.tsx) plus `TOUR_STEPS` in [tourSteps.ts](tourSteps.ts). Reads `data-tour` regions and ends on Finish, Skip, or Escape. |
-| Presence | `PresenceService.beat` in [service.py](service.py): in-memory map of browser id to last heartbeat, pruned to a 90 s window; no IPs, no persistence. One id per browser (localStorage), so tabs are deduplicated. Correct only while the service runs as one process. |
+| Presence | `PresenceService.beat` in [service.py](service.py): in-memory map of browser id to last heartbeat, pruned to a 90 s window, with the browser's country from Cloudflare's `CF-IPCountry` header (`XX`, Tor `T1`, or a direct local request count as unknown); no IPs, no persistence. The response carries only per-country totals. One id per browser (localStorage), so tabs are deduplicated. Correct only while the service runs as one process. |
 | Neighbor handoff | Module views receive selection and callbacks from `app.tsx`; their data path continues through the [parent flow diagram](../README.md#flow-diagram). |
 
 ## Validation
@@ -95,7 +97,9 @@ Route: `POST /api/presence` (body `PresenceHeartbeat`, response `PresenceOut`), 
 | [routes.py](routes.py) | `POST /api/presence`. |
 | [test_workspace.py](test_workspace.py) | Deduplication, expiry, and route validation. |
 | [api.ts](api.ts), [hooks.ts](hooks.ts) | Heartbeat call and the 20 s `usePresence` query. |
-| [Presence.tsx](Presence.tsx) | Online-visitor bar under Run history. |
+| [Presence.tsx](Presence.tsx) | Online-visitor bar under Run history; hover card with the country list. |
+| [WorldMap.tsx](WorldMap.tsx) | Per-country choropleth (d3-geo + world-atlas 110m), loaded on first hover. |
+| [countryCodes.ts](countryCodes.ts) | Generated ISO alpha-2 to atlas numeric id table. |
 
 Browser-wide HTTP, wire-number, query-key, and shared UI code lives in [`../shared/`](../README.md#shared-browser-layer). Views obtain server data through their module hooks.
 
@@ -114,7 +118,7 @@ All tasks remain tracked in [the development plan](../../docs/plan.md). Dependen
 | WS-01 | Define selection state and reducer | BASE-02 | Given different layer/node IDs, actions preserve their object kinds and snapshot scope. |
 | WS-02 | Link two panels through context | WS-01 | Select A then B; delaying A’s response cannot revert either active panel. |
 | WS-03 | Add pinning and layout restoration | WS-02 | A pinned panel survives active-context changes; invalid restored references have an explicit fallback. |
-| WS-04 | Show the online-visitor count under Run history | BASE-02 | Two browsers count as two, two tabs of one browser as one, and a silent browser drops out after 90 s (`test_workspace.py`). |
+| WS-04 | Show the online-visitor count under Run history | BASE-02 | Two browsers count as two, two tabs of one browser as one, and a silent browser drops out after 90 s; hovering shows the countries from `CF-IPCountry` (`test_workspace.py`, hover screenshot). |
 
 Current status: WS-01 and WS-02 are implemented as the selection reducer and application wiring. WS-04 is implemented. WS-03 is planned.
 

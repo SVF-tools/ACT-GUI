@@ -215,13 +215,23 @@ a.button.secondary { background: var(--panel2); color: inherit; border: 1px soli
 .insptop { flex: 1 1 50%; min-height: 0; display: flex; flex-direction: column; }
 .insphistory { flex: 1 1 50%; min-height: 0; overflow: auto; border-top: 1px solid var(--line); padding: 12px; }
 /* Online-visitor bar under Run history (workspace/Presence.tsx) */
-.presence { flex: none; display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--line); padding: 8px 12px; font-size: 12px; color: var(--muted); }
+.presence { position: relative; cursor: default; flex: none; display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--line); padding: 8px 12px; font-size: 12px; color: var(--muted); }
 .presence b { color: var(--text); font-variant-numeric: tabular-nums; animation: presencepop .4s ease-out; }
 .presencedot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 0 var(--good); animation: presencepulse 2s ease-out infinite; }
 .presencedot.off { background: var(--muted); animation: none; }
 @keyframes presencepulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 60%, transparent); } 100% { box-shadow: 0 0 0 6px transparent; } }
 @keyframes presencepop { 0% { opacity: .3; } 100% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .presencedot, .presence b { animation: none; } }
+.presence:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.presencepop { position: absolute; right: 8px; bottom: calc(100% + 6px); z-index: 50; width: 340px; max-width: calc(100vw - 24px); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, .35); color: var(--text); }
+.worldmap { display: block; width: 100%; aspect-ratio: 2 / 1; background: var(--bg); border-radius: 6px; }
+.worldmap path { fill: var(--panel2); stroke: var(--line); stroke-width: .4; }
+.worldmap path.on { stroke: var(--accent); }
+.worldmap.loading { display: grid; place-items: center; color: var(--muted); font-size: 12px; }
+.presencelist { list-style: none; margin: 8px 0 0; padding: 0; max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
+.presencelist li { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+.presencelist b { font-variant-numeric: tabular-nums; animation: none; }
+.presencepop .note { margin: 6px 0 0; font-size: 11px; }
 
 @media (max-width: 1100px) {
   .shell { grid-template-columns: 260px minmax(0, 1fr); grid-template-areas: "top top" "side center" "insp insp"; grid-template-rows: auto minmax(0, 1fr) auto; height: auto; min-height: 100vh; }

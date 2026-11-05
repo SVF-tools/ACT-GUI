@@ -10,6 +10,11 @@ export type Dataset = string
 export type Description = string
 export type Onnx = string
 export type SourceId = string
+export type Count = number
+/**
+ * ISO 3166-1 alpha-2 from Cloudflare CF-IPCountry; null when unknown or local
+ */
+export type Country = (string | null)
 export type FinalSummary = ("available" | "pending" | "not_recorded" | "unsupported")
 export type NodeEvents = ("available" | "pending" | "not_recorded" | "unsupported")
 export type Reason = string
@@ -189,6 +194,10 @@ export type Sha2561 = string
 export type Source2 = ("catalog" | "vnnlib" | "torch")
 export type ClientId = string
 /**
+ * Online browsers per country, largest first
+ */
+export type Countries = CountryCount[]
+/**
  * Browsers with a heartbeat inside the window
  */
 export type Online = number
@@ -262,6 +271,7 @@ export interface ActGuiWire {
 AnswerSection?: AnswerSection
 CapabilityOut?: CapabilityOut
 ClassifierSourceOut?: ClassifierSourceOut
+CountryCount?: CountryCount
 CoverageOut?: CoverageOut
 DiagnosticOut?: DiagnosticOut
 EngineInfoOut?: EngineInfoOut
@@ -338,6 +348,14 @@ dataset: Dataset
 description: Description
 onnx: Onnx
 source_id: SourceId
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "CountryCount".
+ */
+export interface CountryCount {
+count: Count
+country: Country
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -762,6 +780,7 @@ client_id: ClientId
  * via the `definition` "PresenceOut".
  */
 export interface PresenceOut {
+countries: Countries
 online: Online
 window_s: WindowS
 }
