@@ -4,6 +4,7 @@
   --on-accent: #081120; --line-hover: #3b4658; --edge: #4a5568; --well: #10151c; --zero: #5b667a; --axis: #3a4454;
   --error-bg: #3a1d1d; --error-text: #ffb4ae; --before: rgba(167, 139, 250, .35); --box-fill: rgba(106, 169, 255, .25);
   --k-lin: #1a2638; --k-act: #2a2140; --k-spec: #33281a; --k-io: #17302a; --k-misc: #222a33;
+  --rail: #12161d; --sunken: rgba(0, 0, 0, .18); --scroll: #3b4658; --scroll-idle: rgba(139, 149, 167, .18); --shadow: 0 1px 2px rgba(0, 0, 0, .25);
   color-scheme: dark;
   font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 14px; color: var(--text); background: var(--bg);
 }
@@ -13,6 +14,7 @@
   --on-accent: #ffffff; --line-hover: #aab4c3; --edge: #9aa5b4; --well: #e6eaf0; --zero: #8792a3; --axis: #c3cad5;
   --error-bg: #fdecea; --error-text: #9b211b; --before: rgba(124, 77, 219, .28); --box-fill: rgba(37, 99, 235, .18);
   --k-lin: #e3edfb; --k-act: #eee7fb; --k-spec: #fbf0de; --k-io: #e0f4ec; --k-misc: #eceff3;
+  --rail: #eceff4; --sunken: rgba(27, 34, 48, .04); --scroll: #aab4c3; --scroll-idle: rgba(93, 104, 121, .2); --shadow: 0 1px 3px rgba(27, 34, 48, .08);
   color-scheme: light;
 }
 * { box-sizing: border-box; }
@@ -39,16 +41,35 @@ h3 { font-size: 15px; margin: 12px 0 8px; }
 .badge.good { border-color: var(--good); color: var(--good); } .badge.warn { border-color: var(--warn); color: var(--warn); }
 .badge.bad { border-color: var(--bad); color: var(--bad); } .badge.muted { color: var(--muted); }
 
-.sidebar { grid-area: side; overflow: auto; border-right: 1px solid var(--line); padding: 12px; display: flex; flex-direction: column; gap: 12px; }
-.center { grid-area: center; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.sidebar { grid-area: side; overflow: auto; border-right: 1px solid var(--line); padding: 14px 12px; display: flex; flex-direction: column; gap: 14px; background: var(--rail); }
+.center { grid-area: center; overflow: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; }
 .inspector { grid-area: insp; border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; background: var(--panel); }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.panel { background: var(--panel); border: 1px solid color-mix(in srgb, var(--line) 75%, transparent); border-radius: 12px; padding: 14px; box-shadow: var(--shadow); }
+
+/* Scroll regions: one thin themed scrollbar style everywhere, faint until the region is hovered;
+   nested regions sit in a sunken well and fade at the edge that has more content. */
+.sidebar, .center, .tabbody, .insphistory, .scrolllist, .graphwrap, .tblwrap, .steps, .tabs, .batchchips .chips, .presencelist, .prop-network, .prop-layer {
+  scrollbar-width: thin; scrollbar-color: var(--scroll-idle) transparent;
+}
+:is(.sidebar, .center, .tabbody, .insphistory, .scrolllist, .graphwrap, .tblwrap, .steps, .tabs, .batchchips .chips, .presencelist, .prop-network, .prop-layer):hover { scrollbar-color: var(--scroll) transparent; }
+.sidebar, .center, .tabbody, .insphistory { scrollbar-gutter: stable; }
+.scrolllist, .batchchips .chips, .presencelist { background: var(--sunken); border-radius: 10px; padding: 6px; }
+@property --fade-top { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --fade-bottom { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@keyframes scrollfade { 0% { --fade-top: 0px; --fade-bottom: 22px; } 8%, 92% { --fade-top: 22px; --fade-bottom: 22px; } 100% { --fade-top: 22px; --fade-bottom: 0px; } }
+@supports (animation-timeline: scroll()) {
+  /* The scroll timeline is inactive when nothing overflows, so short regions get no fade. */
+  .scrolllist, .tabbody, .insphistory, .batchchips .chips, .presencelist {
+    mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent 100%);
+    animation: scrollfade linear both; animation-timeline: scroll(self);
+  }
+}
 .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } .split.stack { grid-template-columns: 1fr; }
 
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.scrolllist { overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+.scrolllist { overflow-y: auto; overscroll-behavior: contain; }
 .scrolllist > li { flex-shrink: 0; }
-.item { width: 100%; text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+.item { width: 100%; text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; transition: border-color .15s, background-color .15s; }
 .item:hover { border-color: var(--line-hover); } .item.active { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
 .item .title { font-weight: 600; } .item .sub { color: var(--muted); font-size: 12px; } .item .sub.err { color: var(--error-text); }
 .chips { display: flex; gap: 4px; flex-wrap: wrap; }
@@ -215,7 +236,7 @@ a.button.secondary { background: var(--panel2); color: inherit; border: 1px soli
 .barrow.outrow { grid-template-columns: 28px 1fr 150px 48px; } .barrow.outrow.pred { background: var(--panel2); }
 .bar.shift { background: var(--bad); opacity: .3; } .outrow .tags { display: flex; gap: 3px; }
 .insptop { flex: 1 1 50%; min-height: 0; display: flex; flex-direction: column; }
-.insphistory { flex: 1 1 50%; min-height: 0; overflow: auto; border-top: 1px solid var(--line); padding: 12px; }
+.insphistory { flex: 1 1 50%; min-height: 0; overflow: auto; border-top: 1px solid var(--line); padding: 12px; background: var(--rail); }
 /* Online-visitor bar under Run history (workspace/Presence.tsx) */
 .presence { position: relative; cursor: default; flex: none; display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--line); padding: 8px 12px; font-size: 12px; color: var(--muted); }
 .presence b { color: var(--text); font-variant-numeric: tabular-nums; animation: presencepop .4s ease-out; }
