@@ -10,7 +10,9 @@ from engine_bridge.contracts import (
 )
 from engine_bridge.engine_session import act_imports
 
-_MAX_SPEC_VALUES = 4096  # per input row of an INPUT_SPEC; whole tensor for ASSERT params
+# Per input row of an INPUT_SPEC; whole tensor for ASSERT params. Sized for the largest VNN-COMP input in
+# ACT's data (vggnet16_2022, 3x224x224), so every listed benchmark instance can be described.
+_MAX_SPEC_VALUES = 3 * 224 * 224
 _MAX_SPEC_ROWS = 64  # rows of a batched INPUT_SPEC (model_spec.sources.BATCH_LIMIT)
 
 
