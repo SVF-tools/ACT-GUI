@@ -241,6 +241,11 @@ export type Providers = ProviderOut[]
 export type ActStatus1 = string
 export type Row1 = number
 export type Verdict = ("certified" | "falsified" | "unknown" | "timeout" | "error")
+export type Errors = number
+export type Exception = (string | null)
+export type Location = (string | null)
+export type Messages = string[]
+export type Warnings = number
 export type At = string
 export type Kind12 = ("run.queued" | "run.started" | "run.stop_requested" | "run.completed" | "run.failed" | "bab.summary" | "fuzz.progress")
 export type RunId5 = string
@@ -350,6 +355,7 @@ PresenceOut?: PresenceOut
 ProviderList?: ProviderList
 ProviderOut?: ProviderOut
 RowVerdictOut?: RowVerdictOut
+RunDiagnosticsOut?: RunDiagnosticsOut
 RunEvent?: RunEvent
 RunList?: RunList
 RunOut?: RunOut
@@ -937,6 +943,19 @@ row: Row1
 verdict: Verdict
 }
 /**
+ * What the worker captured while driving ACT; its presence means GET /api/runs/{id}/snapshot has diagnostics.
+ * 
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "RunDiagnosticsOut".
+ */
+export interface RunDiagnosticsOut {
+errors: Errors
+exception: Exception
+location: Location
+messages?: Messages
+warnings: Warnings
+}
+/**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "RunEvent".
  */
@@ -967,6 +986,7 @@ act_commit: ActCommit1
 client_request_id: ClientRequestId
 counterexample_saved_at?: CounterexampleSavedAt
 created_at: CreatedAt
+diagnostics?: (RunDiagnosticsOut | null)
 domain: Domain
 error: (ErrorBody | null)
 finished_at: FinishedAt

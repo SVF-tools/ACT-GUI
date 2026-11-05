@@ -9,7 +9,7 @@ from visual_bench.wire import Scalar, Verdict, Method, Domain, RunState, Wire, E
 from visual_bench.model_spec.schemas import NativeResult
 from visual_bench.fuzzing.schemas import FuzzOptions
 
-__all__ = ['RunRequest', 'RowVerdictOut', 'RunResultOut', 'RunOut', 'RunList', 'RunEventKind', 'RunEvent']
+__all__ = ['RunRequest', 'RowVerdictOut', 'RunResultOut', 'RunDiagnosticsOut', 'RunOut', 'RunList', 'RunEventKind', 'RunEvent']
 
 
 class RunRequest(Wire):
@@ -47,6 +47,15 @@ class RunResultOut(Wire):
     counterexample_output: list[float] | None = None
     counterexample_output_error: str | None = None
 
+class RunDiagnosticsOut(Wire):
+    """What the worker captured while driving ACT; its presence means GET /api/runs/{id}/snapshot has diagnostics."""
+    # Python warnings, WARNING log records, ACT's printed [WARN] lines, and handled problems (e.g. no layer states)
+    warnings: int
+    errors: int  # ERROR/CRITICAL log records and ACT's printed [ERROR] lines
+    messages: list[str] = []  # the first few warnings, for display
+    exception: str | None  # root cause of a failed ACT call, "<type>: <message>"
+    location: str | None  # innermost ACT frame of that exception (else the innermost frame), "<file>:<line> in <fn>"
+
 class RunOut(Wire):
     run_id: str
     model_id: str
@@ -66,6 +75,7 @@ class RunOut(Wire):
     matches_native: bool | None
     last_seq: int
     counterexample_saved_at: str | None = None  # when the user saved ACT's counterexample (verification runs)
+    diagnostics: RunDiagnosticsOut | None = None  # None for runs recorded before diagnostics were captured
 
 class RunList(Wire):
     runs: list[RunOut]

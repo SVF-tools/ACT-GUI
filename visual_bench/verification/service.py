@@ -5,10 +5,13 @@
   with different parameters it is rejected.
 - Records are the source of truth; run status is derived from committed events.
 - Method-specific live output (fuzz frames) goes to a LiveObserver; this module stays method-neutral.
+- Every run that reaches a worker leaves diagnostics (diagnostics.py) before its terminal event: the
+  worker's warnings, logs and error location, ACT's stdout/stderr, and the engine it ran on.
 """
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 import signal
@@ -16,7 +19,9 @@ import subprocess
 import sys
 import tempfile
 import threading
+import traceback
 import uuid
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -29,8 +34,11 @@ from visual_bench.model_spec.service import ModelService
 from visual_bench.records import RecordStore
 from visual_bench.records.store import now_iso
 from visual_bench.fuzzing.schemas import FuzzOptions
+from visual_bench.verification import diagnostics as D
 from visual_bench.verification import schemas as S
 from visual_bench.wire import ErrorBody
+
+log = logging.getLogger(__name__)
 
 WORKER_GRACE_S = 120.0
 SAVED = "saved_counterexamples.json"  # run annotation shared with the fuzzing module (user-saved counterexamples)
@@ -112,7 +120,11 @@ class RunService:
                 "execution": {"requested_device": requested_device(), "gurobi_license": license_source},
             })
             self.records.append_event(run_id, "run.queued", "queued", {"method": req.method})
-            t = threading.Thread(target=self._supervise, args=(run_id, path, req, env), daemon=True, name=run_id)
+            context = {"engine": self._engine_snapshot(),
+                       "environment": {"requested_device": requested_device(), "gurobi_license": license_source,
+                                       "cuda_visible_devices": env.get("CUDA_VISIBLE_DEVICES")}}
+            t = threading.Thread(target=self._supervise, args=(run_id, path, req, env, context), daemon=True,
+                                 name=run_id)
             self._active[run_id] = t
             self._stop[run_id] = threading.Event()
             t.start()
@@ -140,22 +152,37 @@ class RunService:
             env["CUDA_VISIBLE_DEVICES"] = ""
         return env, self.engine.gurobi.worker_env(env)
 
-    def _supervise(self, run_id: str, model_path: Path, req: S.RunRequest, env: dict[str, str]) -> None:
+    def _engine_snapshot(self) -> dict[str, Any]:
+        """The ACT engine a run is started on, frozen into its diagnostics."""
+        info, scrub = self.engine.info, D.scrubber(D.default_roots())
+        return {"commit": info.commit, "expected_commit": info.expected_commit, "tracked_changes": info.tracked_changes,
+                "act_root": scrub(info.act_root), "python": info.python, "torch": info.torch,
+                "cuda_available": info.cuda_available, "source": self.engine.source.model_dump(),
+                "capabilities": {c.name: c.availability for c in info.capabilities},
+                "diagnostics": [asdict(d) for d in info.diagnostics],
+                "failing_api_checks": [{**asdict(c), "detail": scrub(c.detail)} for c in info.api_checks if not c.ok]}
+
+    def _supervise(self, run_id: str, model_path: Path, req: S.RunRequest, env: dict[str, str],
+                   context: dict[str, Any]) -> None:
+        captured: dict[str, Any] = {**context, "worker": None, "process": None}
         try:
             with tempfile.TemporaryDirectory(prefix="act-gui-run-") as tmp:
-                req_file, out_file, err_file = (Path(tmp) / n for n in ("request.json", "output.json", "stderr.txt"))
-                req_file.write_text(json.dumps({"model_path": str(model_path), "method": req.method,
-                                                "time_budget_s": req.time_budget_s, "domain": req.domain,
-                                                "record_layers": self.engine.capability_available(
-                                                    "inspect.layer_bounds.interval"),
-                                                "fuzz": req.fuzz.model_dump() if req.fuzz else None}))
+                req_file, out_file, err_file, std_file = (
+                    Path(tmp) / n for n in ("request.json", "output.json", "stderr.txt", "stdout.txt"))
+                worker_req = {"model_path": str(model_path), "method": req.method,
+                              "time_budget_s": req.time_budget_s, "domain": req.domain,
+                              "record_layers": self.engine.capability_available("inspect.layer_bounds.interval"),
+                              "fuzz": req.fuzz.model_dump() if req.fuzz else None}
+                req_file.write_text(json.dumps(worker_req))
+                captured["request"] = {**worker_req, "model_path": f"model/{req.model_id}.json"}
+                captured["tmp"] = tmp
                 read_fd, write_fd = os.pipe()
-                with open(err_file, "w") as stderr:
+                with open(err_file, "w") as stderr, open(std_file, "w") as stdout:
                     try:
                         proc = subprocess.Popen(
                             [sys.executable, "-m", "visual_bench.verification.worker", str(req_file), str(out_file),
                              str(write_fd)],
-                            cwd=REPO_ROOT, env=env, stdout=subprocess.DEVNULL, stderr=stderr, pass_fds=(write_fd,))
+                            cwd=REPO_ROOT, env=env, stdout=stdout, stderr=stderr, pass_fds=(write_fd,))
                     finally:
                         os.close(write_fd)
                     self.records.append_event(run_id, "run.started", "running", {"pid": proc.pid})
@@ -181,20 +208,33 @@ class RunService:
                         proc.wait()
                     finally:
                         timer.cancel()
-                if self._stop[run_id].is_set() and (proc.returncode != 0 or not out_file.is_file()):
+                out = json.loads(out_file.read_text()) if out_file.is_file() else None
+                scrub = D.scrubber(D.default_roots({"<run>": tmp, "<model-dir>": model_path.parent}))
+                captured["worker"] = (out or {}).pop("diagnostics", None)
+                captured["process"] = {"exit_code": proc.returncode, "killed_at_deadline": killed.is_set(),
+                                       "stop_requested": self._stop[run_id].is_set()}
+                captured["logs"], captured["printed"] = {}, []
+                for src, name in ((std_file, "act_stdout.log"), (err_file, "worker_stderr.log")):
+                    text, captured["logs"][name] = D.log_tail(src, scrub)
+                    captured["printed"] += D.printed_problems(text, name)
+                    self.records.write_diagnostic(run_id, name, text.encode())
+                if self._stop[run_id].is_set() and (proc.returncode != 0 or out is None):
                     raise AppError(409, "stopped", "Stopped by the user before ACT returned a result.")
                 if killed.is_set():
                     raise AppError(504, "worker_timeout", "Worker exceeded its budget plus grace period and was killed.")
-                if proc.returncode != 0 or not out_file.is_file():
+                if proc.returncode != 0 or out is None:
                     tail = err_file.read_text().strip().splitlines()[-3:]
                     raise AppError(500, "worker_crashed", f"Worker exited with code {proc.returncode}: {' | '.join(tail)}")
-                out = json.loads(out_file.read_text())
             if "error" in out:
                 raise AppError(422, out["error"]["code"], out["error"]["message"])
+            self._write_diagnostics(run_id, captured, None)
             self._commit_result(run_id, out)
         except AppError as err:
+            self._write_diagnostics(run_id, captured, {"code": err.code, "message": err.message})
             self.records.append_event(run_id, "run.failed", "failed", {"code": err.code, "message": err.message})
         except Exception as exc:  # unexpected supervisor fault: still a visible, explicit failure
+            captured["supervisor_traceback"] = traceback.format_exc()
+            self._write_diagnostics(run_id, captured, {"code": "supervisor_error", "message": repr(exc)})
             self.records.append_event(run_id, "run.failed", "failed", {"code": "supervisor_error", "message": repr(exc)})
         finally:
             self.live.forget(run_id)
@@ -202,6 +242,20 @@ class RunService:
                 self._active.pop(run_id, None)
                 self._procs.pop(run_id, None)
                 self._stop.pop(run_id, None)
+
+    def _write_diagnostics(self, run_id: str, captured: dict[str, Any], failure: dict[str, str] | None) -> None:
+        """Write diagnostics.json; a failure here is logged and never blocks the run's terminal event."""
+        try:
+            scrub = D.scrubber(D.default_roots({"<run>": captured.pop("tmp", None),
+                                                "<records>": self.records.root, "<models>": self.models.models_root}))
+            if "supervisor_traceback" in captured:
+                captured["supervisor_traceback"] = scrub(captured["supervisor_traceback"])
+            diag = {"version": D.DIAGNOSTICS_VERSION, "run_id": run_id, "captured_at": now_iso(),
+                    "failure": failure and {**failure, "message": scrub(failure["message"])}, **captured}
+            diag["summary"] = D.summary(diag)
+            self.records.write_diagnostic(run_id, "diagnostics.json", json.dumps(diag, indent=2, default=str).encode())
+        except Exception:
+            log.exception("could not record diagnostics of %s", run_id)
 
     @staticmethod
     def _signal_stop(proc: subprocess.Popen[bytes], method: str) -> None:
@@ -260,7 +314,9 @@ class RunService:
         matches = None
         if result and native:
             matches = result.act_status == native.status
-        return S.RunOut(run_id=run_id, model_id=req.model_id, method=req.method, domain=domain,
+        diag = self.records.diagnostics(run_id)
+        diagnostics = S.RunDiagnosticsOut.model_validate(diag["summary"]) if diag and "summary" in diag else None
+        return S.RunOut(run_id=run_id, model_id=req.model_id, method=req.method, domain=domain, diagnostics=diagnostics,
                         time_budget_s=req.time_budget_s,
                         client_request_id=req.client_request_id, status=status, created_at=m["created_at"],
                         started_at=started, finished_at=last["at"] if status in ("completed", "failed") and last else None,
@@ -299,6 +355,25 @@ class RunService:
         specs = self.models.describe(run.model_id).input_specs
         shape = [1, *specs[0].shape[1:]] if specs and specs[0].shape else [1, len(ce["input"])]
         return vnncomp_sat(ce["input"], ce["output"], shape if math.prod(shape) == len(ce["input"]) else [1, len(ce["input"])])
+
+    # -- reproduction snapshot -------------------------------------------------------------------------
+    def snapshot(self, run_id: str) -> bytes:
+        """Zip of everything needed to replay a finished run's ACT call (see diagnostics.snapshot_zip)."""
+        run = self.get(run_id)
+        if run.status not in ("completed", "failed"):
+            raise AppError(409, "run_active", "A snapshot is taken once the run has finished.")
+        manifest = self.records.manifest(run_id)
+        entry = self.models.entry(run.model_id)
+        model_file, note = None, None
+        try:
+            model_file = self.models.path(run.model_id)
+            if run.model_sha256 != entry["sha256"]:
+                model_file, note = None, f"the model now has sha256 {entry['sha256']}, not the run's {run.model_sha256}"
+        except AppError as err:
+            note = f"not included ({err.code}: {err.message})"
+        return D.snapshot_zip(run_id, self.records.run_dir(run_id), manifest, run.status,
+                              run.error.model_dump() if run.error else None, self.records.diagnostics(run_id),
+                              model_file, entry, note)
 
     def active_count(self) -> int:
         with self._lock:

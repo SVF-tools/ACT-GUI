@@ -40,6 +40,11 @@ def router(runs: RunService) -> APIRouter:
         return Response(runs.saved_counterexample_file(run_id), media_type="text/plain; charset=utf-8",
                         headers={"Content-Disposition": f'attachment; filename="{run_id}-ce.counterexample"'})
 
+    @r.get("/runs/{run_id}/snapshot")
+    def snapshot(run_id: str) -> Response:
+        return Response(runs.snapshot(run_id), media_type="application/zip",
+                        headers={"Content-Disposition": f'attachment; filename="{run_id}-snapshot.zip"'})
+
     @r.get("/runs/{run_id}/events")
     async def events(run_id: str, request: Request, after: int = 0) -> StreamingResponse:
         """SSE: replay committed events after seq 'after' (or Last-Event-ID), then follow until terminal."""

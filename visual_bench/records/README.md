@@ -83,7 +83,12 @@ layers.json                   recorded interval layer states
 fuzzing.json                  fuzzing result when applicable
 artifacts.json                sha256 seal for available artifacts
 saved_counterexamples.json    mutable user annotation, included in export
+diagnostics.json              worker warnings/logs/error location and engine snapshot (verification VER-12)
+act_stdout.log                scrubbed tail of the worker's stdout (ACT's prints)
+worker_stderr.log             scrubbed tail of the worker's stderr
 ```
+
+Diagnostics files are written once when a run ends, for failed runs too, so they are not sealed; `write_diagnostic` accepts only these names. The export zip includes them; the reproduction snapshot is verification's `GET /api/runs/{id}/snapshot`, not this module's export.
 
 
 </details>

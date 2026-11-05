@@ -7,12 +7,13 @@ Fuzzing progress goes as JSON lines to the inherited pipe <progress_fd>: {"progr
 or {"frame": FuzzFrame} (the latest mutated input, shown live and not recorded as an event).
 SIGTERM is a stop request: a fuzz run ends after its current iteration and reports what it found;
 other methods are killed by the supervisor instead.
+The output always carries "diagnostics" (diagnostics.Capture): warnings, WARNING+ log records, and the
+exception chain with its error location when the ACT call failed.
 """
 from __future__ import annotations
 
 import dataclasses
 import json
-import logging
 import os
 import signal
 import sys
@@ -45,12 +46,15 @@ def _run(req: dict[str, Any], progress: IO[str], stop: threading.Event) -> dict[
 def main(request_path: str, output_path: str, progress_fd: int) -> int:
     stop = threading.Event()  # installed first, so a stop during ACT imports is still graceful
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
-    from engine_bridge.contracts import BridgeError
-    from engine_bridge.inspection import interval_layer_states
+    from visual_bench.verification.diagnostics import Capture, default_roots, scrubber
 
-    logging.disable(logging.WARNING)
     req = json.loads(Path(request_path).read_text())
-    with os.fdopen(progress_fd, "w") as progress:
+    capture = Capture(scrubber(default_roots({"<run>": Path(request_path).parent,
+                                               "<model-dir>": Path(req["model_path"]).parent})))
+    with capture, os.fdopen(progress_fd, "w") as progress:
+        from engine_bridge.contracts import BridgeError
+        from engine_bridge.inspection import interval_layer_states
+
         try:
             out = _run(req, progress, stop)
             if not req.get("record_layers", True):
@@ -61,8 +65,16 @@ def main(request_path: str, output_path: str, progress_fd: int) -> int:
                     out["layer_states"] = dataclasses.asdict(interval_layer_states(Path(req["model_path"])))
                 except BridgeError as err:
                     out["layer_states_error"] = {"code": err.code, "message": err.message}
+            if "layer_states_error" in out:
+                capture.note("layer_states_" + out["layer_states_error"]["code"], out["layer_states_error"]["message"])
         except BridgeError as err:
+            capture.exception(err)
             out = {"error": {"code": err.code, "message": err.message, "retryable": err.retryable}}
+        except Exception as exc:  # an ACT or adapter fault the bridge did not map: report it with its traceback
+            capture.exception(exc)
+            out = {"error": {"code": "unexpected_exception", "message": f"{type(exc).__name__}: {exc}",
+                             "retryable": False}}
+    out["diagnostics"] = capture.report()
     tmp = Path(output_path + ".tmp")
     tmp.write_text(json.dumps(out))
     tmp.replace(output_path)

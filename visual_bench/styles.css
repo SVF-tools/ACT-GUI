@@ -75,6 +75,8 @@ a.button.secondary { background: var(--panel2); color: inherit; border: 1px soli
 .danger { background: transparent; color: var(--bad); border: 1px solid var(--bad); border-radius: 6px; padding: 3px 10px; font-weight: 600; }
 .danger:hover:not(:disabled) { background: var(--error-bg); }
 .runitem.live { display: flex; gap: 6px; align-items: stretch; } .runitem.live .item { flex: 1; min-width: 0; }
+.runitem.tools { display: flex; gap: 6px; align-items: flex-start; } .runitem.tools .item { flex: 1; min-width: 0; }
+.runitem .snapshot { flex: none; margin-top: 4px; text-decoration: none; }
 .bannerrow { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
 .verdict { font-size: 13px; display: flex; flex-direction: column; gap: 6px; margin-top: 0; }
 .verdict.bannerrow { flex-direction: row; }
