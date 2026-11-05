@@ -117,17 +117,17 @@ def test_fuzz_options_require_fuzz_method_and_other_runs_have_no_fuzzing(client:
     follow_to_end(client, run_id)
     assert client.get(f"/api/runs/{run_id}/fuzzing").json()["availability"] == "unsupported"
 
-def test_torch_batch_is_one_fuzz_only_net_fuzzed_row_by_row(client: TestClient):
+def test_torch_batch_is_one_net_fuzzed_row_by_row(client: TestClient):
     sources_or_skip(client)
     body = {"source": {"kind": "torch", "source_id": "mnist_conv_small", "index": 3, "eps": 0.3, "indices": [3, 0, 7]}}
     m = client.post("/api/models", json=body).json()
-    assert (m["methods"], m["params"]["batch"], m["params"]["indices"]) == (["fuzz"], 3, "3,0,7")
+    assert (m["methods"], m["params"]["batch"], m["params"]["indices"]) == (["interval", "fuzz"], 3, "3,0,7")
     d = client.get(f"/api/models/{m['model_id']}").json()
     assert d["input_specs"][0]["shape"] == [3, 1, 28, 28]
     full = {"source": {"kind": "torch", "source_id": "cifar10_conv_med", "index": 0, "eps": 0.01, "indices": list(range(64))}}
     big = client.post("/api/models", json=full).json()
     assert client.get(f"/api/models/{big['model_id']}").json()["input_specs"][0]["shape"] == [64, 3, 32, 32]
-    assert client.post("/api/runs", json={"model_id": m["model_id"], "method": "interval"}).status_code != 202
+    assert client.post("/api/runs", json={"model_id": m["model_id"], "method": "bab"}).status_code != 202
 
     run_id = client.post("/api/runs", json={"model_id": m["model_id"], "method": "fuzz", "time_budget_s": 30,
                                            "fuzz": {"max_iterations": 300, "rng_seed": 0}}).json()["run_id"]

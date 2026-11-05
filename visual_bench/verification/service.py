@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import signal
 import subprocess
@@ -19,6 +20,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Protocol
 
+from engine_bridge.execution import required_capability
 from visual_bench.config import REPO_ROOT, requested_device
 from visual_bench.engine.service import EngineService
 from visual_bench.errors import AppError
@@ -31,7 +33,21 @@ from visual_bench.verification import schemas as S
 from visual_bench.wire import ErrorBody
 
 WORKER_GRACE_S = 120.0
+SAVED = "saved_counterexamples.json"  # run annotation shared with the fuzzing module (user-saved counterexamples)
 STOP_GRACE_S = 10.0  # a stopped fuzz worker finishes its current iteration within this, else it is killed
+
+
+def vnncomp_sat(x: list[float], y: list[float], x_shape: list[int]) -> str:
+    """A counterexample as a VNN-COMP result: "sat" plus the VNN-LIB 2.0 command-line assignment.
+
+    VNN-LIB 2.0 (Sec. 5.3.1): per declared variable, "<name> <type> [<dims>]" then one value per line in
+    row-major order. Variables are the conventional X (input, shaped like the input spec) and Y (output,
+    [1, n]); the element type is float64 because ACT computed and checked the counterexample in float64.
+    """
+    def header(name: str, shape: list[int]) -> str:
+        return f"{name} float64 [{','.join(str(d) for d in shape)}]"
+
+    return "\n".join(["sat", header("X", x_shape), *map(repr, x), header("Y", [1, len(y)]), *map(repr, y)]) + "\n"
 
 
 class LiveObserver(Protocol):
@@ -76,7 +92,7 @@ class RunService:
             req = req.model_copy(update={"fuzz": FuzzOptions()})
         if req.method == "interval" and req.domain is None:
             req = req.model_copy(update={"domain": "interval"})
-        self.engine.require_engine()
+        self.engine.require_capability(required_capability(req.method, req.domain))
         with self._lock:
             if req.client_request_id:
                 existing = self._find_by_request_id(req.client_request_id)
@@ -91,7 +107,8 @@ class RunService:
             self.records.create(run_id, {
                 "run_id": run_id, "created_at": now_iso(), "request": req.model_dump(),
                 "model": {"act_path": entry["act_path"], "sha256": entry["sha256"]},
-                "act": {"commit": self.engine.info.commit, "expected_commit": self.engine.expected_commit},
+                "act": {"commit": self.engine.info.commit, "expected_commit": self.engine.expected_commit,
+                        "source": self.engine.source.model_dump()},
                 "execution": {"requested_device": requested_device(), "gurobi_license": license_source},
             })
             self.records.append_event(run_id, "run.queued", "queued", {"method": req.method})
@@ -129,6 +146,8 @@ class RunService:
                 req_file, out_file, err_file = (Path(tmp) / n for n in ("request.json", "output.json", "stderr.txt"))
                 req_file.write_text(json.dumps({"model_path": str(model_path), "method": req.method,
                                                 "time_budget_s": req.time_budget_s, "domain": req.domain,
+                                                "record_layers": self.engine.capability_available(
+                                                    "inspect.layer_bounds.interval"),
                                                 "fuzz": req.fuzz.model_dump() if req.fuzz else None}))
                 read_fd, write_fd = os.pipe()
                 with open(err_file, "w") as stderr:
@@ -196,7 +215,10 @@ class RunService:
         o = out["outcome"]
         result = {"verdict": o["verdict"], "act_status": o["act_status"], "elapsed_s": o["elapsed_s"],
                   "metadata": o["metadata"], "counterexample": o["counterexample"],
-                  "bab_summary": out.get("bab_summary"), "device": o["device"]}
+                  "bab_summary": out.get("bab_summary"), "device": o["device"],
+                  "rows": o.get("rows") or [], "counterexample_row": o.get("counterexample_row"),
+                  "counterexample_output": o.get("counterexample_output"),
+                  "counterexample_output_error": o.get("counterexample_output_error")}
         self.records.write_artifact(run_id, "result.json", result)
         if "layer_states" in out:
             self.records.write_artifact(run_id, "layers.json", out["layer_states"])
@@ -243,7 +265,44 @@ class RunService:
                         client_request_id=req.client_request_id, status=status, created_at=m["created_at"],
                         started_at=started, finished_at=last["at"] if status in ("completed", "failed") and last else None,
                         model_sha256=m["model"]["sha256"], act_commit=m["act"]["commit"], result=result, error=error,
-                        native_reference=native, matches_native=matches, last_seq=last["seq"] if last else 0)
+                        native_reference=native, matches_native=matches, last_seq=last["seq"] if last else 0,
+                        counterexample_saved_at=None if req.method == "fuzz" else
+                        next((e["saved_at"] for e in self.records.annotation(run_id, SAVED) or []), None))
+
+    # -- saved counterexample (user annotation on a verification run; ACT decided the violation) ------------
+    def save_counterexample(self, run_id: str) -> tuple[S.RunOut, bool]:
+        """Save ACT's counterexample of a verify_once/BaB run on its record; saving it again is a no-op."""
+        run = self.get(run_id)
+        if run.method == "fuzz":
+            raise AppError(422, "unsupported_method", "Fuzz runs save counterexamples by index (saved-counterexamples).")
+        r = run.result
+        if r is None or r.counterexample is None:
+            raise AppError(404, "counterexample_not_found", f"ACT reported no counterexample for {run_id}")
+        with self._lock:
+            created = not self.records.annotation(run_id, SAVED)
+            if created:
+                self.records.write_annotation(run_id, SAVED, [{"saved_at": now_iso(), "counterexample": {
+                    "row": r.counterexample_row or 0, "input": r.counterexample, "output": r.counterexample_output}}])
+        return self.get(run_id), created
+
+    def saved_counterexample_file(self, run_id: str) -> str:
+        """The saved counterexample as a VNN-COMP witness (see vnncomp_sat); X takes one input row's shape."""
+        run = self.get(run_id)
+        saved = self.records.annotation(run_id, SAVED) if run.method != "fuzz" else None
+        if not saved:
+            raise AppError(404, "counterexample_not_saved", f"No counterexample is saved on {run_id}")
+        ce = saved[0]["counterexample"]
+        if ce["output"] is None:
+            reason = run.result.counterexample_output_error if run.result else None
+            raise AppError(422, "output_unavailable", "The network output at this counterexample could not be computed, "
+                           f"so it has no VNN-COMP witness: {reason or 'not recorded'}")
+        specs = self.models.describe(run.model_id).input_specs
+        shape = [1, *specs[0].shape[1:]] if specs and specs[0].shape else [1, len(ce["input"])]
+        return vnncomp_sat(ce["input"], ce["output"], shape if math.prod(shape) == len(ce["input"]) else [1, len(ce["input"])])
+
+    def active_count(self) -> int:
+        with self._lock:
+            return len(self._active)
 
     def list(self) -> S.RunList:
         return S.RunList(runs=[self.get(r) for r in self.records.run_ids()])

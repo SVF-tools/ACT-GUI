@@ -7,6 +7,8 @@ export type TourStep = {
   body: string;
   /** Shown instead of the spotlight when the target is not on screen (e.g. no model selected yet). */
   missing?: string;
+  /** The step stays open, with only its region clickable, until a model is loaded and active; then the tour advances. */
+  waitFor?: "model";
 };
 
 export const TOUR_STEPS: readonly TourStep[] = [
@@ -17,13 +19,14 @@ export const TOUR_STEPS: readonly TourStep[] = [
   },
   {
     target: "load",
-    title: "1 · Load a model",
-    body: "Build a model from a Torch image classifier (pick test images and eps) or from a VNN-COMP ONNX + VNN-LIB instance. Each image/eps choice becomes its own model snapshot.",
+    title: "1 · Build and load a model",
+    body: "Pick a Torch image classifier with a test image and eps (or a VNN-COMP ONNX + VNN-LIB instance), then press Build and load. Each image/eps choice becomes its own model snapshot. The tour continues on the loaded model.",
+    waitFor: "model",
   },
   {
     target: "models",
-    title: "2 · Pick a model",
-    body: "Pinned catalog networks and the models you loaded are listed here. Click one to make it the active model.",
+    title: "2 · Your models",
+    body: "The model you just built is now active. Pinned catalog networks and every model you load are listed here; click one later to switch.",
   },
   {
     target: "network",
@@ -57,8 +60,8 @@ export const TOUR_STEPS: readonly TourStep[] = [
   },
   {
     target: "inspector",
-    title: "8 · Assistant, Records, Engine",
-    body: "Ask the assistant about the selected layer (answers cite ACT evidence and never override its verdict), browse run records, and check the ACT engine and Gurobi license.",
+    title: "8 · Engine, Records, Assistant",
+    body: "Check the ACT engine and Gurobi license, browse run records, and ask the assistant about the selected layer (answers cite ACT evidence and never override its verdict).",
   },
   {
     target: "context",

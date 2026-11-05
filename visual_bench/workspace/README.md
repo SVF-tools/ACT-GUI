@@ -57,7 +57,7 @@ flowchart TB
 | Selection | `selectionReducer` in [selection.ts](selection.ts). Returns a new context and revision; model changes clear run, layer, and neuron. |
 | Modes | `modes`, `modeForMethod`, and `modeForId` in [modes.ts](modes.ts). Maps `fuzz`, `interval`, and `bab` to visible center views. |
 | Layout and theme | `ContextBar` in [layout.tsx](layout.tsx) and theme state in [theme.tsx](theme.tsx). Renders shared context; it does not fetch. |
-| Tour | `Tour` in [tour.tsx](tour.tsx) plus `TOUR_STEPS` in [tourSteps.ts](tourSteps.ts). Reads `data-tour` regions and ends on Finish, Skip, or Escape. |
+| Tour | `Tour` in [tour.tsx](tour.tsx) plus `TOUR_STEPS` in [tourSteps.ts](tourSteps.ts). Reads `data-tour` regions and ends on Finish, Skip, or Escape. A `waitFor: "model"` step (Build and load) lets only its region take clicks, keeps Next disabled until `app.tsx` reports a loaded model, then advances by itself so later steps spotlight the live center panels. |
 | Presence | `PresenceService.beat` in [service.py](service.py): in-memory map of browser id to last heartbeat, pruned to a 90 s window, with the browser's country from Cloudflare's `CF-IPCountry` header (`XX`, Tor `T1`, or a direct local request count as unknown); no IPs, no persistence. The response carries only per-country totals. One id per browser (localStorage), so tabs are deduplicated. Correct only while the service runs as one process. |
 | Neighbor handoff | Module views receive selection and callbacks from `app.tsx`; their data path continues through the [parent flow diagram](../README.md#flow-diagram). |
 
@@ -89,7 +89,7 @@ Route: `POST /api/presence` (body `PresenceHeartbeat`, response `PresenceOut`), 
 | [modes.test.ts](modes.test.ts) | Mode IDs and method mapping. |
 | [layout.tsx](layout.tsx) | Context bar showing the current model, run, layer, and index. |
 | [theme.tsx](theme.tsx) | Light and dark theme toggle with persistence. |
-| [tour.tsx](tour.tsx) | Skippable first-visit tour, keyboard navigation, target measurement, and portal rendering. |
+| [tour.tsx](tour.tsx) | Skippable first-visit tour, keyboard navigation, target measurement, the interactive Build-and-load gate, and portal rendering. |
 | [tourSteps.ts](tourSteps.ts) | Tour copy, order, target regions, and missing-region hints. |
 | [tourSteps.test.ts](tourSteps.test.ts) | Tour step and placement behavior. |
 | [schemas.py](schemas.py) | `PresenceHeartbeat` and `PresenceOut` wire models. |

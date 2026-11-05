@@ -9,19 +9,30 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
-from engine_bridge.contracts import BridgeError, Capability, Diagnostic, EngineInfo, SolverStatus
+from engine_bridge.contracts import ApiCheck, BridgeError, Capability, Diagnostic, EngineInfo, SolverStatus
 
 DEFAULT_ACT_ROOT = "/data1/guanqin/ACT"
 
 
 def act_root() -> Path:
+    """The baseline ACT checkout: catalog nets, data/ and literature/ are read from here."""
     return Path(os.environ.get("ACT_ROOT", DEFAULT_ACT_ROOT)).resolve()
+
+
+def act_code_root() -> Path:
+    """The checkout whose ACT code is imported: ACT_CODE_ROOT (a switched branch) or else ACT_ROOT."""
+    code = os.environ.get("ACT_CODE_ROOT")
+    return Path(code).resolve() if code else act_root()
 
 
 @contextmanager
 def act_imports(root: Path | None = None) -> Iterator[Path]:
-    """Ensure the pinned ACT checkout is importable; raise act_missing otherwise."""
-    root = root or act_root()
+    """Ensure the active ACT checkout is importable; raise act_missing otherwise.
+
+    A process imports ACT from one checkout only: ACT modules register ONNX converters in global
+    third-party registries, so they cannot be re-imported from another checkout in the same process.
+    """
+    root = root or act_code_root()
     if not (root / "act" / "__init__.py").exists() and not (root / "act").is_dir():
         raise BridgeError("act_missing", f"ACT checkout not found at {root} (set ACT_ROOT).")
     if str(root) not in sys.path:
@@ -41,7 +52,8 @@ def _git(root: Path, *args: str) -> str | None:
     return out.stdout.strip() if out.returncode == 0 else None
 
 
-# Capabilities established against the pinned baseline (see engine_bridge/engine_session/README.md).
+# What each capability calls. Those with API requirements (parity.py) are advertised only when the
+# imported checkout passes them; the unsupported ones need ACT hooks that no adapter calls yet.
 _BASELINE_CAPABILITIES = (
     Capability("model.load_json", "available", "act.back_end.serialization.serialization.load_net_from_file"),
     Capability("spec.read", "available", "INPUT_SPEC / ASSERT layer params"),
@@ -51,6 +63,8 @@ _BASELINE_CAPABILITIES = (
     Capability("verify.bab", "available", "act.back_end.bab.bab.verify_bab_batched + TorchLPSolver (as act/config/pipeline_cli.py)"),
     Capability("fuzz.actfuzzer", "available", "act.pipeline.fuzzing.ACTFuzzer on ACTToTorch(net); progress via the instance's _print_progress seam; mutated-input frames via a wrapper on the instance's mutation_engine.mutate"),
     Capability("inspect.layer_bounds.interval", "available", "act.back_end.analyze.analyze after-facts"),
+    Capability("source.vnnlib", "available", "act.front_end.vnnlib_loader.create_specs.create_specs_from_paths + TorchToACT"),
+    Capability("source.onnx_classifier", "available", "act.front_end.vnnlib_loader.onnx_converter.convert_onnx_to_pytorch + TorchToACT"),
     Capability("events.bab_nodes", "unsupported", "no BaB observer hook in baseline (plan ACT-03)"),
     Capability("events.bab_summary", "available", "VerifyResult.metadata after completion"),
     Capability("control.pause_step_split", "unsupported", "no safe control boundary in baseline (plan ACT-05)"),
@@ -105,7 +119,7 @@ def probe_gurobi(license_file: Path | None = None, timeout_s: float = 60.0) -> S
 
 
 def probe(expected_commit: str | None = None, root: Path | None = None) -> EngineInfo:
-    root = root or act_root()
+    root = root or act_code_root()
     diags: list[Diagnostic] = []
     torch_v: str | None = None
     cuda: bool | None = None
@@ -115,8 +129,11 @@ def probe(expected_commit: str | None = None, root: Path | None = None) -> Engin
         with act_imports(root):
             import torch
 
+            from engine_bridge.engine_session.parity import check_api
+
             torch_v = torch.__version__
             cuda = bool(torch.cuda.is_available())
+            checks = check_api()
         commit = _git(root, "rev-parse", "HEAD")
         status = _git(root, "status", "--porcelain", "--untracked-files=no")
         dirty = None if status is None else bool(status)
@@ -125,13 +142,60 @@ def probe(expected_commit: str | None = None, root: Path | None = None) -> Engin
                                     f"ACT at {commit[:12]} differs from pinned baseline {expected_commit[:12]}; results are not baseline-certified."))
         if dirty:
             diags.append(Diagnostic("tracked_changes", "warning", "ACT checkout has modified tracked files."))
-        caps = _BASELINE_CAPABILITIES if not diags else tuple(
-            Capability(c.name, c.availability, c.source + " (baseline claim; current checkout differs)") for c in _BASELINE_CAPABILITIES)
+        caps = tuple(_checked(c, checks, baseline=not diags) for c in _BASELINE_CAPABILITIES)
+        failed = sorted({c.capability for c in checks if not c.ok})
+        if failed:
+            diags.append(Diagnostic("api_mismatch", "warning",
+                                    f"ACT API checks failed; unavailable here: {', '.join(failed)}."))
     except BridgeError as err:
         diags.append(Diagnostic(err.code, "error", err.message))
         caps = tuple(Capability(c.name, "unsupported", f"ACT unavailable: {err.code}") for c in _BASELINE_CAPABILITIES)
+        checks = ()
     return EngineInfo(
         act_root=str(root), commit=commit, expected_commit=expected_commit, tracked_changes=dirty,
         python=sys.version.split()[0], torch=torch_v, cuda_available=cuda,
-        capabilities=caps, diagnostics=tuple(diags),
+        capabilities=caps, diagnostics=tuple(diags), api_checks=checks,
     )
+
+
+def _checked(cap: Capability, checks: tuple[ApiCheck, ...], baseline: bool) -> Capability:
+    mine = [c for c in checks if c.capability == cap.name]
+    if cap.availability != "available" or not mine:
+        return cap
+    bad = next((c for c in mine if not c.ok), None)
+    if bad is not None:
+        return Capability(cap.name, "unsupported", f"API check failed: {bad.detail}")
+    return Capability(cap.name, "available", cap.source + ("" if baseline else " (API checked; results not baseline-certified)"))
+
+
+_PROBE_SCRIPT = """
+import json, sys
+from dataclasses import asdict
+from pathlib import Path
+from engine_bridge.engine_session.session import probe
+print('@@RESULT ' + json.dumps(asdict(probe(sys.argv[1] or None, Path(sys.argv[2])))), flush=True)
+"""
+
+
+def probe_isolated(expected_commit: str | None, root: Path, timeout_s: float = 300.0) -> EngineInfo:
+    """probe() in a fresh interpreter, for a checkout this process must not import."""
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(Path(__file__).resolve().parents[2]), env.get("PYTHONPATH")]))
+    try:
+        proc = subprocess.run([sys.executable, "-c", _PROBE_SCRIPT, expected_commit or "", str(root)], env=env,
+                              capture_output=True, text=True, timeout=timeout_s)
+        line = next((l for l in proc.stdout.splitlines() if l.startswith("@@RESULT ")), None)
+        failure = None if line else f"exit code {proc.returncode}: {' | '.join(proc.stderr.strip().splitlines()[-3:])}"
+    except subprocess.TimeoutExpired:
+        line, failure = None, f"did not finish within {timeout_s:.0f}s"
+    if line is None:
+        return EngineInfo(act_root=str(root), commit=None, expected_commit=expected_commit, tracked_changes=None,
+                          python=sys.version.split()[0], torch=None, cuda_available=None, capabilities=(),
+                          diagnostics=(Diagnostic("probe_failed", "error", f"ACT probe {failure}"),))
+    d = json.loads(line[len("@@RESULT "):])
+    return EngineInfo(act_root=d["act_root"], commit=d["commit"], expected_commit=d["expected_commit"],
+                      tracked_changes=d["tracked_changes"], python=d["python"], torch=d["torch"],
+                      cuda_available=d["cuda_available"],
+                      capabilities=tuple(Capability(**c) for c in d["capabilities"]),
+                      diagnostics=tuple(Diagnostic(**g) for g in d["diagnostics"]),
+                      api_checks=tuple(ApiCheck(**a) for a in d["api_checks"]))

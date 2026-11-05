@@ -3,6 +3,14 @@
 export type Evidence = string[]
 export type Kind = ("observation" | "interpretation" | "hypothesis" | "missing")
 export type Text = string
+export type Capability = string
+export type Detail = string
+export type Ok = boolean
+export type Symbol = string
+export type Branch = (string | null)
+export type Commit = (string | null)
+export type Kind1 = ("baseline" | "branch")
+export type Remote = (string | null)
 export type Availability = ("available" | "pending" | "not_recorded" | "unsupported")
 export type Name = string
 export type Source = string
@@ -26,20 +34,38 @@ export type WaveEvents = ("available" | "pending" | "not_recorded" | "unsupporte
 export type Code = string
 export type Message = string
 export type Severity = ("info" | "warning" | "error")
+export type Branches = string[]
+export type Remote1 = string
+export type Url = string
 export type ActRoot = string
+export type ApiChecks = ApiCheckOut[]
 export type Capabilities = CapabilityOut[]
-export type Commit = (string | null)
+export type Commit1 = (string | null)
 export type CudaAvailable = (boolean | null)
 export type Diagnostics = DiagnosticOut[]
 export type ExpectedCommit = (string | null)
 export type Python = string
+export type Branch1 = (string | null)
+export type Commit2 = (string | null)
+export type Kind2 = ("baseline" | "branch")
+export type Remote2 = (string | null)
+export type SwitchedAt = (string | null)
+export type Url1 = (string | null)
 export type Torch = (string | null)
 export type TrackedChanges = (boolean | null)
 export type Usable = boolean
+export type Custom = boolean
+export type Name1 = string
+export type Url2 = string
+export type CustomAllowed = boolean
+export type Remotes = EngineRemoteOut[]
+export type Branch2 = (string | null)
+export type Remote3 = (string | null)
+export type Url3 = (string | null)
 export type Code1 = string
 export type Message1 = string
 export type Retryable = boolean
-export type Kind1 = ("layer_state" | "run_result" | "spec" | "coverage")
+export type Kind3 = ("layer_state" | "run_result" | "spec" | "coverage")
 export type Label = string
 export type LayerId = (number | null)
 export type Neuron = (number | null)
@@ -61,7 +87,7 @@ export type ElapsedS = number
 export type Index = number
 export type Input = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type Iteration = number
-export type Kind2 = string
+export type Kind4 = string
 export type Output = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type SeedInput = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type SeedOutput = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
@@ -100,7 +126,7 @@ export type Iteration2 = number
 export type Input2 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type Output1 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type Row = number
-export type Name1 = string
+export type Name2 = string
 export type Selected = number
 export type Violations = number
 export type Weight = number
@@ -127,29 +153,30 @@ export type Seeds = FuzzSeedOut[]
 export type Status = ("queued" | "running" | "completed" | "failed")
 export type Strategies = FuzzStrategyOut[]
 export type Timeline = FuzzPointOut[]
+export type Instance = string
 export type Service = string
 export type Status1 = "ok"
 export type Version = string
 export type Center = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type Dataset1 = (string | null)
-export type Kind3 = string
+export type Kind5 = string
 export type LayerId2 = number
 export type Lb = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type Shape = number[]
 export type Ub = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type InVars = number
-export type Kind4 = string
+export type Kind6 = string
 export type LayerId3 = number
 export type OutVars = number
 export type OutputShape = (number[] | null)
-export type Name2 = string
+export type Name3 = string
 export type Shape1 = (number[] | null)
 export type Value1 = (string | null)
 export type Params = ParamOut[]
 export type Preds = number[]
 export type Succs = number[]
 export type BeforeLayerIds = number[]
-export type Kind5 = string
+export type Kind7 = string
 export type LayerId4 = number
 export type Lb1 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type Shape2 = number[]
@@ -161,13 +188,13 @@ export type Method = ("interval" | null)
 export type RunId4 = string
 export type Source1 = (LoadVnnlibRequest | LoadTorchRequest)
 export type Benchmark = string
-export type Kind6 = "vnnlib"
+export type Kind8 = "vnnlib"
 export type Onnx1 = string
 export type Vnnlib = string
 export type Eps = number
 export type Index1 = number
 export type Indices = ([number, ...(number)[]] | null)
-export type Kind7 = "torch"
+export type Kind9 = "torch"
 export type SourceId1 = string
 export type ActCommit = (string | null)
 export type InputDim = number
@@ -175,7 +202,7 @@ export type InputSpecs = InputSpecOut[]
 export type Layers1 = LayerOut[]
 export type ModelId1 = string
 export type OutputDim = number
-export type Kind8 = string
+export type Kind10 = string
 export type LayerId5 = number
 export type Matrix = (number[][] | null)
 export type Rows = number
@@ -185,6 +212,7 @@ export type TrueClass1 = (number | null)
 export type Sha256 = string
 export type ActPath = string
 export type Description1 = string
+export type EngineCheck = (("same_commit" | "loads" | "load_failed" | "unchecked") | null)
 export type Methods = ("interval" | "bab" | "fuzz")[]
 export type ModelId2 = string
 export type ElapsedS4 = number
@@ -206,17 +234,21 @@ export type Online = number
  */
 export type WindowS = number
 export type Availability3 = ("available" | "not_configured")
-export type Kind9 = ("fake" | "real")
-export type Name3 = string
+export type Kind11 = ("fake" | "real")
+export type Name4 = string
 export type Note = string
 export type Providers = ProviderOut[]
+export type ActStatus1 = string
+export type Row1 = number
+export type Verdict = ("certified" | "falsified" | "unknown" | "timeout" | "error")
 export type At = string
-export type Kind10 = ("run.queued" | "run.started" | "run.stop_requested" | "run.completed" | "run.failed" | "bab.summary" | "fuzz.progress")
+export type Kind12 = ("run.queued" | "run.started" | "run.stop_requested" | "run.completed" | "run.failed" | "bab.summary" | "fuzz.progress")
 export type RunId5 = string
 export type Seq = number
 export type Status3 = ("queued" | "running" | "completed" | "failed")
 export type ActCommit1 = (string | null)
 export type ClientRequestId = (string | null)
+export type CounterexampleSavedAt = (string | null)
 export type CreatedAt = string
 export type Domain = (("interval" | "dual" | "hybridz") | null)
 export type FinishedAt = (string | null)
@@ -225,14 +257,18 @@ export type MatchesNative = (boolean | null)
 export type Method1 = ("interval" | "bab" | "fuzz")
 export type ModelId3 = string
 export type ModelSha256 = string
-export type ActStatus1 = string
+export type ActStatus2 = string
 export type BabSummary = ({
 [k: string]: string | number | boolean | null
 } | null)
 export type Counterexample = (number[] | null)
+export type CounterexampleOutput = (number[] | null)
+export type CounterexampleOutputError = (string | null)
+export type CounterexampleRow = (number | null)
 export type Device1 = (string | null)
 export type ElapsedS5 = number
-export type Verdict = ("certified" | "falsified" | "unknown" | "timeout" | "error")
+export type Rows1 = RowVerdictOut[]
+export type Verdict1 = ("certified" | "falsified" | "unknown" | "timeout" | "error")
 export type RunId6 = string
 export type StartedAt = (string | null)
 export type Status4 = ("queued" | "running" | "completed" | "failed")
@@ -269,12 +305,19 @@ export type VnnlibRoot = string
 
 export interface ActGuiWire {
 AnswerSection?: AnswerSection
+ApiCheckOut?: ApiCheckOut
+BuiltWithOut?: BuiltWithOut
 CapabilityOut?: CapabilityOut
 ClassifierSourceOut?: ClassifierSourceOut
 CountryCount?: CountryCount
 CoverageOut?: CoverageOut
 DiagnosticOut?: DiagnosticOut
+EngineBranchesOut?: EngineBranchesOut
 EngineInfoOut?: EngineInfoOut
+EngineRemoteOut?: EngineRemoteOut
+EngineSourceOut?: EngineSourceOut
+EngineSourcesOut?: EngineSourcesOut
+EngineSwitchRequest?: EngineSwitchRequest
 ErrorBody?: ErrorBody
 ErrorResponse?: ErrorResponse
 EvidenceRef?: EvidenceRef
@@ -306,6 +349,7 @@ PresenceHeartbeat?: PresenceHeartbeat
 PresenceOut?: PresenceOut
 ProviderList?: ProviderList
 ProviderOut?: ProviderOut
+RowVerdictOut?: RowVerdictOut
 RunEvent?: RunEvent
 RunList?: RunList
 RunOut?: RunOut
@@ -329,6 +373,30 @@ export interface AnswerSection {
 evidence: Evidence
 kind: Kind
 text: Text
+}
+/**
+ * One ACT symbol a capability's bridge adapter calls, checked on the active checkout.
+ * 
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "ApiCheckOut".
+ */
+export interface ApiCheckOut {
+capability: Capability
+detail: Detail
+ok: Ok
+symbol: Symbol
+}
+/**
+ * The ACT engine a model was built on: its commit and where that code came from.
+ * 
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "BuiltWithOut".
+ */
+export interface BuiltWithOut {
+branch?: Branch
+commit: Commit
+kind: Kind1
+remote?: Remote
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -380,19 +448,74 @@ severity: Severity
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "EngineBranchesOut".
+ */
+export interface EngineBranchesOut {
+branches: Branches
+remote: Remote1
+url: Url
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "EngineInfoOut".
  */
 export interface EngineInfoOut {
 act_root: ActRoot
+api_checks: ApiChecks
 capabilities: Capabilities
-commit: Commit
+commit: Commit1
 cuda_available: CudaAvailable
 diagnostics: Diagnostics
 expected_commit: ExpectedCommit
 python: Python
+source: EngineSourceOut
 torch: Torch
 tracked_changes: TrackedChanges
 usable: Usable
+}
+/**
+ * Where the imported ACT code comes from: the pinned baseline checkout or a staged branch head.
+ * 
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "EngineSourceOut".
+ */
+export interface EngineSourceOut {
+branch?: Branch1
+commit?: Commit2
+kind: Kind2
+remote?: Remote2
+switched_at?: SwitchedAt
+url?: Url1
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "EngineRemoteOut".
+ */
+export interface EngineRemoteOut {
+custom: Custom
+name: Name1
+url: Url2
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "EngineSourcesOut".
+ */
+export interface EngineSourcesOut {
+active: EngineSourceOut
+custom_allowed: CustomAllowed
+remotes: Remotes
+}
+/**
+ * Neither remote nor url: the pinned baseline. Otherwise the branch head of a listed remote (by name)
+ * or of a user-entered https git URL.
+ * 
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "EngineSwitchRequest".
+ */
+export interface EngineSwitchRequest {
+branch?: Branch2
+remote?: Remote3
+url?: Url3
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -415,7 +538,7 @@ error: ErrorBody
  * via the `definition` "EvidenceRef".
  */
 export interface EvidenceRef {
-kind: Kind1
+kind: Kind3
 label: Label
 layer_id: LayerId
 neuron: Neuron
@@ -463,7 +586,7 @@ elapsed_s: ElapsedS
 index: Index
 input: Input
 iteration: Iteration
-kind: Kind2
+kind: Kind4
 output: Output
 seed_input: SeedInput
 seed_output?: SeedOutput
@@ -548,7 +671,7 @@ row: Row
  * via the `definition` "FuzzStrategyOut".
  */
 export interface FuzzStrategyOut {
-name: Name1
+name: Name2
 selected: Selected
 violations: Violations
 weight: Weight
@@ -615,6 +738,7 @@ saved_at: SavedAt
  * via the `definition` "HealthOut".
  */
 export interface HealthOut {
+instance: Instance
 service: Service
 status: Status1
 version: Version
@@ -626,7 +750,7 @@ version: Version
 export interface InputSpecOut {
 center: Center
 dataset: Dataset1
-kind: Kind3
+kind: Kind5
 layer_id: LayerId2
 lb: Lb
 shape: Shape
@@ -638,7 +762,7 @@ ub: Ub
  */
 export interface LayerOut {
 in_vars: InVars
-kind: Kind4
+kind: Kind6
 layer_id: LayerId3
 out_vars: OutVars
 output_shape: OutputShape
@@ -651,7 +775,7 @@ succs: Succs
  * via the `definition` "ParamOut".
  */
 export interface ParamOut {
-name: Name2
+name: Name3
 shape: Shape1
 value: Value1
 }
@@ -661,7 +785,7 @@ value: Value1
  */
 export interface LayerStateOut {
 before_layer_ids: BeforeLayerIds
-kind: Kind5
+kind: Kind7
 layer_id: LayerId4
 lb: Lb1
 shape: Shape2
@@ -695,7 +819,7 @@ source: Source1
  */
 export interface LoadVnnlibRequest {
 benchmark: Benchmark
-kind: Kind6
+kind: Kind8
 onnx: Onnx1
 vnnlib: Vnnlib
 }
@@ -707,7 +831,7 @@ export interface LoadTorchRequest {
 eps: Eps
 index: Index1
 indices?: Indices
-kind: Kind7
+kind: Kind9
 source_id: SourceId1
 }
 /**
@@ -729,7 +853,7 @@ sha256: Sha256
  * via the `definition` "OutputSpecOut".
  */
 export interface OutputSpecOut {
-kind: Kind8
+kind: Kind10
 layer_id: LayerId5
 matrix: Matrix
 rows: Rows
@@ -743,7 +867,9 @@ true_class: TrueClass1
  */
 export interface ModelSummary {
 act_path: ActPath
+built_with?: (BuiltWithOut | null)
 description: Description1
+engine_check?: EngineCheck
 methods: Methods
 model_id: ModelId2
 native: Native
@@ -797,9 +923,18 @@ providers: Providers
  */
 export interface ProviderOut {
 availability: Availability3
-kind: Kind9
-name: Name3
+kind: Kind11
+name: Name4
 note: Note
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "RowVerdictOut".
+ */
+export interface RowVerdictOut {
+act_status: ActStatus1
+row: Row1
+verdict: Verdict
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -807,7 +942,7 @@ note: Note
  */
 export interface RunEvent {
 at: At
-kind: Kind10
+kind: Kind12
 payload: Payload
 run_id: RunId5
 seq: Seq
@@ -830,6 +965,7 @@ runs: Runs
 export interface RunOut {
 act_commit: ActCommit1
 client_request_id: ClientRequestId
+counterexample_saved_at?: CounterexampleSavedAt
 created_at: CreatedAt
 domain: Domain
 error: (ErrorBody | null)
@@ -851,13 +987,17 @@ time_budget_s: TimeBudgetS
  * via the `definition` "RunResultOut".
  */
 export interface RunResultOut {
-act_status: ActStatus1
+act_status: ActStatus2
 bab_summary: BabSummary
 counterexample: Counterexample
+counterexample_output?: CounterexampleOutput
+counterexample_output_error?: CounterexampleOutputError
+counterexample_row?: CounterexampleRow
 device?: Device1
 elapsed_s: ElapsedS5
 metadata: Metadata
-verdict: Verdict
+rows?: Rows1
+verdict: Verdict1
 }
 export interface Metadata {
 [k: string]: string | number | boolean | null

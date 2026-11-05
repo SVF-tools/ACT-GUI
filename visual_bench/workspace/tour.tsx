@@ -22,7 +22,12 @@ function visibleRect(el: HTMLElement): Rect {
   return { top, left, width: right - left, height: bottom - top };
 }
 
-export function Tour({ onClose }: { onClose: () => void }) {
+function holeClip(r: Rect): string {
+  const [x1, y1, x2, y2] = [r.left, r.top, r.left + r.width, r.top + r.height];
+  return `polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${x1}px ${y1}px, ${x2}px ${y1}px, ${x2}px ${y2}px, ${x1}px ${y2}px, ${x1}px ${y1}px)`;
+}
+
+export function Tour({ modelReady, onClose }: { modelReady: boolean; onClose: () => void }) {
   const [index, setIndex] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
   const [card, setCard] = useState<Size>({ width: 360, height: 200 });
@@ -30,8 +35,19 @@ export function Tour({ onClose }: { onClose: () => void }) {
   const nextRef = useRef<HTMLButtonElement>(null);
   const step = TOUR_STEPS[index]!;
   const last = index === TOUR_STEPS.length - 1;
+  const waiting = step.waitFor === "model" && !modelReady;
+  const wasReady = useRef(modelReady);
 
-  const next = useCallback(() => (last ? onClose() : setIndex((i) => i + 1)), [last, onClose]);
+  const next = useCallback(() => {
+    if (waiting) return;
+    if (last) onClose();
+    else setIndex((i) => i + 1);
+  }, [waiting, last, onClose]);
+
+  useEffect(() => {
+    if (step.waitFor === "model" && modelReady && !wasReady.current) setIndex((i) => i + 1);
+    wasReady.current = modelReady;
+  }, [modelReady, step.waitFor]);
   const back = useCallback(() => setIndex((i) => Math.max(0, i - 1)), []);
 
   useLayoutEffect(() => {
@@ -65,6 +81,7 @@ export function Tour({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLElement && e.target.closest("input, select, textarea")) return;
       if (e.key === "Escape") onClose();
       else if (e.key === "ArrowRight") next();
       else if (e.key === "ArrowLeft") back();
@@ -78,7 +95,8 @@ export function Tour({ onClose }: { onClose: () => void }) {
 
   return createPortal(
     <div className="tour">
-      <div className={rect ? "tourblock" : "tourblock dim"} onClick={(e) => e.stopPropagation()} />
+      <div className={rect ? "tourblock" : "tourblock dim"} onClick={(e) => e.stopPropagation()}
+        style={step.waitFor && rect ? { clipPath: holeClip(rect) } : undefined} />
       {rect && <div className="tourspot" style={{ top: rect.top, left: rect.left, width: rect.width, height: rect.height }} />}
       <div ref={cardRef} className="tourcard" role="dialog" aria-modal="true" aria-labelledby="tour-title"
         style={{ top: pos.top, left: pos.left }}>
@@ -86,11 +104,12 @@ export function Tour({ onClose }: { onClose: () => void }) {
         <h3 id="tour-title">{step.title}</h3>
         <p>{step.body}</p>
         {missing && <p className="note">{missing}</p>}
+        {waiting && <p className="note tourwait">Waiting for Build and load…</p>}
         <div className="touractions">
           {!last && <button type="button" className="tourskip" onClick={onClose}>Skip tour</button>}
           <span className="tourgrow" />
           {index > 0 && <button type="button" className="secondary small" onClick={back}>Back</button>}
-          <button type="button" ref={nextRef} className="primary small" onClick={next}>{last ? "Finish" : "Next"}</button>
+          <button type="button" ref={nextRef} className="primary small" onClick={next} disabled={waiting}>{last ? "Finish" : "Next"}</button>
         </div>
       </div>
     </div>,

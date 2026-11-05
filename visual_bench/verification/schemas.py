@@ -9,7 +9,7 @@ from visual_bench.wire import Scalar, Verdict, Method, Domain, RunState, Wire, E
 from visual_bench.model_spec.schemas import NativeResult
 from visual_bench.fuzzing.schemas import FuzzOptions
 
-__all__ = ['RunRequest', 'RunResultOut', 'RunOut', 'RunList', 'RunEventKind', 'RunEvent']
+__all__ = ['RunRequest', 'RowVerdictOut', 'RunResultOut', 'RunOut', 'RunList', 'RunEventKind', 'RunEvent']
 
 
 class RunRequest(Wire):
@@ -28,14 +28,24 @@ class RunRequest(Wire):
             raise ValueError("domain is only valid with method 'interval'")
         return self
 
-class RunResultOut(Wire):
+class RowVerdictOut(Wire):
+    row: int  # INPUT row of a batched net (one test image)
     verdict: Verdict
+    act_status: str
+
+class RunResultOut(Wire):
+    verdict: Verdict  # batched nets: the conjunction of the row verdicts below
     act_status: str
     elapsed_s: float
     metadata: dict[str, Scalar]
     counterexample: list[float] | None
     bab_summary: dict[str, Scalar] | None
     device: str | None = None  # torch device ACT computed on; None for runs recorded before it was captured
+    rows: list[RowVerdictOut] = []  # ACT's per-row verdicts of a batched verify_once run; empty for single-row nets
+    counterexample_row: int | None = None  # the batch row the counterexample belongs to
+    # Output of ACT's rebuilt model (ACTToTorch) at the counterexample, for its VNN-COMP export; None with a reason.
+    counterexample_output: list[float] | None = None
+    counterexample_output_error: str | None = None
 
 class RunOut(Wire):
     run_id: str
@@ -55,6 +65,7 @@ class RunOut(Wire):
     native_reference: NativeResult | None
     matches_native: bool | None
     last_seq: int
+    counterexample_saved_at: str | None = None  # when the user saved ACT's counterexample (verification runs)
 
 class RunList(Wire):
     runs: list[RunOut]

@@ -5,13 +5,17 @@ import type { ModelSummary, SourcesOut } from "../generated/wire";
 import { classLabel, Pixels } from "../shared/ui/pixels";
 import { useSources, useSample, useLoadModel } from "./hooks";
 import type { LoadModelBody } from "../generated/wire";
+import { useCapabilities } from "../engine/hooks";
 
 type Mode = "vnnlib" | "torch";
+const MODE_CAPABILITY: Record<Mode, string> = { torch: "source.onnx_classifier", vnnlib: "source.vnnlib" };
 const BATCH_LIMIT = 64; // engine_bridge.model_spec.sources.BATCH_LIMIT
 
 export function LoadPanel({ current, onLoaded }: { current: ModelSummary | null; onLoaded: (m: ModelSummary) => void }) {
   const sources = useSources();
+  const lacks = useCapabilities();
   const [mode, setMode] = useState<Mode>("torch");
+  const missing = lacks(MODE_CAPABILITY[mode]);
   useEffect(() => {
     if (current?.source === "vnnlib" || current?.source === "torch") setMode(current.source);
   }, [current]);
@@ -20,14 +24,16 @@ export function LoadPanel({ current, onLoaded }: { current: ModelSummary | null;
       <h2>Load model</h2>
       <nav className="tabs" role="tablist" aria-label="model source">
         {(["torch", "vnnlib"] as const).map((m) => (
-          <button key={m} role="tab" aria-selected={mode === m} className={mode === m ? "tab active" : "tab"} onClick={() => setMode(m)}>
+          <button key={m} role="tab" aria-selected={mode === m} className={mode === m ? "tab active" : "tab"} onClick={() => setMode(m)}
+            title={lacks(MODE_CAPABILITY[m]) ?? undefined}>
             {m === "torch" ? "Torch model" : "VNN-LIB"}
           </button>
         ))}
       </nav>
       {sources.status === "pending" && <div className="note">Reading sources from ACT…</div>}
       {sources.status === "error" && <div className="error">{sources.error.message}</div>}
-      {sources.status === "success" && (mode === "torch"
+      {missing && <div className="note">Disabled on this ACT checkout. {missing}</div>}
+      {sources.status === "success" && !missing && (mode === "torch"
         ? <TorchForm s={sources.data} current={current?.source === "torch" ? current : null} onLoaded={onLoaded} />
         : <VnnlibForm s={sources.data} current={current?.source === "vnnlib" ? current : null} onLoaded={onLoaded} />)}
     </section>
@@ -45,7 +51,7 @@ function useLoad(onLoaded: (m: ModelSummary) => void) {
 
 function TorchForm({ s, current, onLoaded }: { s: SourcesOut; current: ModelSummary | null; onLoaded: (m: ModelSummary) => void }) {
   const [sourceId, setSourceId] = useState(s.classifiers[0]?.source_id ?? "");
-  // One test image per batch slot; a batch of several is one ACT net with a row per image (fuzz-only).
+  // One test image per batch slot; a batch of several is one ACT net with a row per image (fuzzing and verify_once).
   const [indices, setIndices] = useState<number[]>([0]);
   const [slot, setSlot] = useState(0);
   const [eps, setEps] = useState(2 / 255);
@@ -140,7 +146,7 @@ function TorchForm({ s, current, onLoaded }: { s: SourcesOut; current: ModelSumm
       </button>
       {load.error && <div className="error">{load.error}</div>}
       <div className="note">Box = test image ± eps clipped to [0, 1]; property: the model keeps the dataset label (TOP1_ROBUST). Built by ACT's front end; each setting is its own model snapshot.
-        {batched ? " A batch is one net with a row per image that ACTFuzzer fuzzes together; ACT's verify_once does not accept it, so it is fuzz-only." : ""}</div>
+        {batched ? " A batch is one net with a row per image: ACTFuzzer fuzzes the rows together and Verification reports ACT's verdict per image; BaB needs a single image." : ""}</div>
     </div>
   );
 }

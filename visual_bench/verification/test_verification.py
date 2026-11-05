@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 
 from visual_bench.records import RecordStore
 from visual_bench.server import create_app
-from visual_bench.testing import follow_to_end
+from visual_bench.testing import follow_to_end, sources_or_skip
 from visual_bench.workbench import Workbench
 
 
@@ -49,6 +49,26 @@ def test_falsified_run_reports_act_counterexample(client: TestClient):
     result = client.get(f"/api/runs/{run_id}").json()["result"]
     assert result["verdict"] == "falsified" and result["counterexample"]
 
+    url = f"/api/runs/{run_id}/saved-counterexample"
+    assert client.get(f"{url}/vnnlib").json()["error"]["code"] == "counterexample_not_saved"
+    first, again = client.post(url), client.post(url)
+    assert (first.status_code, again.status_code) == (201, 200)
+    assert first.json()["counterexample_saved_at"] == again.json()["counterexample_saved_at"] is not None
+    resp = client.get(f"{url}/vnnlib")
+    assert resp.status_code == 200 and f"{run_id}-ce.counterexample" in resp.headers["content-disposition"]
+    lines = resp.text.splitlines()
+    x, y = result["counterexample"], result["counterexample_output"]
+    shape = client.get("/api/models/unsafe_linear").json()["input_specs"][0]["shape"]
+    assert lines[0] == "sat" and lines[1] == f"X float64 [{','.join(map(str, shape))}]"
+    assert [float(v) for v in lines[2:2 + len(x)]] == x
+    assert lines[2 + len(x)] == f"Y float64 [1,{len(y)}]" and [float(v) for v in lines[3 + len(x):]] == y
+    bundle = zipfile.ZipFile(io.BytesIO(client.get(f"/api/runs/{run_id}/export").content))
+    assert f"{run_id}/saved_counterexamples.json" in bundle.namelist()
+
+    certified = client.post("/api/runs", json={"model_id": "range_check", "method": "interval"}).json()["run_id"]
+    follow_to_end(client, certified)
+    assert client.post(f"/api/runs/{certified}/saved-counterexample").json()["error"]["code"] == "counterexample_not_found"
+
 def test_stop_ends_a_verification_worker_without_a_verdict(client: TestClient):
     run_id = client.post("/api/runs", json={"model_id": "bab_deep_mlp", "method": "bab", "time_budget_s": 60}).json()["run_id"]
     client.post(f"/api/runs/{run_id}/stop")  # before the worker can import ACT, so it never reports a result
@@ -68,6 +88,21 @@ def test_domain_run_records_domain_and_has_no_interval_native_reference(client: 
     default = client.post("/api/runs", json={"model_id": "range_check", "method": "interval"}).json()
     assert default["domain"] == "interval"
     follow_to_end(client, default["run_id"])
+
+def test_torch_batch_verification_records_a_verdict_per_image(client: TestClient):
+    sources_or_skip(client)
+    m = client.post("/api/models", json={"source": {"kind": "torch", "source_id": "mnist_conv_small", "index": 3,
+                                                    "eps": 0.01, "indices": [3, 0, 7]}}).json()
+    assert "interval" in m["methods"] and "bab" not in m["methods"]
+    run_id = client.post("/api/runs", json={"model_id": m["model_id"], "method": "interval"}).json()["run_id"]
+    follow_to_end(client, run_id)
+    run = client.get(f"/api/runs/{run_id}").json()
+    assert run["status"] == "completed", run["error"]
+    rows = run["result"]["rows"]
+    assert [r["row"] for r in rows] == [0, 1, 2] and run["result"]["metadata"]["batch"] == 3
+    assert (run["result"]["verdict"] == "certified") == all(r["verdict"] == "certified" for r in rows)
+    layers = client.get(f"/api/runs/{run_id}/layers").json()
+    assert layers["availability"] != "available"  # layer inspection reads one input lane
 
 def test_idempotent_start_and_conflict(client: TestClient):
     body = {"model_id": "range_check", "method": "interval", "client_request_id": "req-1"}

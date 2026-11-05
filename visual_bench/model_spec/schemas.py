@@ -7,13 +7,24 @@ from pydantic import Field, model_validator
 
 from visual_bench.wire import WireNumber, Scalar, Method, Wire
 
-__all__ = ['NativeResult', 'ModelSummary', 'VnnlibInstanceOut', 'VnnlibBenchmarkOut', 'ClassifierSourceOut', 'SourcesOut', 'SampleOut', 'LoadVnnlibRequest', 'LoadTorchRequest', 'LoadModelRequest', 'LoadModelBody', 'ParamOut', 'LayerOut', 'InputSpecOut', 'OutputSpecOut', 'ModelDescriptionOut']
+__all__ = ['NativeResult', 'BuiltWithOut', 'EngineCheck', 'ModelSummary', 'VnnlibInstanceOut', 'VnnlibBenchmarkOut', 'ClassifierSourceOut', 'SourcesOut', 'SampleOut', 'LoadVnnlibRequest', 'LoadTorchRequest', 'LoadModelRequest', 'LoadModelBody', 'ParamOut', 'LayerOut', 'InputSpecOut', 'OutputSpecOut', 'ModelDescriptionOut']
 
 
 class NativeResult(Wire):
     status: str
     elapsed_s: float
     nodes: int | None
+
+class BuiltWithOut(Wire):
+    """The ACT engine a model was built on: its commit and where that code came from."""
+    commit: str | None
+    kind: Literal["baseline", "branch"]
+    remote: str | None = None
+    branch: str | None = None
+
+# Whether a built model's ACT net loads on the active engine: built on the same commit, loaded (or failed to load)
+# when it was first described on this commit, or not tried yet. Catalog models are pinned files: None.
+EngineCheck = Literal["same_commit", "loads", "load_failed", "unchecked"]
 
 class ModelSummary(Wire):
     model_id: str
@@ -24,6 +35,8 @@ class ModelSummary(Wire):
     native: dict[str, NativeResult]
     source: Literal["catalog", "vnnlib", "torch"] = "catalog"
     params: dict[str, Scalar] = {}  # how a vnnlib/torch model was built (benchmark, files, dataset, index, eps, ...)
+    built_with: BuiltWithOut | None = None  # None for catalog models and models built before it was recorded
+    engine_check: EngineCheck | None = None
 
 class VnnlibInstanceOut(Wire):
     onnx: str
@@ -69,7 +82,7 @@ class LoadTorchRequest(Wire):
     source_id: str = Field(min_length=1, max_length=64)
     index: int = Field(ge=0, le=1_000_000)
     eps: float = Field(ge=0, le=1)
-    # Test images of a batch, one ACT input row each, fuzzed together; None = [index]. A batch net is fuzz-only.
+    # Test images of a batch, one ACT input row each, fuzzed together; None = [index]. BaB takes single-image nets only.
     indices: list[Annotated[int, Field(ge=0, le=1_000_000)]] | None = Field(default=None, min_length=1, max_length=64)
 
     @model_validator(mode="after")

@@ -53,10 +53,14 @@ def main(request_path: str, output_path: str, progress_fd: int) -> int:
     with os.fdopen(progress_fd, "w") as progress:
         try:
             out = _run(req, progress, stop)
-            try:
-                out["layer_states"] = dataclasses.asdict(interval_layer_states(Path(req["model_path"])))
-            except BridgeError as err:
-                out["layer_states_error"] = {"code": err.code, "message": err.message}
+            if not req.get("record_layers", True):
+                out["layer_states_error"] = {"code": "capability_unavailable", "message":
+                                             "The active ACT checkout fails the inspect.layer_bounds.interval API checks."}
+            else:
+                try:
+                    out["layer_states"] = dataclasses.asdict(interval_layer_states(Path(req["model_path"])))
+                except BridgeError as err:
+                    out["layer_states_error"] = {"code": err.code, "message": err.message}
         except BridgeError as err:
             out = {"error": {"code": err.code, "message": err.message, "retryable": err.retryable}}
     tmp = Path(output_path + ".tmp")

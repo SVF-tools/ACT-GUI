@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from visual_bench.verification import schemas as S
 from visual_bench.verification.service import RunService
@@ -29,6 +29,16 @@ def router(runs: RunService) -> APIRouter:
     @r.post("/runs/{run_id}/stop", response_model=S.RunOut)
     def stop_run(run_id: str) -> S.RunOut:
         return runs.stop(run_id)
+
+    @r.post("/runs/{run_id}/saved-counterexample", response_model=S.RunOut, status_code=201)
+    def save_counterexample(run_id: str) -> JSONResponse:
+        run, created = runs.save_counterexample(run_id)
+        return JSONResponse(run.model_dump(), status_code=201 if created else 200)
+
+    @r.get("/runs/{run_id}/saved-counterexample/vnnlib")
+    def saved_counterexample_file(run_id: str) -> Response:
+        return Response(runs.saved_counterexample_file(run_id), media_type="text/plain; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="{run_id}-ce.counterexample"'})
 
     @r.get("/runs/{run_id}/events")
     async def events(run_id: str, request: Request, after: int = 0) -> StreamingResponse:

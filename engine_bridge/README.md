@@ -8,7 +8,7 @@ Only this scope directly imports ACT. It adapts the pinned engine into neutral r
 
 | Goal / module | Start here | Current output / upper-layer consumer |
 | --- | --- | --- |
-| **engine_session**: ACT discovery, version diagnostics, capabilities, solver probe | [Probe and import guide](engine_session/README.md#change-guide) | EngineInfo / SolverStatus → visual_bench/engine; act_imports stays inside bridge callers. |
+| **engine_session**: ACT discovery, branch staging, API parity checks per capability, version diagnostics, solver probe | [Probe and import guide](engine_session/README.md#change-guide) | EngineInfo / SolverStatus → visual_bench/engine; act_imports stays inside bridge callers. |
 | **model_spec**: source discovery, ACT net building, graph/spec description | [Loading and description guide](model_spec/README.md#change-guide) | ModelDescription, BuiltNet, source/sample descriptions → visual_bench/model_spec. |
 | **execution**: verification/BaB invocation, fuzz options/observations, method eligibility | [Invocation guide](execution/README.md#change-guide) | RunOutcome / FuzzOutcome → run worker; supported methods → ModelService. |
 | **inspection**: layer-bound collection | [Interval analysis guide](inspection/README.md#change-guide) | LayerStates → worker output → sealed layers.json → visual_bench/analysis. |
@@ -52,7 +52,7 @@ flowchart TB
 | model_spec | [describe.py](model_spec/describe.py): describe_model; [sources.py](model_spec/sources.py): source builders. Native load_net is an internal bridge helper. | [Local flow](model_spec/README.md#flow-diagram) → [workbench model_spec](../visual_bench/model_spec/README.md#flow-diagram) |
 | execution | [verify.py](execution/verify.py): run_verification; [fuzz.py](execution/fuzz.py): run_fuzzing; [methods.py](execution/methods.py): verify_methods | [Local flow](execution/README.md#flow-diagram) → [verification](../visual_bench/verification/README.md#flow-diagram) / [fuzzing](../visual_bench/fuzzing/README.md#flow-diagram) |
 | inspection | [layers.py](inspection/layers.py): interval_layer_states; a fresh interval analysis, not a saved BaB/node state | [Local flow](inspection/README.md#flow-diagram) → [analysis](../visual_bench/analysis/README.md#flow-diagram) |
-| engine_session | [session.py](engine_session/session.py): probe, probe_gurobi, act_root, act_imports | [Local flow](engine_session/README.md#flow-diagram) → [engine](../visual_bench/engine/README.md#flow-diagram) |
+| engine_session | [session.py](engine_session/session.py): probe, probe_isolated, probe_gurobi, act_root, act_code_root, act_imports; [checkouts.py](engine_session/checkouts.py): branch staging; [parity.py](engine_session/parity.py): API checks | [Local flow](engine_session/README.md#flow-diagram) → [engine](../visual_bench/engine/README.md#flow-diagram) |
 | events | [coverage.py](events/coverage.py): observation_coverage, bab_summary | [Local flow](events/README.md#flow-diagram) → [bab](../visual_bench/bab/README.md#flow-diagram) |
 
 ## Decide the Edit Scope

@@ -23,6 +23,8 @@ export const keys = {
   fuzzDefaults: () => ["fuzz", "defaults"] as const,
   engine: () => ["engine"] as const,
   gurobi: () => ["engine", "gurobi"] as const,
+  engineSources: () => ["engine", "source"] as const,
+  engineBranches: (remote: string | null) => ["engine", "branches", remote] as const,
   providers: () => ["assistant", "providers"] as const,
   presence: () => ["presence"] as const,
 };

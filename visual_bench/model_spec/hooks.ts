@@ -1,4 +1,4 @@
-// Queries/mutations for /api/models, /api/models/{id}, /api/sources and /api/sources/sample.
+// Queries/mutations for /api/models, /api/models/{id}, /api/models/{id}/rebuild, /api/sources and /api/sources/sample.
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { keys } from "../shared/queryClient";
 import * as api from "./api";
@@ -9,6 +9,14 @@ export const useModel = (id: string | null) =>
 export const useSources = () => useQuery({ queryKey: keys.sources(), queryFn: api.sources });
 export const useSample = (dataset: string | null, index: number) =>
   useQuery({ queryKey: keys.sample(dataset, index), queryFn: () => api.sample(dataset!, index), enabled: dataset !== null });
+
+export function useRebuildModel() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: api.rebuildModel,
+    onSuccess: () => client.invalidateQueries({ queryKey: keys.models() }),
+  });
+}
 
 export function useLoadModel() {
   const client = useQueryClient();

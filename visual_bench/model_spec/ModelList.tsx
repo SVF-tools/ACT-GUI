@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { fmt, indexRanges } from "../shared/wire";
 import type { ModelSummary } from "../generated/wire";
 import type { UseQueryResult } from "@tanstack/react-query";
+import { builtWithLabel } from "./RebuildNotice";
 
 export function ModelList({ models, selected, onSelect }: {
   models: UseQueryResult<ModelSummary[]>; selected: string | null; onSelect: (id: string) => void;
@@ -26,6 +27,7 @@ export function ModelList({ models, selected, onSelect }: {
                   <span className="chips">
                     {m.source && m.source !== "catalog" && <span className="chip">{m.source === "torch" ? "torch" : "vnn-lib"}</span>}
                     {m.source === "torch" && <TorchChips p={m.params ?? {}} />}
+                    <EngineChip m={m} />
                     {Object.entries(m.native).map(([method, r]) => (
                       <span key={method} className={`chip v-${r.status.toLowerCase()}`} title="recorded native ACT result (fixtures/catalog.json)">
                         {method}: {r.status.toLowerCase()}
@@ -59,6 +61,18 @@ function ScrollList({ children }: { children: ReactNode }) {
     return () => ro.disconnect();
   });
   return <ul ref={ref} className="list scrolllist">{children}</ul>;
+}
+
+// Built models whose net the active ACT engine fails to load, or that came from another ACT commit and are not tried yet.
+function EngineChip({ m }: { m: ModelSummary }) {
+  const built = `built on ${builtWithLabel(m.built_with)}`;
+  if (m.engine_check === "load_failed") {
+    return <span className="chip bad" title={`${built}; the active ACT engine cannot load it. Select it to rebuild.`}>needs rebuild</span>;
+  }
+  if (m.engine_check === "unchecked" && m.built_with) {
+    return <span className="chip warn" title={`${built}; not yet loaded on the active engine`}>ACT {m.built_with.commit?.slice(0, 8)}</span>;
+  }
+  return null;
 }
 
 function TorchChips({ p }: { p: Record<string, unknown> }) {

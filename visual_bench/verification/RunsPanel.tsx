@@ -2,6 +2,8 @@ import { useState, type ReactNode } from "react";
 import type { FuzzOptions, RunRequest } from "../generated/wire";
 import { useModels } from "../model_spec/hooks";
 import { useStartRun } from "./hooks";
+import { useCapabilities } from "../engine/hooks";
+import { modeForMethod } from "../workspace/modes";
 import { METHOD_LABEL } from "./labels";
 
 type Method = RunRequest["method"];
@@ -18,10 +20,13 @@ export function RunsPanel({ modelId, method, onMethod, onSelect, fuzzOptions, fu
 }) {
   const models = useModels();
   const startRun = useStartRun();
+  const lacks = useCapabilities();
+  const domainOk = (d: Domain) => lacks(`verify.${d}`) === null;
   const methods = models.status === "success" ? models.data.find((m) => m.model_id === modelId)?.methods ?? [] : [];
   const supported = methods.includes(method);
   const [budget, setBudget] = useState(30);
   const [domain, setDomain] = useState<Domain>("interval");
+  const missing = method === "interval" ? lacks(`verify.${domain}`) : lacks(modeForMethod(method).capability);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -56,7 +61,7 @@ export function RunsPanel({ modelId, method, onMethod, onSelect, fuzzOptions, fu
         {method === "interval" && (
           <label>Abstract domain
             <select value={domain} onChange={(e) => setDomain(e.target.value as Domain)}>
-              {(Object.keys(DOMAIN_LABEL) as Domain[]).map((d) => <option key={d} value={d}>{DOMAIN_LABEL[d]}</option>)}
+              {(Object.keys(DOMAIN_LABEL) as Domain[]).map((d) => <option key={d} value={d} disabled={!domainOk(d)}>{DOMAIN_LABEL[d]}</option>)}
             </select>
           </label>
         )}
@@ -64,9 +69,10 @@ export function RunsPanel({ modelId, method, onMethod, onSelect, fuzzOptions, fu
           <input type="number" min={1} max={600} value={budget} onChange={(e) => setBudget(Number(e.target.value))} />
         </label>
         {method === "fuzz" && fuzzSettings}
-        <button className="primary" disabled={busy || !supported || (method === "fuzz" && !fuzzOptions)} onClick={start}>{busy ? "Starting…" : "Run ACT"}</button>
+        <button className="primary" disabled={busy || !supported || missing !== null || (method === "fuzz" && !fuzzOptions)} onClick={start}>{busy ? "Starting…" : "Run ACT"}</button>
       </div>
-      {!supported && models.status === "success" && <div className="note">This model does not support {METHOD_LABEL[method]}.</div>}
+      {missing ? <div className="note">Disabled on this ACT checkout. {missing}</div>
+        : !supported && models.status === "success" && <div className="note">This model does not support {METHOD_LABEL[method]}.</div>}
       {err && <div className="error">{err}</div>}
     </section>
   );

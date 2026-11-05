@@ -78,7 +78,7 @@ flowchart TB
 | Block | Code entry | Contract or artifact | Neighbor handoff |
 | --- | --- | --- | --- |
 | Save | [service.py: save_counterexample](service.py) | First save returns 201, repeat returns 200, unknown ACT index is 404 | [Records](../records/README.md#flow-diagram) stores user annotation |
-| Export | [service.py: saved_assignment](service.py) | `sat`, shaped `X`, and `[1,n]` `Y`, all `float64` | [model_spec](../model_spec/README.md#flow-diagram) supplies shape |
+| Export | [service.py: saved_assignment](service.py) via `verification.service.vnncomp_sat` | `sat`, shaped `X`, and `[1,n]` `Y`, all `float64` (same format as verification-run exports) | [model_spec](../model_spec/README.md#flow-diagram) supplies shape |
 | Image export | [FuzzSaved.tsx](FuzzSaved.tsx) and view helpers | Browser can download native resolution PNG for image inputs | Browser presentation owns PNG formatting |
 
 ## Validation

@@ -84,7 +84,7 @@ Run the module's real ACT tests:
 .venv/bin/python -m pytest visual_bench/model_spec
 ```
 
-Acceptance is observable when catalog models list their pinned sha256 and methods, a valid VNN-LIB or classifier source returns 201 then 200 for the same content, the model survives service restart, descriptions preserve ACT layer IDs and shapes, samples return the requested dataset row, and invalid paths or sources return structured errors.
+Acceptance is observable when catalog models list their pinned sha256 and methods, a valid VNN-LIB or classifier source returns 201 then 200 for the same content, the model survives service restart, descriptions preserve ACT layer IDs and shapes, samples return the requested dataset row, a model the active engine cannot load is reported as `load_failed` and rebuilds from its recorded parameters, and invalid paths or sources return structured errors.
 
 Run `npm run gen:types` after changing `schemas.py`, then `npm run check:types`. Do not hand edit `visual_bench/generated/wire.ts`. Do not claim tests were run unless the command and result are recorded.
 
@@ -98,11 +98,11 @@ Run `npm run gen:types` after changing `schemas.py`, then `npm run check:types`.
 | Layer | Entry | Contract or artifact | Owner for handoff |
 | --- | --- | --- | --- |
 | Wire | [schemas.py](schemas.py) | Model summaries, source requests, samples, layers, input and output specs | `generated/wire.ts` is generated from Pydantic models |
-| Service | [service.py](service.py) | `models`, `sources`, `sample`, `load`, `describe`; content addressed built models | Engine gate is `engine.EngineService`; ACT description is bridge owned |
-| HTTP | [routes.py](routes.py) | `/api/models`, `/api/models/{id}`, `/api/sources`, `/api/sources/sample` | Verification consumes model IDs and methods |
-| Browser data | [api.ts](api.ts), [hooks.ts](hooks.ts) | Queries for models, descriptions, sources, samples; load invalidates model list | Shared query keys own cache identity |
-| Views | [LoadPanel.tsx](LoadPanel.tsx), [ModelList.tsx](ModelList.tsx), [ModelGraph.tsx](ModelGraph.tsx), [SpecPanel.tsx](SpecPanel.tsx), [InputDomain.tsx](InputDomain.tsx) | Load, graph, spec, image-domain, and sample presentation | Workspace owns selection and navigation |
-| Tests | [test_model_spec.py](test_model_spec.py) | Real ACT loads, idempotency, persistence, descriptions, samples, structured errors | Bridge loader tests cover ACT source adaptation |
+| Service | [service.py](service.py) | `models`, `sources`, `sample`, `load`, `rebuild`, `describe`; content addressed built models with `built_with` (ACT commit and source) and `engine_check` | Engine gate is `engine.EngineService`; ACT description is bridge owned |
+| HTTP | [routes.py](routes.py) | `/api/models`, `/api/models/{id}`, `POST /api/models/{id}/rebuild`, `/api/sources`, `/api/sources/sample` | Verification consumes model IDs and methods |
+| Browser data | [api.ts](api.ts), [hooks.ts](hooks.ts) | Queries for models, descriptions, sources, samples; load and rebuild invalidate the model list | Shared query keys own cache identity |
+| Views | [LoadPanel.tsx](LoadPanel.tsx), [ModelList.tsx](ModelList.tsx), [ModelGraph.tsx](ModelGraph.tsx), [SpecPanel.tsx](SpecPanel.tsx), [InputDomain.tsx](InputDomain.tsx), [RebuildNotice.tsx](RebuildNotice.tsx) | Load, graph, spec, image-domain, and sample presentation; rebuild offer for a model the active engine cannot load | Workspace owns selection and navigation |
+| Tests | [test_model_spec.py](test_model_spec.py) | Real ACT loads, idempotency, persistence, descriptions, samples, engine-check and rebuild, structured errors | Bridge loader tests cover ACT source adaptation |
 
 
 </details>
@@ -121,7 +121,8 @@ The task IDs and dependencies remain stable. MSV-04 is the implemented loading s
 | MSV-01 | Deliver real description list/detail UI | VER-01, WS-02 | A real sample shows correct layer shapes, tensor edges, and specification variables with loading/error states. |
 | MSV-02 | Evaluate and wrap the network renderer | MSV-01 | Show stable IDs, external selection, node callbacks, resize, worker/assets, and browser findings; document a fallback if the candidate fails. |
 | MSV-03 | Validate specification drafts | MSV-01, MSB-03 | Invalid variable mappings are explained; a valid change creates a new reference and cannot mutate an existing run. |
-| MSV-04 | Load models from VNN-LIB and torch sources | MSB-04, MSV-01 | `LoadPanel.tsx` in the sidebar: VNN-LIB tab (benchmark, instance) and Torch tab (classifier, test-image index with preview and label, eps slider, batch size with a per-image picker: a batch of several test images builds one fuzz-only net with a row per image, and the Specification panel shows it one row at a time). `POST /api/models` builds through the bridge and returns the content-addressed model (201 new, 200 existing); loaded models appear under "Loaded" with their parameters, and selecting one prefills the form so a new image/eps rebuilds a new snapshot. Flat VNN-LIB image vectors of known datasets are drawn as H x W x C (cora_2024 convention). |
+| MSV-04 | Load models from VNN-LIB and torch sources | MSB-04, MSV-01 | `LoadPanel.tsx` in the sidebar: VNN-LIB tab (benchmark, instance) and Torch tab (classifier, test-image index with preview and label, eps slider, batch size with a per-image picker: a batch of several test images builds one net with a row per image (fuzzing and Verification; BaB needs one image), and the Specification panel shows it one row at a time). `POST /api/models` builds through the bridge and returns the content-addressed model (201 new, 200 existing); loaded models appear under "Loaded" with their parameters, and selecting one prefills the form so a new image/eps rebuilds a new snapshot. Flat VNN-LIB image vectors of known datasets are drawn as H x W x C (cora_2024 convention). |
+| MSV-05 | Flag and rebuild models built on another ACT engine | MSV-04, VER-08 | `ModelService.load` records `built_with` (commit, baseline or remote/branch) in `.meta.json`. `ModelSummary.engine_check` is `same_commit` when the active engine built it, otherwise the outcome of the first describe on the active commit (`loads` / `load_failed`) or `unchecked`; model files are never scanned eagerly (built models can be GBs). `ModelList.tsx` marks `load_failed` ("needs rebuild") and untried models from another commit; `RebuildNotice.tsx` replaces the load error with a button that calls `POST /api/models/{id}/rebuild`, which rebuilds the recorded source settings through `load` and selects the new model; the old model and its runs are kept. Evidence: `test_model_spec.py::test_model_from_another_engine_is_flagged_when_it_fails_to_load_and_rebuilds`. |
 
 
 MSV-02's renderer evaluation and MSV-03's editable draft validation are not current capabilities. Proposed `ModelSpecView.tsx`, `view_model.ts`, and `network_renderer.ts` are design references only. Keep unsupported specifications visible with their actual representation and reason.

@@ -56,3 +56,4 @@ class HealthOut(Wire):
     status: Literal["ok"]
     service: str
     version: str
+    instance: str  # changes whenever the service process (re)starts

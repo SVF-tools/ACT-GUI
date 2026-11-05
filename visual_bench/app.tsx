@@ -1,10 +1,12 @@
 // Composition root: selection and props connect otherwise independent feature slices.
-import { useReducer, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import { AssistantView } from "./assistant/AssistantView";
 import { ModelGraph } from "./model_spec/ModelGraph";
 import { LoadPanel } from "./model_spec/LoadPanel";
 import { ModelList } from "./model_spec/ModelList";
 import { SpecPanel } from "./model_spec/SpecPanel";
+import { RebuildNotice } from "./model_spec/RebuildNotice";
+import { ApiError } from "./shared/http";
 import { useModels, useModel } from "./model_spec/hooks";
 import { RecordsView } from "./records/RecordsView";
 import { RunsPanel } from "./verification/RunsPanel";
@@ -12,6 +14,7 @@ import { RunHistory } from "./verification/RunHistory";
 import { useLiveRuns } from "./verification/hooks";
 import { EngineBadge } from "./engine/EngineBadge";
 import { EngineView } from "./engine/EngineView";
+import { useCapabilities } from "./engine/hooks";
 import { GurobiBadge } from "./engine/GurobiBadge";
 import { FuzzSettings } from "./fuzzing/FuzzSettings";
 import { useFuzzConfiguration } from "./fuzzing/hooks";
@@ -24,17 +27,21 @@ import { PresenceBar } from "./workspace/Presence";
 import { markTourDone, tourPending } from "./workspace/tourSteps";
 import { Empty } from "./shared/ui/Empty";
 
-const TABS = ["Assistant", "Records", "Engine"] as const;
+const TABS = ["Engine", "Records", "Assistant"] as const;
 type Tab = (typeof TABS)[number];
 export function App() {
   const [sel, dispatch] = useReducer(selectionReducer, initialSelection);
   const [mode, setMode] = useState<ModeId>(defaultMode);
-  const [tab, setTab] = useState<Tab>("Assistant");
+  const [tab, setTab] = useState<Tab>("Engine");
   const [touring, setTouring] = useState(tourPending);
   const models = useModels();
   const model = useModel(sel.modelId);
   const fuzz = useFuzzConfiguration();
   const activeMode = modeForId(mode);
+  const lacks = useCapabilities();
+  // After an ACT switch, leave a mode the new checkout cannot run.
+  const fallbackMode = lacks(activeMode.capability) ? modes.find((m) => !lacks(m.capability))?.id : undefined;
+  useEffect(() => { if (fallbackMode) setMode(fallbackMode); }, [fallbackMode]);
   useLiveRuns();
   const current = models.status === "success" ? models.data.find((m) => m.model_id === sel.modelId) ?? null : null;
 
@@ -52,7 +59,7 @@ export function App() {
           title="Show the guided tour">? Guide</button>
         <ThemeToggle />
       </header>
-      {touring && <Tour onClose={() => { markTourDone(); setTouring(false); }} />}
+      {touring && <Tour modelReady={model.status === "success"} onClose={() => { markTourDone(); setTouring(false); }} />}
       <aside className="sidebar">
         <div data-tour="load">
           <LoadPanel current={current}
@@ -65,7 +72,11 @@ export function App() {
       <main className="center">
         {sel.modelId === null && <Empty title="Select a model" text="Models are real ACT networks pinned by commit and sha256." />}
         {sel.modelId !== null && model.status === "pending" && <Empty title="Loading model through ACT…" text="" />}
-        {model.status === "error" && <div className="error">Model load failed: {model.error.message}</div>}
+        {model.status === "error" && (current && (current.source ?? "catalog") !== "catalog" && model.error instanceof ApiError
+          && model.error.code === "model_load_failed"
+          ? <RebuildNotice model={current} message={model.error.message}
+              onRebuilt={(m) => dispatch({ type: "selectModel", modelId: m.model_id })} />
+          : <div className="error">Model load failed: {model.error.message}</div>)}
         {model.status === "success" && (
           <>
             <section className="panel" data-tour="network">
@@ -89,10 +100,13 @@ export function App() {
             <section className="panel modes" data-tour="modes">
               <nav className="tabs" role="tablist" aria-label="run mode">
                 {modes.map((m) => (
-                  <button key={m.id} role="tab" aria-selected={mode === m.id} className={mode === m.id ? "tab active" : "tab"} onClick={() => setMode(m.id)}>{m.label}</button>
+                  <button key={m.id} role="tab" aria-selected={mode === m.id} className={mode === m.id ? "tab active" : "tab"}
+                    disabled={lacks(m.capability) !== null} title={lacks(m.capability) ?? undefined}
+                    onClick={() => setMode(m.id)}>{m.label}</button>
                 ))}
               </nav>
               <div className="modebody">
+                {lacks(activeMode.capability) && <div className="banner warn"><b>Disabled on this ACT checkout.</b> {lacks(activeMode.capability)}</div>}
                 <activeMode.View sel={sel} model={model.data}
                   onSelectLayer={(layerId) => dispatch({ type: "selectLayer", layerId })}
                   onSelectNeuron={(neuron) => dispatch({ type: "selectNeuron", neuron })} />

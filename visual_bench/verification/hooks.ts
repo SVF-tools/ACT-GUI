@@ -1,4 +1,4 @@
-// Queries/commands for /api/runs, /api/runs/{id}, /stop; SSE at /api/runs/{id}/events.
+// Queries/commands for /api/runs, /api/runs/{id}, /stop, /saved-counterexample; SSE at /api/runs/{id}/events.
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { followRun } from "../shared/http";
@@ -17,6 +17,14 @@ export function useStartRun() {
       client.setQueryData(keys.run(run.run_id), run);
       await client.invalidateQueries({ queryKey: keys.runs() });
     },
+  });
+}
+
+export function useSaveRunCounterexample() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: api.saveCounterexample,
+    onSuccess: (run) => client.setQueryData(keys.run(run.run_id), run),
   });
 }
 

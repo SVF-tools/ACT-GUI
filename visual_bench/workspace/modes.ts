@@ -31,10 +31,11 @@ function FuzzMode({ sel, model }: ModeProps) {
   return createElement(FuzzView, { runId: sel.runId, model });
 }
 
-export const modes: readonly { id: ModeId; label: string; method: Method; View: ComponentType<ModeProps> }[] = [
-  { id: "Fuzzing", label: "Fuzzing", method: "fuzz", View: FuzzMode },
-  { id: "Verification", label: "Verification", method: "interval", View: VerificationMode },
-  { id: "BaB", label: "BaB", method: "bab", View: BabMode },
+// capability: the engine capability (bridge API checks) a mode needs to run ACT.
+export const modes: readonly { id: ModeId; label: string; method: Method; capability: string; View: ComponentType<ModeProps> }[] = [
+  { id: "Fuzzing", label: "Fuzzing", method: "fuzz", capability: "fuzz.actfuzzer", View: FuzzMode },
+  { id: "Verification", label: "Verification", method: "interval", capability: "verify.interval", View: VerificationMode },
+  { id: "BaB", label: "BaB", method: "bab", capability: "verify.bab", View: BabMode },
 ];
 
 export const defaultMode: ModeId = "Verification";
