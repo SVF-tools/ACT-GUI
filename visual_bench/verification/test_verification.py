@@ -9,6 +9,7 @@ import json
 import time
 import zipfile
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -89,6 +90,39 @@ def test_domain_run_records_domain_and_has_no_interval_native_reference(client: 
     assert default["domain"] == "interval"
     follow_to_end(client, default["run_id"])
 
+def test_verification_defaults_match_act_dual_config(client: TestClient):
+    from engine_bridge.engine_session import act_imports
+
+    served = client.get("/api/verification/defaults").json()
+    with act_imports():
+        from act.config.config import DualConfig
+
+        act = DualConfig()
+    act_name: dict[str, str] = {"iterations": "n_iters", "max_time_s": "max_time"}
+    tunable = {k: v for k, v in served["dual"].items() if k != "alpha"}
+    assert tunable == {k: getattr(act, act_name[k] if k in act_name else k) for k in tunable}
+    assert served["dual"]["alpha"] == "fixed" and served["hybridz"] == {"tolerance": 1e-7}
+
+def test_dual_alpha_optimization_reaches_act(client: TestClient):
+    caps = {c["name"]: c["availability"] for c in client.get("/api/engine").json()["capabilities"]}
+    if caps.get("verify.dual.options") != "available":
+        pytest.skip("active ACT checkout has no verify_once dual options (branch act-gui-match)")
+
+    def run(dual: dict[str, object] | None) -> dict[str, Any]:
+        body = {"model_id": "bab_deep_mlp", "method": "interval", "domain": "dual", **({"dual": dual} if dual else {})}
+        run_id = client.post("/api/runs", json=body).json()["run_id"]
+        follow_to_end(client, run_id)
+        return client.get(f"/api/runs/{run_id}").json()
+
+    fixed = run(None)  # fixed slopes leave bab_deep_mlp UNKNOWN; optimized alpha tightens ACT's dual bound
+    assert fixed["dual"]["alpha"] == "fixed" and fixed["result"]["act_status"] == "UNKNOWN"
+    slack = fixed["result"]["metadata"]["min_slack"]
+    for alpha in ("optimize", "optimize_refresh"):
+        optimized = run({"alpha": alpha, "iterations": 20})
+        assert optimized["dual"] == {**fixed["dual"], "alpha": alpha, "iterations": 20}
+        assert optimized["status"] == "completed", optimized["error"]
+        assert optimized["result"]["metadata"]["min_slack"] > slack
+
 def test_torch_batch_verification_records_a_verdict_per_image(client: TestClient):
     sources_or_skip(client)
     m = client.post("/api/models", json={"source": {"kind": "torch", "source_id": "mnist_conv_small", "index": 3,
@@ -122,6 +156,10 @@ def test_idempotent_start_and_conflict(client: TestClient):
     ({"model_id": "range_check", "method": "bab", "extra": 1}, 422, "invalid_request"),
     ({"model_id": "range_check", "method": "bab", "domain": "dual"}, 422, "invalid_request"),
     ({"model_id": "range_check", "method": "interval", "domain": "zonotope"}, 422, "invalid_request"),
+    ({"model_id": "range_check", "method": "interval", "dual": {"alpha": "optimize"}}, 422, "invalid_request"),
+    ({"model_id": "range_check", "method": "interval", "domain": "dual", "dual": {"iterations": 0}}, 422,
+     "invalid_request"),
+    ({"model_id": "range_check", "method": "interval", "domain": "dual", "hybridz": {}}, 422, "invalid_request"),
 ])
 def test_invalid_run_requests_are_structured_errors(client: TestClient, body, status, code):
     resp = client.post("/api/runs", json=body)

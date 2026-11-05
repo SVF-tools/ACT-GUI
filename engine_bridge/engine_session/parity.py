@@ -65,6 +65,13 @@ def requirements() -> dict[str, tuple[Requirement, ...]]:
                       Requirement(f"{_VERIFIER}:get_output_ids", positional=1)),
         "verify.interval": _VERIFY_ONCE,
         "verify.dual": _VERIFY_ONCE,
+        "verify.dual.options": (
+            *_VERIFY_ONCE,
+            Requirement(f"{_VERIFIER}:verify_once", ("dual_iters", "dual_config", "dual_refresh_forward"), positional=1),
+            Requirement("act.config.config:DualConfig", ("n_iters", "lr_alpha", "lr_decay", "per_class_alpha",
+                                                          "stagnation_patience", "stagnation_tol", "max_time",
+                                                          "forward_lin_max_perturbed")),
+        ),
         "observe.propagation": (
             *_VERIFY_ONCE,
             Requirement("act.back_end.observe:observe", positional=1),

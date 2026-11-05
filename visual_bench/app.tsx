@@ -18,6 +18,8 @@ import { useCapabilities } from "./engine/hooks";
 import { GurobiBadge } from "./engine/GurobiBadge";
 import { FuzzSettings } from "./fuzzing/FuzzSettings";
 import { useFuzzConfiguration } from "./fuzzing/hooks";
+import { useVerifyConfiguration } from "./verification/hooks";
+import type { Domain } from "./verification/RunsPanel";
 import { initialSelection, selectionReducer } from "./workspace/selection";
 import { modes, defaultMode, modeForId, modeForMethod, type ModeId } from "./workspace/modes";
 import { ContextBar } from "./workspace/layout";
@@ -40,6 +42,8 @@ export function App() {
   const models = useModels();
   const model = useModel(sel.modelId);
   const fuzz = useFuzzConfiguration();
+  const verify = useVerifyConfiguration();
+  const [domain, setDomain] = useState<Domain>("interval");
   const activeMode = modeForId(mode);
   const propagation = usePropagation(mode === "Verification" ? sel.runId : null);
   const inspecting = mode === "Verification" && (propagation.data?.availability === "available" || propagation.data?.availability === "pending");
@@ -95,6 +99,7 @@ export function App() {
               modelId={model.data.model_id}
               method={activeMode.method}
               fuzzOptions={fuzz.value}
+              domain={domain} onDomain={setDomain} verify={verify}
               fuzzSettings={<>
                 {fuzz.query.isError && <div className="error">Fuzz defaults unavailable: {fuzz.query.error.message}</div>}
                 {fuzz.value && fuzz.defaults && <FuzzSettings value={fuzz.value} defaults={fuzz.defaults} onChange={fuzz.setValue} />}

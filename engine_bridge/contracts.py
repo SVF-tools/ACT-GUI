@@ -16,6 +16,24 @@ Method = Literal["interval", "bab", "fuzz"]
 # interval = IntervalTF bounds, dual = ACT DualSolver, hybridz = HybridzTF + HZSolver.
 Domain = Literal["interval", "dual", "hybridz"]
 DOMAINS: tuple[Domain, ...] = ("interval", "dual", "hybridz")
+# Dual alpha handling of verify_once: fixed slopes (one backward pass), Adam over alpha with the forward bounds
+# kept fixed, or Adam over alpha recomputing the forward bounds from the current alpha every iteration.
+DualAlpha = Literal["fixed", "optimize", "optimize_refresh"]
+
+
+@dataclass(frozen=True)
+class DualOptions:
+    """DualSolver settings of a dual verify_once run. Defaults equal ACT's DualConfig; alpha "fixed" is ACT's
+    verify_once default, so DualOptions() calls verify_once exactly as before (no extra ACT API needed)."""
+    alpha: DualAlpha = "fixed"
+    iterations: int = 50
+    lr_alpha: float = 0.1
+    lr_decay: float = 0.98
+    per_class_alpha: bool = True
+    stagnation_patience: int = 0
+    stagnation_tol: float = 1e-5
+    max_time_s: float = 0.0
+    forward_lin_max_perturbed: int = 100
 
 
 class BridgeError(Exception):

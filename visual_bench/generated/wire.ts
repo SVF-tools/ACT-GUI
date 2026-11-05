@@ -34,6 +34,15 @@ export type WaveEvents = ("available" | "pending" | "not_recorded" | "unsupporte
 export type Code = string
 export type Message = string
 export type Severity = ("info" | "warning" | "error")
+export type Alpha = ("fixed" | "optimize" | "optimize_refresh")
+export type ForwardLinMaxPerturbed = number
+export type Iterations = number
+export type LrAlpha = number
+export type LrDecay = number
+export type MaxTimeS = number
+export type PerClassAlpha = boolean
+export type StagnationPatience = number
+export type StagnationTol = number
 export type Branches = string[]
 export type Remote1 = string
 export type Url = string
@@ -135,7 +144,7 @@ export type CounterexampleCount = number
 export type CoverageStrategy1 = string
 export type Device = string
 export type ElapsedS3 = number
-export type Iterations = number
+export type Iterations1 = number
 export type NeuronCoverage = number
 export type NeverActivatedCount = number
 export type NeverActivatedSample = string[]
@@ -157,6 +166,7 @@ export type Instance = string
 export type Service = string
 export type Status1 = "ok"
 export type Version = string
+export type Tolerance = number
 export type Center = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type Dataset1 = (string | null)
 export type Kind5 = string
@@ -364,6 +374,7 @@ ClassifierSourceOut?: ClassifierSourceOut
 CountryCount?: CountryCount
 CoverageOut?: CoverageOut
 DiagnosticOut?: DiagnosticOut
+DualOptions?: DualOptions
 EngineBranchesOut?: EngineBranchesOut
 EngineInfoOut?: EngineInfoOut
 EngineRemoteOut?: EngineRemoteOut
@@ -385,6 +396,7 @@ FuzzStrategyOut?: FuzzStrategyOut
 FuzzSummaryOut?: FuzzSummaryOut
 FuzzingOut?: FuzzingOut
 HealthOut?: HealthOut
+HybridzOptions?: HybridzOptions
 InputSpecOut?: InputSpecOut
 LayerOut?: LayerOut
 LayerStateOut?: LayerStateOut
@@ -422,6 +434,7 @@ SelectionContext?: SelectionContext
 SolverLicenseUpload?: SolverLicenseUpload
 SolverStatusOut?: SolverStatusOut
 SourcesOut?: SourcesOut
+VerifyDefaults?: VerifyDefaults
 VnnlibBenchmarkOut?: VnnlibBenchmarkOut
 VnnlibInstanceOut?: VnnlibInstanceOut
 }
@@ -505,6 +518,24 @@ export interface DiagnosticOut {
 code: Code
 message: Message
 severity: Severity
+}
+/**
+ * DualSolver settings of a dual-domain verify_once run. Defaults equal ACT's DualConfig (drift-checked in
+ * test_verification.py); with every default the run calls verify_once exactly as without options.
+ * 
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "DualOptions".
+ */
+export interface DualOptions {
+alpha?: Alpha
+forward_lin_max_perturbed?: ForwardLinMaxPerturbed
+iterations?: Iterations
+lr_alpha?: LrAlpha
+lr_decay?: LrDecay
+max_time_s?: MaxTimeS
+per_class_alpha?: PerClassAlpha
+stagnation_patience?: StagnationPatience
+stagnation_tol?: StagnationTol
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -746,7 +777,7 @@ counterexample_count: CounterexampleCount
 coverage_strategy: CoverageStrategy1
 device: Device
 elapsed_s: ElapsedS3
-iterations: Iterations
+iterations: Iterations1
 neuron_coverage: NeuronCoverage
 never_activated_count: NeverActivatedCount
 never_activated_sample: NeverActivatedSample
@@ -802,6 +833,15 @@ instance: Instance
 service: Service
 status: Status1
 version: Version
+}
+/**
+ * HybridZ verdict-solver settings of a hybridz-domain verify_once run; its time limit is the run budget.
+ * 
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "HybridzOptions".
+ */
+export interface HybridzOptions {
+tolerance?: Tolerance
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -1160,8 +1200,10 @@ counterexample_saved_at?: CounterexampleSavedAt
 created_at: CreatedAt
 diagnostics?: (RunDiagnosticsOut | null)
 domain: Domain3
+dual?: (DualOptions | null)
 error: (ErrorBody | null)
 finished_at: FinishedAt
+hybridz?: (HybridzOptions | null)
 last_seq: LastSeq
 matches_native: MatchesNative
 method: Method1
@@ -1201,7 +1243,9 @@ export interface Metadata2 {
 export interface RunRequest {
 client_request_id?: ClientRequestId1
 domain?: Domain4
+dual?: (DualOptions | null)
 fuzz?: (FuzzOptions | null)
+hybridz?: (HybridzOptions | null)
 method: Method2
 model_id: ModelId4
 time_budget_s?: TimeBudgetS1
@@ -1272,4 +1316,14 @@ instances: Instances
 export interface VnnlibInstanceOut {
 onnx: Onnx2
 vnnlib: Vnnlib2
+}
+/**
+ * GET /api/verification/defaults: the settings a verify_once run uses when the request leaves them out.
+ * 
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "VerifyDefaults".
+ */
+export interface VerifyDefaults {
+dual: DualOptions
+hybridz: HybridzOptions
 }

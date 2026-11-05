@@ -89,6 +89,10 @@ class RunService:
                 return run_id
         return None
 
+    @staticmethod
+    def defaults() -> S.VerifyDefaults:
+        return S.VerifyDefaults(dual=S.DualOptions(), hybridz=S.HybridzOptions())
+
     # -- commands ------------------------------------------------------------
     def start(self, req: S.RunRequest) -> tuple[S.RunOut, bool]:
         """Return (run, created). Never waits for ACT."""
@@ -100,7 +104,13 @@ class RunService:
             req = req.model_copy(update={"fuzz": FuzzOptions()})
         if req.method == "interval" and req.domain is None:
             req = req.model_copy(update={"domain": "interval"})
+        if req.domain == "dual" and req.dual is None:
+            req = req.model_copy(update={"dual": S.DualOptions()})
+        if req.domain == "hybridz" and req.hybridz is None:
+            req = req.model_copy(update={"hybridz": S.HybridzOptions()})
         self.engine.require_capability(required_capability(req.method, req.domain))
+        if req.dual is not None and req.dual != S.DualOptions():
+            self.engine.require_capability("verify.dual.options")
         with self._lock:
             if req.client_request_id:
                 existing = self._find_by_request_id(req.client_request_id)
@@ -171,6 +181,8 @@ class RunService:
                     Path(tmp) / n for n in ("request.json", "output.json", "stderr.txt", "stdout.txt"))
                 worker_req = {"model_path": str(model_path), "method": req.method,
                               "time_budget_s": req.time_budget_s, "domain": req.domain,
+                              "dual": req.dual.model_dump() if req.dual else None,
+                              "hybridz": req.hybridz.model_dump() if req.hybridz else None,
                               "record_layers": self.engine.capability_available("inspect.layer_bounds.interval"),
                               "record_propagation": self.engine.capability_available("observe.propagation"),
                               "record_directory": str(self.records.run_dir(run_id).resolve()),
@@ -324,6 +336,7 @@ class RunService:
         diag = self.records.diagnostics(run_id)
         diagnostics = S.RunDiagnosticsOut.model_validate(diag["summary"]) if diag and "summary" in diag else None
         return S.RunOut(run_id=run_id, model_id=req.model_id, method=req.method, domain=domain, diagnostics=diagnostics,
+                        dual=req.dual, hybridz=req.hybridz,
                         time_budget_s=req.time_budget_s,
                         client_request_id=req.client_request_id, status=status, created_at=m["created_at"],
                         started_at=started, finished_at=last["at"] if status in ("completed", "failed") and last else None,

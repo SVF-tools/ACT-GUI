@@ -10,8 +10,32 @@ from visual_bench.model_spec.schemas import NativeResult
 from visual_bench.fuzzing.schemas import FuzzOptions
 from visual_bench.analysis.schemas import PropagationRecordOut
 
-__all__ = ['RunRequest', 'RowVerdictOut', 'RunResultOut', 'RunDiagnosticsOut', 'RunOut', 'RunList', 'RunEventKind', 'RunEvent']
+__all__ = ['DualOptions', 'HybridzOptions', 'VerifyDefaults', 'RunRequest', 'RowVerdictOut', 'RunResultOut', 'RunDiagnosticsOut', 'RunOut', 'RunList', 'RunEventKind', 'RunEvent']
 
+
+class DualOptions(Wire):
+    """DualSolver settings of a dual-domain verify_once run. Defaults equal ACT's DualConfig (drift-checked in
+    test_verification.py); with every default the run calls verify_once exactly as without options."""
+    # fixed: fixed ReLU slopes, one backward pass (ACT's verify_once default); optimize: Adam over alpha with the
+    # forward bounds kept fixed; optimize_refresh: Adam over alpha, recomputing the forward bounds every iteration.
+    alpha: Literal["fixed", "optimize", "optimize_refresh"] = "fixed"
+    iterations: int = Field(default=50, ge=1, le=10_000)
+    lr_alpha: float = Field(default=0.1, gt=0, le=10)
+    lr_decay: float = Field(default=0.98, gt=0, le=1)
+    per_class_alpha: bool = True
+    stagnation_patience: int = Field(default=0, ge=0, le=10_000)  # 0 disables the stagnation stop
+    stagnation_tol: float = Field(default=1e-5, ge=0, le=1)
+    max_time_s: float = Field(default=0.0, ge=0, le=600)  # 0 disables the optimization time limit
+    forward_lin_max_perturbed: int = Field(default=100, ge=0, le=1_000_000)
+
+class HybridzOptions(Wire):
+    """HybridZ verdict-solver settings of a hybridz-domain verify_once run; its time limit is the run budget."""
+    tolerance: float = Field(default=1e-7, gt=0, le=1e-2)
+
+class VerifyDefaults(Wire):
+    """GET /api/verification/defaults: the settings a verify_once run uses when the request leaves them out."""
+    dual: DualOptions
+    hybridz: HybridzOptions
 
 class RunRequest(Wire):
     model_id: str = Field(min_length=1, max_length=64)
@@ -20,6 +44,8 @@ class RunRequest(Wire):
     client_request_id: str | None = Field(default=None, min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.:-]+$")
     fuzz: FuzzOptions | None = None
     domain: Domain | None = None  # method "interval" only; the service defaults it to "interval"
+    dual: DualOptions | None = None  # domain "dual" only; the service fills in the defaults
+    hybridz: HybridzOptions | None = None  # domain "hybridz" only; the service fills in the defaults
 
     @model_validator(mode="after")
     def _options_match_method(self) -> "RunRequest":
@@ -27,6 +53,10 @@ class RunRequest(Wire):
             raise ValueError("fuzz options are only valid with method 'fuzz'")
         if self.domain is not None and self.method != "interval":
             raise ValueError("domain is only valid with method 'interval'")
+        if self.dual is not None and self.domain != "dual":
+            raise ValueError("dual options are only valid with domain 'dual'")
+        if self.hybridz is not None and self.domain != "hybridz":
+            raise ValueError("hybridz options are only valid with domain 'hybridz'")
         return self
 
 class RowVerdictOut(Wire):
@@ -62,6 +92,8 @@ class RunOut(Wire):
     model_id: str
     method: Method
     domain: Domain | None  # abstract domain of a verify_once run; None for bab/fuzz
+    dual: DualOptions | None = None  # settings of a dual run; None for other runs and for runs recorded before them
+    hybridz: HybridzOptions | None = None  # settings of a hybridz run, likewise
     time_budget_s: float
     client_request_id: str | None
     status: RunState

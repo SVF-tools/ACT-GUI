@@ -59,6 +59,7 @@ _BASELINE_CAPABILITIES = (
     Capability("spec.read", "available", "INPUT_SPEC / ASSERT layer params"),
     Capability("verify.interval", "available", "act.back_end.verifier.verify_once"),
     Capability("verify.dual", "available", "act.back_end.verifier.verify_once with set_solver_mode('dual') (DualSolver)"),
+    Capability("verify.dual.options", "available", "act.back_end.verifier.verify_once(dual_iters, dual_config, dual_refresh_forward): DualSolver alpha optimization and DualConfig policy (ACT-07)"),
     Capability("verify.hybridz", "available", "act.back_end.verifier.verify_once with solver+TF mode 'hybridz' (HybridzTF + HZSolver)"),
     Capability("verify.bab", "available", "act.back_end.bab.bab.verify_bab_batched + TorchLPSolver (as act/config/pipeline_cli.py)"),
     Capability("fuzz.actfuzzer", "available", "act.pipeline.fuzzing.ACTFuzzer on ACTToTorch(net); progress via the instance's _print_progress seam; mutated-input frames via a wrapper on the instance's mutation_engine.mutate"),

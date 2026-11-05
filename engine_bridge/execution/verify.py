@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from engine_bridge.contracts import DOMAINS, BridgeError, Domain, LaneOutcome, Method, RunOutcome, Verdict
+from engine_bridge.contracts import DOMAINS, BridgeError, Domain, DualOptions, LaneOutcome, Method, RunOutcome, Verdict
 from engine_bridge.engine_session import act_imports
 from engine_bridge.model_spec.describe import load_net
 
@@ -113,8 +113,25 @@ def select_domain(domain: Domain) -> None:
         set_transfer_function_mode("interval")
 
 
-def run_verification(model_path: Path, method: Method, time_budget_s: float,
-                     domain: Domain = "interval") -> RunOutcome:
+def dual_kwargs(options: DualOptions) -> dict[str, Any]:
+    """verify_once keywords for DualOptions; the defaults add none, so a plain verify_once runs (capability verify.dual).
+    Anything else needs verify.dual.options. Call inside act_imports()."""
+    if options == DualOptions():
+        return {}
+    from act.config.config import DualConfig
+
+    config = DualConfig(
+        n_iters=options.iterations, lr_alpha=options.lr_alpha, lr_decay=options.lr_decay,
+        per_class_alpha=options.per_class_alpha, stagnation_patience=options.stagnation_patience,
+        stagnation_tol=options.stagnation_tol, max_time=options.max_time_s,
+        forward_lin_max_perturbed=options.forward_lin_max_perturbed,
+    )
+    return {"dual_iters": 0 if options.alpha == "fixed" else options.iterations, "dual_config": config,
+            "dual_refresh_forward": options.alpha == "optimize_refresh"}
+
+
+def run_verification(model_path: Path, method: Method, time_budget_s: float, domain: Domain = "interval",
+                     dual: DualOptions | None = None, hybridz_tolerance: float = 1e-7) -> RunOutcome:
     if method not in ("interval", "bab"):
         raise BridgeError("unsupported_method", f"Unknown method {method!r}")
     if domain not in DOMAINS:
@@ -129,7 +146,8 @@ def run_verification(model_path: Path, method: Method, time_budget_s: float,
             select_domain(domain)
             # HybridZ's MILP verdict solver takes the run budget as its time limit (as pipeline_cli --timeout).
             kwargs: dict[str, Any] = (
-                {"timelimit": float(time_budget_s), "hybridz_tolerance": 1e-7} if domain == "hybridz" else {})
+                {"timelimit": float(time_budget_s), "hybridz_tolerance": float(hybridz_tolerance)}
+                if domain == "hybridz" else dual_kwargs(dual or DualOptions()) if domain == "dual" else {})
             t = time.perf_counter()
             results = verify_once(net, **kwargs)
             elapsed = time.perf_counter() - t

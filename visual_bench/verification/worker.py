@@ -38,7 +38,11 @@ def _run(req: dict[str, Any], progress: IO[str], stop: threading.Event) -> dict[
             progress.flush()
 
         return runner.run(model, req, send, stop)
+    from engine_bridge.contracts import DualOptions
+
     domain = req.get("domain") or "interval"
+    dual = DualOptions(**req["dual"]) if req.get("dual") else None
+    tolerance = float((req.get("hybridz") or {}).get("tolerance", 1e-7))
     layers: dict[str, Any] = {}
     if req["method"] == "interval" and req.get("record_propagation", False):
         from engine_bridge.contracts import BridgeError
@@ -52,14 +56,16 @@ def _run(req: dict[str, Any], progress: IO[str], stop: threading.Event) -> dict[
             progress.flush()
 
         writer = PropagationWriter(Path(req["record_directory"]), domain, send_propagation)
-        outcome, sink = run_observed_verification(model, float(req["time_budget_s"]), domain, writer, start_ns)
+        outcome, sink = run_observed_verification(model, float(req["time_budget_s"]), domain, writer, start_ns,
+                                                  dual, tolerance)
         writer.finish(sink.ignored_records)
         try:
             layers["layer_states"] = dataclasses.asdict(sink.layer_states(domain))
         except BridgeError as err:
             layers["layer_states_error"] = {"code": err.code, "message": err.message}
     else:
-        outcome = run_verification(model, req["method"], float(req["time_budget_s"]), domain=domain)
+        outcome = run_verification(model, req["method"], float(req["time_budget_s"]), domain=domain, dual=dual,
+                                   hybridz_tolerance=tolerance)
         if req["method"] == "interval":
             layers["propagation"] = {"domain": domain, "availability": "unavailable", "complete": True,
                                      "records": [], "phases": [], "ignored_records": 0}

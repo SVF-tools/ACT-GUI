@@ -2,7 +2,7 @@ import type { RunOut, RunRequest } from "../generated/wire";
 import { StopButton } from "../shared/ui/StopButton";
 import { snapshotUrl } from "./api";
 import { useRuns, useStopRun } from "./hooks";
-import { METHOD_LABEL } from "./labels";
+import { METHOD_LABEL, runDomainLabel } from "./labels";
 type Method = RunRequest["method"];
 
 // Past runs of the selected model for the current method; live updates share the query cache.
@@ -37,7 +37,7 @@ function RunItem({ run, active, onSelect }: {
   return (
     <li className={live ? "runitem live" : snapshot ? "runitem tools" : "runitem"}>
       <button className={active ? "item active" : "item"} onClick={() => onSelect(run.run_id)}>
-        <span className="title">{run.run_id} <span className="muted">{run.method}{run.domain ? ` · ${run.domain}` : ""}</span></span>
+        <span className="title">{run.run_id} <span className="muted">{run.method}{runDomainLabel(run)}</span></span>
         <span className="chips">
           <span className={`chip s-${run.status}`}>{run.status}</span>
           {verdict && <span className={`chip v-${verdict}`} title="ACT verdict">{verdict}</span>}

@@ -1,6 +1,7 @@
 // ACT verdict of the selected run, shown at the top of the Verification and BaB modes.
 // The verdict is ACT's (RunResultOut.verdict / act_status); this view only labels it.
 import { fmt, indexRanges } from "../shared/wire";
+import { runDomainLabel } from "./labels";
 import type { ModelDescriptionOut, RowVerdictOut, RunOut } from "../generated/wire";
 import { useModels } from "../model_spec/hooks";
 import { useState } from "react";
@@ -27,7 +28,7 @@ export function VerdictBanner({ runId, model }: {
   if (run.status === "queued" || run.status === "running") {
     return (
       <div className="banner verdict bannerrow">
-        <span><b className="vbig">RUNNING</b> {run.method}{run.domain ? ` · ${run.domain}` : ""} · {run.run_id} · no verdict yet.</span>
+        <span><b className="vbig">RUNNING</b> {run.method}{runDomainLabel(run)} · {run.run_id} · no verdict yet.</span>
         <StopButton method={run.method} onStop={() => stopRun.mutateAsync(run.run_id)} />
       </div>
     );
@@ -46,7 +47,7 @@ export function VerdictBanner({ runId, model }: {
     <div className={`banner verdict ${v.cls}`}>
       <div className="verdicthead">
         <b className="vbig">{v.title}</b>
-        <span className="chip">{run.method}{run.domain ? ` · ${run.domain}` : ""}</span>
+        <span className="chip">{run.method}{runDomainLabel(run)}</span>
         <span className="chip mono" title="raw ACT status">{r.act_status}</span>
         <span className="chip">{r.elapsed_s.toFixed(2)} s</span>
         {run.matches_native === true && <span className="chip good" title="matches the recorded native ACT result">= native</span>}

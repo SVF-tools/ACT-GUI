@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from engine_bridge.contracts import BridgeError, Domain, LayerState, LayerStates, ModelDescription, RunOutcome
+from engine_bridge.contracts import BridgeError, Domain, DualOptions, LayerState, LayerStates, ModelDescription, RunOutcome
 from engine_bridge.engine_session import act_imports
 from engine_bridge.execution.verify import run_verification
 from engine_bridge.inspection.layers import MAX_VALUES_PER_LAYER
@@ -194,14 +194,15 @@ class PropagationSink:
 
 def run_observed_verification(model_path: Path, time_budget_s: float, domain: Domain,
                               callback: Callable[[PropagationRecord], None],
-                              start_ns: int | None = None) -> tuple[RunOutcome, PropagationSink]:
+                              start_ns: int | None = None, dual: DualOptions | None = None,
+                              hybridz_tolerance: float = 1e-7) -> tuple[RunOutcome, PropagationSink]:
     model = describe_model(model_path)
     sink = PropagationSink(callback, model, start_ns)
     with act_imports():
         from act.back_end.observe import observe
 
         with observe(sink):
-            outcome = run_verification(model_path, "interval", time_budget_s, domain)
+            outcome = run_verification(model_path, "interval", time_budget_s, domain, dual, hybridz_tolerance)
     if sink.callback_error is not None:
         raise BridgeError("propagation_recording_failed", str(sink.callback_error)) from sink.callback_error
     return outcome, sink

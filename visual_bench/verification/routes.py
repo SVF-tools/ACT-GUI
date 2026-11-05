@@ -13,6 +13,10 @@ from visual_bench.verification.service import RunService
 def router(runs: RunService) -> APIRouter:
     r = APIRouter(prefix="/api", tags=["verification"])
 
+    @r.get("/verification/defaults", response_model=S.VerifyDefaults)
+    def verification_defaults() -> S.VerifyDefaults:
+        return runs.defaults()
+
     @r.post("/runs", response_model=S.RunOut, status_code=202)
     def start_run(req: S.RunRequest) -> JSONResponse:
         run, created = runs.start(req)
