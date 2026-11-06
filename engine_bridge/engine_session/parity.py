@@ -74,9 +74,9 @@ def requirements() -> dict[str, tuple[Requirement, ...]]:
         ),
         "observe.propagation": (
             *_VERIFY_ONCE,
-            Requirement("act.back_end.observe:observe", positional=1),
-            Requirement("act.back_end.observe:emit", positional=1),
-            *(Requirement(f"act.back_end.observe:{name}") for name in
+            Requirement("act.pipeline.gui.observe:observe", positional=1),
+            Requirement("act.pipeline.gui.observe:emit", positional=1),
+            *(Requirement(f"act.pipeline.gui.observe:{name}") for name in
               ("RecordKey", "LayerBounds", "Relaxation", "DualBackward", "SpecBound")),
         ),
         "verify.hybridz": (
