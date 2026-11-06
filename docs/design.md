@@ -74,6 +74,7 @@ These are design constraints, not a claim that all associated APIs exist. Curren
 - Replay reconstructs recorded display state, not solver memory. Missing historical bounds are not_recorded.
 - Run creation checks supported methods and idempotency. Future engine commands must additionally check capabilities and expected_revision and distinguish accepted from applied. Enable pause/step/split only when ACT supports the stated semantics.
 - Fetch large tensors and detailed tree data on demand instead of streaming everything.
+- Propagation records (2026-11-05, ACT-06): every bound ACT reports carries a key of scope (run root now, BaB node later, with parent), domain, pass (forward/backward/refine), layer, stage, version and origin (computed/inherited); lanes stay separate from scope. Tensors are stored once, content-addressed, and referenced by key, so BaB nodes reuse unchanged parent tensors instead of copying them. A run shows only its own domain; cross-domain comparison is a separate future feature.
 
 ## 5. First AI-native Workflow
 

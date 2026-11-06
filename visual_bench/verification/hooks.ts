@@ -1,9 +1,10 @@
-// Queries/commands for /api/runs, /api/runs/{id}, /stop; SSE at /api/runs/{id}/events.
-import { useEffect } from "react";
+// Queries/commands for /api/verification/defaults, /api/runs, /api/runs/{id}, /stop, /saved-counterexample; SSE at /api/runs/{id}/events.
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { followRun } from "../shared/http";
 import { keys } from "../shared/queryClient";
 import * as api from "./api";
+import type { VerifySettingsValue } from "./VerifySettings";
 
 export const useRuns = () => useQuery({ queryKey: keys.runs(), queryFn: api.runs });
 export const useRun = (id: string | null) =>
@@ -17,6 +18,14 @@ export function useStartRun() {
       client.setQueryData(keys.run(run.run_id), run);
       await client.invalidateQueries({ queryKey: keys.runs() });
     },
+  });
+}
+
+export function useSaveRunCounterexample() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, row }: { id: string; row: number | null }) => api.saveCounterexample(id, row),
+    onSuccess: (run) => client.setQueryData(keys.run(run.run_id), run),
   });
 }
 
@@ -49,4 +58,15 @@ export function useLiveRuns() {
     }));
     return () => stops.forEach((stop) => stop());
   }, [activeIds, client]);
+}
+
+export const useVerificationDefaults = () =>
+  useQuery({ queryKey: keys.verificationDefaults(), queryFn: api.verificationDefaults });
+
+/** verify_once settings (dual / hybridz) edited in the run form; null until the defaults arrive. */
+export function useVerifyConfiguration() {
+  const query = useVerificationDefaults();
+  const defaults = query.isSuccess ? query.data as VerifySettingsValue : null;
+  const [draft, setValue] = useState<VerifySettingsValue | null>(null);
+  return { query, defaults, value: draft ?? defaults, setValue };
 }

@@ -3,12 +3,26 @@ import { useState } from "react";
 import { fmt, num } from "../shared/wire";
 import { Empty } from "../shared/ui/Empty";
 import type { LayerStateOut, ModelDescriptionOut } from "../generated/wire";
-import { useLayers } from "./hooks";
+import { useLayers, usePropagation } from "./hooks";
+import { PropagationView } from "./PropagationView";
 
-export function AnalysisView({ sel, model, onSelectLayer, onSelectNeuron }: {
+type Props = {
   sel: { runId: string | null; layerId: number | null; neuron: number | null }; model: ModelDescriptionOut | null;
   onSelectLayer: (id: number) => void; onSelectNeuron: (i: number | null) => void;
-}) {
+};
+export function AnalysisView(props: Props) {
+  const q = usePropagation(props.sel.runId);
+  if (!props.sel.runId) return <Empty title="No run selected" text="Start or pick a verification run to inspect its propagation." />;
+  if (q.isPending) return <Empty title="Loading propagation…" text="Reading this run's records." />;
+  if (q.error) return <div className="error" role="alert">{q.error.message}<button className="secondary" onClick={() => void q.refetch()}>Retry</button></div>;
+  if (q.data.availability === "available" || q.data.availability === "pending") return <PropagationView {...props} index={q.data} />;
+  return <>
+    <p className="note">{q.data.availability === "unavailable" ? "Propagation was unavailable on this run's ACT version." : "Propagation was not recorded for this run."} Legacy layer states, if present, are shown below.</p>
+    <LegacyAnalysisView {...props} />
+  </>;
+}
+
+function LegacyAnalysisView({ sel, model, onSelectLayer, onSelectNeuron }: Props) {
   const q = useLayers(sel.runId);
   if (!sel.runId) return <Empty title="No run selected" text="Start or pick a run; its interval layer states are recorded with it." />;
   if (q.status === "pending") return <Empty title="Loading layer states…" text="" />;
@@ -34,7 +48,7 @@ export function AnalysisView({ sel, model, onSelectLayer, onSelectNeuron }: {
         </div>
         <button onClick={() => step(1)} disabled={idx >= order.length - 1}>next ▶</button>
       </div>
-      <div className="note">Method: {st.method} · {st.provenance.act_call} · {st.provenance.recorded}</div>
+      <div className="note">Domain: {st.method} · forward pass · {st.provenance.act_call} · {st.provenance.recorded}</div>
       {!layer ? <Empty title="Pick a layer" text="Use the stepper or click a node in the network." /> : (
         <LayerBounds layer={layer} before={st.layers.find((l) => l.layer_id === layer.before_layer_ids[0]) ?? null}
           neuron={sel.neuron} onSelectNeuron={onSelectNeuron} model={model} />
@@ -58,10 +72,10 @@ function LayerBounds({ layer, before, neuron, onSelectNeuron, model }: {
   const kind = model?.layers.find((l) => l.layer_id === layer.layer_id)?.kind ?? layer.kind;
   return (
     <>
-      <h3>Layer {layer.layer_id} · {kind} <small>shape [{layer.shape.join("×")}] · stage: after{before ? ` · before = after of layer ${before.layer_id}` : ""}</small></h3>
+      <h3>Layer {layer.layer_id} · {kind} <small>shape [{layer.shape.join("×")}] · {layer.stage === "pre" ? "pre-activation" : "post-activation"} · forward pass{before ? ` · predecessor: layer ${before.layer_id}` : ""}</small></h3>
       <div className="legend">
         {sameSize && <span><i className="sw before" /> before (input to this layer)</span>}
-        <span><i className="sw after" /> after (ACT interval bounds)</span>
+        <span><i className="sw after" /> {layer.stage === "pre" ? "pre-activation" : "post-activation"} bounds</span>
         <span className="muted">axis [{fmt(lo)}, {fmt(hi)}], 0 marked</span>
       </div>
       <div className="bars" role="list">
@@ -106,7 +120,7 @@ function BoxProjection({ lb, ub }: { lb: number[]; ub: number[] }) {
         <text x={4} y={S - 4} className="plabel">x{a}: [{fmt(lb[a]!)}, {fmt(ub[a]!)}]</text>
         <rect x={s(lb[a]!)} y={S - s(ub[b]!)} width={Math.max(1, s(ub[a]!) - s(lb[a]!))} height={Math.max(1, s(ub[b]!) - s(lb[b]!))} className="box" />
       </svg>
-      <div className="note">Representation: interval box · guarantee: sound outer bound from ACT interval analysis · tighter geometry: unsupported (ACT baseline has no projection export).</div>
+      <div className="note">Representation: box of this run's recorded ACT bounds. Tighter domain geometry is not exported in this legacy record.</div>
     </div>
   );
 }

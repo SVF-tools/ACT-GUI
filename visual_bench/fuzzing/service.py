@@ -16,10 +16,8 @@ from visual_bench.fuzzing.live import FuzzLive
 from visual_bench.model_spec.service import ModelService
 from visual_bench.records import RecordStore
 from visual_bench.records.store import now_iso
-from visual_bench.verification.service import RunService
+from visual_bench.verification.service import SAVED, RunService, vnncomp_sat
 from visual_bench.wire import wire_number, wire_numbers
-
-SAVED = "saved_counterexamples.json"
 
 
 class FuzzingService:
@@ -91,12 +89,7 @@ class FuzzingService:
         return S.SavedCounterexampleOut(saved_at=entry["saved_at"], counterexample=counterexample_out(entry["counterexample"])), created
 
     def saved_assignment(self, run_id: str, index: int) -> str:
-        """A saved counterexample as a VNN-COMP result: "sat" plus the VNN-LIB 2.0 command-line assignment.
-
-        VNN-LIB 2.0 (Sec. 5.3.1): per declared variable, "<name> <type> [<dims>]" then one value per line in
-        row-major order. Variables are the conventional X (input, shaped like the input spec) and Y (output,
-        [1, n]); the element type is float64 because ACT computed and checked the counterexample in float64.
-        """
+        """A saved counterexample as a VNN-COMP result (verification.service.vnncomp_sat)."""
         run = self.runs.get(run_id)
         saved = self.records.annotation(run_id, SAVED) or []
         entry = next((e for e in saved if e["counterexample"]["index"] == index), None)
@@ -105,12 +98,7 @@ class FuzzingService:
         x, y = entry["counterexample"]["input"], entry["counterexample"]["output"]
         specs = self.models.describe(run.model_id).input_specs
         shape = specs[0].shape if specs and math.prod(specs[0].shape) == len(x) else [1, len(x)]
-        lines = ["sat", _assignment_header("X", shape), *map(repr, x), _assignment_header("Y", [1, len(y)]), *map(repr, y)]
-        return "\n".join(lines) + "\n"
-
-
-def _assignment_header(name: str, shape: list[int]) -> str:
-    return f"{name} float64 [{','.join(str(d) for d in shape)}]"
+        return vnncomp_sat(x, y, shape)
 
 
 def counterexample_out(c: dict[str, Any]) -> S.FuzzCounterexampleOut:

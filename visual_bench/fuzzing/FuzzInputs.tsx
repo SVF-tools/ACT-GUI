@@ -2,9 +2,11 @@ import { fmt, num } from "../shared/wire";
 import type { FuzzingOut, ModelDescriptionOut } from "../generated/wire";
 import { Pixels } from "../shared/ui/pixels";
 import { inputBox, modelShape, finiteRange, argmax, vec } from "./presentation";
+import { useBatchRows } from "../model_spec/hooks";
 
 export function FuzzInputs({ f, model }: { f: FuzzingOut; model: ModelDescriptionOut | null }) {
   const seeds = f.seeds ?? [];
+  const batch = useBatchRows(model?.model_id ?? null);
   const d = seeds[0]?.input.length ?? f.counterexamples[0]?.input.length ?? model?.input_dim ?? 0;
   const box = inputBox(model, d);
   const shape = modelShape(model, d);
@@ -33,7 +35,7 @@ export function FuzzInputs({ f, model }: { f: FuzzingOut; model: ModelDescriptio
               const inside = box && x.every((v, i) => box.lb[i]! <= v && v <= box.ub[i]!);
               return (
                 <tr key={s.row}>
-                  <td className="mono">{s.row}</td>
+                  <td className="mono" title={batch?.labels[s.row]}>{s.row}{batch ? <span className="muted clamp"> {batch.labels[s.row]}</span> : null}</td>
                   <td>{shape ? <Pixels xs={x} shape={shape} lo={xlo} hi={xhi} label="" /> : <span className="mono">{vec(x, 6)}</span>}</td>
                   {box && <td className={inside ? "mono" : "mono state warn"}>{inside ? "yes" : "no"}</td>}
                   <td className="mono">{vec(y, 6)}</td>

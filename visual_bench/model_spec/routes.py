@@ -20,6 +20,11 @@ def router(models: ModelService) -> APIRouter:
         summary, created = models.load(body.source)
         return JSONResponse(summary.model_dump(), status_code=201 if created else 200)
 
+    @r.post("/models/{model_id}/rebuild", response_model=S.ModelSummary, status_code=201)
+    def rebuild_model(model_id: str) -> JSONResponse:
+        summary, created = models.rebuild(model_id)
+        return JSONResponse(summary.model_dump(), status_code=201 if created else 200)
+
     @r.get("/sources", response_model=S.SourcesOut)
     def sources() -> S.SourcesOut:
         return models.sources()

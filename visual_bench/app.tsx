@@ -1,10 +1,12 @@
 // Composition root: selection and props connect otherwise independent feature slices.
-import { useReducer, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import { AssistantView } from "./assistant/AssistantView";
 import { ModelGraph } from "./model_spec/ModelGraph";
 import { LoadPanel } from "./model_spec/LoadPanel";
 import { ModelList } from "./model_spec/ModelList";
 import { SpecPanel } from "./model_spec/SpecPanel";
+import { RebuildNotice } from "./model_spec/RebuildNotice";
+import { ApiError } from "./shared/http";
 import { useModels, useModel } from "./model_spec/hooks";
 import { RecordsView } from "./records/RecordsView";
 import { RunsPanel } from "./verification/RunsPanel";
@@ -12,33 +14,52 @@ import { RunHistory } from "./verification/RunHistory";
 import { useLiveRuns } from "./verification/hooks";
 import { EngineBadge } from "./engine/EngineBadge";
 import { EngineView } from "./engine/EngineView";
+import { useCapabilities } from "./engine/hooks";
 import { GurobiBadge } from "./engine/GurobiBadge";
 import { FuzzSettings } from "./fuzzing/FuzzSettings";
 import { useFuzzConfiguration } from "./fuzzing/hooks";
+import { useVerifyConfiguration } from "./verification/hooks";
+import type { Domain } from "./verification/RunsPanel";
 import { initialSelection, selectionReducer } from "./workspace/selection";
 import { modes, defaultMode, modeForId, modeForMethod, type ModeId } from "./workspace/modes";
 import { ContextBar } from "./workspace/layout";
 import { ThemeToggle } from "./workspace/theme";
 import { Tour } from "./workspace/tour";
+import { PresenceBar } from "./workspace/Presence";
 import { markTourDone, tourPending } from "./workspace/tourSteps";
 import { Empty } from "./shared/ui/Empty";
+import { usePropagation } from "./analysis/hooks";
+import { PropagationProvider } from "./analysis/PropagationContext";
+import { PropagationInspector } from "./analysis/PropagationView";
 
-const TABS = ["Assistant", "Records", "Engine"] as const;
+const TABS = ["Neuron", "Engine", "Records", "Assistant"] as const;
 type Tab = (typeof TABS)[number];
 export function App() {
   const [sel, dispatch] = useReducer(selectionReducer, initialSelection);
   const [mode, setMode] = useState<ModeId>(defaultMode);
-  const [tab, setTab] = useState<Tab>("Assistant");
+  const [tab, setTab] = useState<Tab>("Engine");
   const [touring, setTouring] = useState(tourPending);
   const models = useModels();
   const model = useModel(sel.modelId);
   const fuzz = useFuzzConfiguration();
+  const verify = useVerifyConfiguration();
+  const [domain, setDomain] = useState<Domain>("interval");
   const activeMode = modeForId(mode);
+  // Neuron inspection belongs to a selected verification or BaB run: hidden for fuzzing and before any run.
+  const tabs = TABS.filter((t) => t !== "Neuron" || (mode !== "Fuzzing" && sel.runId !== null));
+  const shownTab: Tab = tabs.includes(tab) ? tab : "Engine";
+  const propagation = usePropagation(mode === "Verification" ? sel.runId : null);
+  const inspecting = mode === "Verification" && (propagation.data?.availability === "available" || propagation.data?.availability === "pending");
+  const lacks = useCapabilities();
+  // After an ACT switch, leave a mode the new checkout cannot run.
+  const fallbackMode = lacks(activeMode.capability) ? modes.find((m) => !lacks(m.capability))?.id : undefined;
+  useEffect(() => { if (fallbackMode) setMode(fallbackMode); }, [fallbackMode]);
   useLiveRuns();
   const current = models.status === "success" ? models.data.find((m) => m.model_id === sel.modelId) ?? null : null;
 
   return (
-    <div className="shell">
+    <PropagationProvider key={`${sel.modelId}-${sel.runId}`}>
+    <div className={`shell${inspecting ? " propagation-open" : ""}`}>
       <header className="topbar">
         <div className="brand">
           <span className="logo">ACT</span>
@@ -51,7 +72,7 @@ export function App() {
           title="Show the guided tour">? Guide</button>
         <ThemeToggle />
       </header>
-      {touring && <Tour onClose={() => { markTourDone(); setTouring(false); }} />}
+      {touring && <Tour modelReady={model.status === "success"} onClose={() => { markTourDone(); setTouring(false); }} />}
       <aside className="sidebar">
         <div data-tour="load">
           <LoadPanel current={current}
@@ -64,19 +85,24 @@ export function App() {
       <main className="center">
         {sel.modelId === null && <Empty title="Select a model" text="Models are real ACT networks pinned by commit and sha256." />}
         {sel.modelId !== null && model.status === "pending" && <Empty title="Loading model through ACT…" text="" />}
-        {model.status === "error" && <div className="error">Model load failed: {model.error.message}</div>}
+        {model.status === "error" && (current && (current.source ?? "catalog") !== "catalog" && model.error instanceof ApiError
+          && model.error.code === "model_load_failed"
+          ? <RebuildNotice model={current} message={model.error.message}
+              onRebuilt={(m) => dispatch({ type: "selectModel", modelId: m.model_id })} />
+          : <div className="error">Model load failed: {model.error.message}</div>)}
         {model.status === "success" && (
           <>
-            <section className="panel" data-tour="network">
+            {!inspecting && <section className="panel" data-tour="network">
                 <h2>Network <small>{model.data.layers.length} layers · ACT {model.data.act_commit?.slice(0, 8)}</small></h2>
                 <ModelGraph model={model.data} selectedLayer={sel.layerId}
                   onSelectLayer={(layerId) => dispatch({ type: "selectLayer", layerId })} />
-            </section>
+            </section>}
             <div data-tour="runs">
             <RunsPanel
               modelId={model.data.model_id}
               method={activeMode.method}
               fuzzOptions={fuzz.value}
+              domain={domain} onDomain={setDomain} verify={verify}
               fuzzSettings={<>
                 {fuzz.query.isError && <div className="error">Fuzz defaults unavailable: {fuzz.query.error.message}</div>}
                 {fuzz.value && fuzz.defaults && <FuzzSettings value={fuzz.value} defaults={fuzz.defaults} onChange={fuzz.setValue} />}
@@ -88,13 +114,16 @@ export function App() {
             <section className="panel modes" data-tour="modes">
               <nav className="tabs" role="tablist" aria-label="run mode">
                 {modes.map((m) => (
-                  <button key={m.id} role="tab" aria-selected={mode === m.id} className={mode === m.id ? "tab active" : "tab"} onClick={() => setMode(m.id)}>{m.label}</button>
+                  <button key={m.id} role="tab" aria-selected={mode === m.id} className={mode === m.id ? "tab active" : "tab"}
+                    disabled={lacks(m.capability) !== null} title={lacks(m.capability) ?? undefined}
+                    onClick={() => setMode(m.id)}>{m.label}</button>
                 ))}
               </nav>
               <div className="modebody">
+                {lacks(activeMode.capability) && <div className="banner warn"><b>Disabled on this ACT checkout.</b> {lacks(activeMode.capability)}</div>}
                 <activeMode.View sel={sel} model={model.data}
                   onSelectLayer={(layerId) => dispatch({ type: "selectLayer", layerId })}
-                  onSelectNeuron={(neuron) => dispatch({ type: "selectNeuron", neuron })} />
+                  onSelectNeuron={(neuron) => { dispatch({ type: "selectNeuron", neuron }); if (neuron !== null) setTab("Neuron"); }} />
               </div>
             </section>
             <div data-tour="spec">
@@ -106,12 +135,13 @@ export function App() {
       <section className="inspector">
         <div className="insptop" data-tour="inspector">
         <nav className="tabs" role="tablist">
-          {TABS.map((t) => (
-            <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? "tab active" : "tab"} onClick={() => setTab(t)}>{t}</button>
+          {tabs.map((t) => (
+            <button key={t} role="tab" aria-selected={shownTab === t} className={shownTab === t ? "tab active" : "tab"} onClick={() => setTab(t)}>{t}</button>
           ))}
         </nav>
         <div className="tabbody">
-          {tab === "Assistant" && (
+          {shownTab === "Neuron" && <PropagationInspector sel={sel} model={model.data ?? null} />}
+          {shownTab === "Assistant" && (
             <AssistantView sel={sel}
               onNavigate={(layerId, neuron) => {
                 dispatch({ type: "selectLayer", layerId });
@@ -119,8 +149,8 @@ export function App() {
                 setMode("Verification");
               }} />
           )}
-          {tab === "Records" && <RecordsView runId={sel.runId} />}
-          {tab === "Engine" && (
+          {shownTab === "Records" && <RecordsView runId={sel.runId} />}
+          {shownTab === "Engine" && (
             <EngineView />
           )}
         </div>
@@ -135,8 +165,10 @@ export function App() {
             />
           </div>
         )}
+        <PresenceBar />
       </section>
     </div>
+    </PropagationProvider>
   );
 }
 

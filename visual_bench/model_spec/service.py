@@ -16,7 +16,7 @@ from typing import Any
 
 from engine_bridge.contracts import BridgeError, VnnlibInstance
 from engine_bridge.engine_session import act_root
-from engine_bridge.execution import UNIVERSAL_METHODS, verify_methods
+from engine_bridge.execution import UNIVERSAL_METHODS, required_capability, verify_methods
 from engine_bridge.model_spec import describe_model, file_sha256
 from engine_bridge.model_spec import sources as model_sources
 from visual_bench.engine.service import EngineService
@@ -32,8 +32,12 @@ class ModelService:
         self.engine = engine
         self._lock = threading.Lock()
         self._derived: dict[str, dict[str, Any]] = {}
+        # (model_id, ACT commit) -> whether ACT loaded the built net when it was described on that commit.
+        self._load_checks: dict[tuple[str, str | None], bool] = {}
         for meta in sorted(models_root.glob("*.meta.json")) if models_root.is_dir() else ():
             entry = json.loads(meta.read_text())
+            if "batch" in entry["params"]:  # recorded under an older method rule; eligibility follows the bridge
+                entry["methods"] = list(verify_methods(int(entry["params"]["batch"])))
             self._derived[entry["id"]] = entry
 
     # -- catalog -------------------------------------------------------------
@@ -55,18 +59,30 @@ class ModelService:
             raise AppError(409, "snapshot_mismatch", f"{entry['act_path']} does not match the pinned sha256")
         return path
 
-    @staticmethod
-    def methods(entry: dict[str, Any]) -> list[Method]:
-        return [*entry["methods"], *UNIVERSAL_METHODS]
+    def methods(self, entry: dict[str, Any]) -> list[Method]:
+        """Methods the net supports and whose ACT API passes on the active checkout."""
+        declared: list[Method] = [*entry["methods"], *UNIVERSAL_METHODS]
+        return [m for m in declared if self.engine.capability_available(required_capability(m))]
 
     def native(self, model_id: str, method: Method) -> dict[str, Any] | None:
         """Recorded native ACT result of a catalog model (interval domain only); None for built models."""
         return self.entry(model_id)["native"].get(method)
 
+    def engine_check(self, entry: dict[str, Any], commit: str | None) -> S.EngineCheck | None:
+        if entry.get("source", "catalog") == "catalog":
+            return None
+        built = (entry.get("built_with") or {}).get("commit")
+        if built is not None and built == commit:
+            return "same_commit"
+        loaded = self._load_checks.get((entry["id"], commit))
+        return "unchecked" if loaded is None else "loads" if loaded else "load_failed"
+
     def models(self) -> list[S.ModelSummary]:
+        commit = self.engine.info.commit
         return [S.ModelSummary(model_id=m["id"], description=m["description"], act_path=m["act_path"],
                                sha256=m["sha256"], methods=self.methods(m), native=m["native"],
-                               source=m.get("source", "catalog"), params=m.get("params", {}))
+                               source=m.get("source", "catalog"), params=m.get("params", {}),
+                               built_with=m.get("built_with"), engine_check=self.engine_check(m, commit))
                 for m in [*self.catalog["models"], *self._derived.values()]]
 
     # -- model sources (MSB-04) ----------------------------------------------
@@ -93,12 +109,13 @@ class ModelService:
 
     def load(self, req: S.LoadVnnlibRequest | S.LoadTorchRequest) -> tuple[S.ModelSummary, bool]:
         """Build a net from a source; the same content returns the existing model (idempotent by sha256)."""
-        self.engine.require_engine()
+        self.engine.require_capability("source.vnnlib" if isinstance(req, S.LoadVnnlibRequest) else "source.onnx_classifier")
         self.models_root.mkdir(parents=True, exist_ok=True)
         tmp = self.models_root / f".build-{uuid.uuid4().hex}.json"
         try:
             if isinstance(req, S.LoadVnnlibRequest):
-                built = model_sources.build_vnnlib_net(VnnlibInstance(req.benchmark, req.onnx, req.vnnlib), tmp)
+                built = model_sources.build_vnnlib_net(
+                    [VnnlibInstance(req.benchmark, req.onnx, v) for v in req.vnnlibs or [req.vnnlib]], tmp)
             else:
                 built = model_sources.build_classifier_net(req.source_id, req.indices or req.index, req.eps, tmp)
         except BridgeError as err:
@@ -110,27 +127,54 @@ class ModelService:
             created = model_id not in self._derived
             if created:
                 tmp.replace(self.models_root / f"{model_id}.json")
+                src = self.engine.source
                 entry = {"id": model_id, "description": built.description, "act_path": f"workbench-models/{model_id}.json",
                          "sha256": sha, "methods": list(verify_methods(built.input_rows)), "native": {},
-                         "source": req.kind, "params": built.params}
+                         "source": req.kind, "params": built.params,
+                         "built_with": {"commit": self.engine.info.commit, "kind": src.kind, "remote": src.remote,
+                                        "branch": src.branch}}
                 (self.models_root / f"{model_id}.meta.json").write_text(json.dumps(entry, indent=2))
                 self._derived[model_id] = entry
             else:
                 tmp.unlink(missing_ok=True)
         return next(m for m in self.models() if m.model_id == model_id), created
 
+    def rebuild(self, model_id: str) -> tuple[S.ModelSummary, bool]:
+        """Build a built model again from its recorded source parameters on the active ACT engine."""
+        entry = self.entry(model_id)
+        p = entry.get("params", {})
+        try:
+            if entry.get("source") == "torch":
+                indices = [int(x) for x in str(p["indices"]).split(",")] if "indices" in p else None
+                req: S.LoadVnnlibRequest | S.LoadTorchRequest = S.LoadTorchRequest(
+                    kind="torch", source_id=str(p["source_id"]), index=int(p["index"]), eps=float(p["eps"]),
+                    indices=indices)
+            elif entry.get("source") == "vnnlib":
+                req = S.LoadVnnlibRequest(kind="vnnlib", benchmark=str(p["benchmark"]), onnx=str(p["onnx"]),
+                                          vnnlib=str(p["vnnlib"]),
+                                          vnnlibs=str(p["vnnlibs"]).split(",") if "vnnlibs" in p else None)
+            else:
+                raise AppError(422, "not_rebuildable", f"{model_id} is a pinned catalog model, not built by the workbench")
+        except (KeyError, ValueError) as err:
+            raise AppError(422, "not_rebuildable", f"{model_id} lacks the source parameters to rebuild it: {err}") from err
+        return self.load(req)
+
     # -- descriptions ----------------------------------------------------------
     def describe(self, model_id: str) -> S.ModelDescriptionOut:
-        self.engine.require_engine()
-        return self._describe_cached(model_id)
+        self.engine.require_capability("model.load_json")
+        self.engine.require_capability("spec.read")
+        return self._describe_cached(model_id, self.engine.info.commit)
 
     @lru_cache(maxsize=32)
-    def _describe_cached(self, model_id: str) -> S.ModelDescriptionOut:
+    def _describe_cached(self, model_id: str, act_commit: str | None) -> S.ModelDescriptionOut:
         path = self.path(model_id)
         try:
             d = describe_model(path)
         except BridgeError as err:
+            if err.code == "model_load_failed":
+                self._load_checks[(model_id, act_commit)] = False
             raise bridge_error(err) from err
+        self._load_checks[(model_id, act_commit)] = True
         raw = asdict(d)
         for spec in raw["input_specs"]:
             spec["lb"], spec["ub"] = wire_numbers(spec["lb"]), wire_numbers(spec["ub"])
@@ -139,4 +183,4 @@ class ModelService:
         if raw["output_spec"] and raw["output_spec"]["thresholds"] is not None:
             raw["output_spec"]["thresholds"] = wire_numbers(raw["output_spec"]["thresholds"])
         raw.pop("source_path")
-        return S.ModelDescriptionOut(model_id=model_id, act_commit=self.engine.info.commit, **raw)
+        return S.ModelDescriptionOut(model_id=model_id, act_commit=act_commit, **raw)

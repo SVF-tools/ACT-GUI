@@ -1,6 +1,6 @@
 # Inspection Adapter
 
-The current bridge performs a fresh interval analysis for a model snapshot and returns ACT's after-state bounds for each layer. A layer's before-state is represented by predecessor IDs. The result carries method, availability, and ACT call provenance. This is recomputation, not a historical scientific snapshot, and it does not expose geometry, live node reads, paging, or stored run history.
+The bridge records propagation during `verify_once` when the active ACT exposes `observe.propagation`. Records retain the run's domain, pass, scope, stage, version, and full per-neuron data. Final forward records supply the existing layer-state view; dual activation records are labeled `pre` (forward pre-activation bounds). On older ACT checkouts the INSP-01 fresh interval analysis remains available as an explicitly labeled fallback. Geometry, live BaB node reads, and solver stepping are not implemented.
 
 For project navigation, see [engine_bridge flow](../README.md#flow-diagram) and [choose a development task](../../README.md#choose-a-development-task).
 
@@ -43,6 +43,14 @@ Run the focused real-ACT tests:
 
 The tests compare returned bounds with direct native `verify_once(..., collect_facts=True)` facts. They also verify that a preceding HybridZ run does not change the interval inspection. No test result is implied by this guide.
 
+Propagation evidence, 2026-11-05: with `ACT_CODE_ROOT=/data1/guanqin/ACT-wt/act-gui-match`
+and an isolated `ACT_GUI_ENGINES` selection of the same checkout, the combined bridge/analysis/worker
+propagation suite passed 15 tests. After the final ASSERT-output-axis correction, the bridge and real
+worker propagation tests passed 9 tests again. Native interval, HybridZ and dual use `bab_deep_mlp`;
+convolution batch/output-axis mapping is a synthetic contract test. The old pinned
+`mnist_conv_small` snapshot cannot load on that ACT branch (`Unsupported ACT metadata tag
+'LabeledInputTensor'`), so it is not claimed as native convolution evidence.
+
 ## Reference and Backlog
 
 <details>
@@ -53,8 +61,10 @@ The tests compare returned bounds with direct native `verify_once(..., collect_f
 | File | Current responsibility |
 | --- | --- |
 | [layers.py](layers.py) | `interval_layer_states` and the 65536-value per-layer guard |
-| [__init__.py](__init__.py) | Re-exports `interval_layer_states` |
+| [propagation.py](propagation.py) | `PropagationSink`, neutral `PropagationKey`/`TensorData`/`PropagationRecord`, and `run_observed_verification`; copies CPU float32 little-endian bytes before ACT can mutate/release tensors |
+| [__init__.py](__init__.py) | Re-exports `interval_layer_states`, `PropagationSink`, `run_observed_verification` |
 | [test_inspection.py](test_inspection.py) | Native `verify_once` fact parity, including after a HybridZ call |
+| [test_propagation.py](test_propagation.py), [testing.py](testing.py) | Synthetic record-copy/failure tests (real observer registry when importable, otherwise a schema-only stub); native observer tests gated on `observe.propagation` |
 
 The run worker calls this adapter after execution and serializes its output; the verification supervisor writes and seals layers.json, which visual_bench analysis reads. The neutral contracts are `LayerState`, `LayerStates`, `Availability`, and `BridgeError` in [`../contracts.py`](../contracts.py). See [visual_bench analysis](../../visual_bench/analysis/README.md).
 
@@ -91,6 +101,8 @@ These are not current APIs. Geometry needs ACT-04 and a contract for coordinates
 | INSP-01 | Expose fixed-run layer states | EXE-01, MSB-03, ACT-01 | A small real network yields correctly mapped before/after data for input through output; absent stages are explicit. |
 | INSP-02 | Expose geometry and projection metadata | INSP-01, ACT-04 | Coordinates, representation, guarantee, method, dtype/tolerance, and source are present; interval-only data is not upgraded into fabricated geometry. |
 | INSP-03 | Define historical availability and new inspection semantics | INSP-01, REC-02 | Integration with retained records distinguishes old evidence, missing history, and recomputation; new inspection data never overwrites original historical provenance. |
+| INSP-04 | Record propagation during the run | INSP-01, ACT-06 | Implemented in `propagation.py`: the sink copies full tensors and scope/parent/domain/pass/layer/stage/version/origin, counts unknown or malformed records, and retains the latest forward bounds. `run_observed_verification` invokes the existing verifier under `observe`; storage callbacks never raise into ACT, but a storage failure is reported after verification. Capability requirements are in `parity.py`; older ACT uses INSP-01. `test_propagation.py` checks copy isolation and native interval/HybridZ final facts after float32 conversion. Native tests skip unless the active ACT has the capability. |
+| INSP-05 | Per-neuron over-approximation of the run's domain | INSP-04, ACT-06 (AGM-06, AGM-08) | Implemented record adaptation for `LayerBounds`, `Relaxation`, `DualBackward`, and `SpecBound`: ACT status, slopes/intercepts, alpha per spec row with `alpha_optimized`, nu when present, margins/slack, and original tensor/output shapes. Missing records are explicit, never computed by another domain. The analysis layer endpoint serves all recorded tensor fields; native observer tests cover all three domains. No additional intermediate dual refinement or BaB records are invented. |
 
 ## Boundaries and Cross-Module Changes
 

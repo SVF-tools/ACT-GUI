@@ -83,7 +83,7 @@ export function GurobiLicensePanel() {
       <form className="licform" onSubmit={(e) => { e.preventDefault(); if (content) void run("apply"); }}>
         {mode === "wls" && (
           <>
-            <p className="note">From the Gurobi Web License Manager (license.gurobi.com): API keys → download → copy the three values.</p>
+            <p className="note">From the <a href="https://license.gurobi.com/" target="_blank" rel="noopener noreferrer">Gurobi Web License Manager ↗</a>: API keys → download → copy the three values.</p>
             <label>WLS access ID
               <input autoComplete="off" spellCheck={false} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
                 value={wls.accessId} onChange={(e) => setWls({ ...wls, accessId: e.target.value })} />

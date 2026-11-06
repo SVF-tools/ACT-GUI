@@ -7,6 +7,9 @@ Layout per run (var/records/<run_id>/):
   layers.json     interval layer states computed by the worker for the run snapshot
   artifacts.json  sha256 of each artifact; written last, so its presence marks a complete record
   saved_counterexamples.json  user annotation: counterexamples the user saved (mutable, not sealed)
+  diagnostics.json, act_stdout.log, worker_stderr.log
+                  what the worker captured while driving ACT (warnings, logs, error location, engine);
+                  written once when the run ends, for failed runs too, so they are not sealed
 
 Writes go to a temp file then os.replace, so a crash never leaves a partial
 artifact visible. Paths inside a record are relative; no client paths are stored.
@@ -18,6 +21,7 @@ import io
 import json
 import os
 import re
+import struct
 import threading
 import zipfile
 from datetime import datetime, timezone
@@ -25,9 +29,10 @@ from pathlib import Path
 from typing import Any
 
 _RUN_ID = re.compile(r"^run-[0-9a-f]{12}$")
-ARTIFACTS = ("manifest.json", "result.json", "layers.json", "fuzzing.json")
+ARTIFACTS = ("manifest.json", "result.json", "layers.json", "fuzzing.json", "propagation.json")
 # User annotations may be written before or after sealing; they never change a sealed artifact.
 ANNOTATIONS = ("saved_counterexamples.json",)
+DIAGNOSTICS = ("diagnostics.json", "act_stdout.log", "worker_stderr.log")
 
 
 def now_iso() -> str:
@@ -62,7 +67,8 @@ class RecordStore:
         return sorted(ids, key=lambda r: self.manifest(r)["created_at"], reverse=True)
 
     # -- writes ------------------------------------------------------------
-    def _atomic_write(self, path: Path, data: bytes) -> None:
+    @staticmethod
+    def _atomic_write(path: Path, data: bytes) -> None:
         tmp = path.with_name(path.name + ".tmp")
         with open(tmp, "wb") as f:
             f.write(data)
@@ -97,9 +103,16 @@ class RecordStore:
             raise ValueError(name)
         self._atomic_write(self.run_dir(run_id) / name, json.dumps(obj, indent=2, sort_keys=True).encode())
 
+    def write_diagnostic(self, run_id: str, name: str, data: bytes) -> None:
+        if name not in DIAGNOSTICS:
+            raise ValueError(name)
+        self._atomic_write(self.run_dir(run_id) / name, data)
+
     def seal(self, run_id: str) -> dict[str, str]:
         d = self.run_dir(run_id)
         hashes = {n: _sha256((d / n).read_bytes()) for n in ARTIFACTS if (d / n).is_file()}
+        for path in (d / "blobs").glob("*.f32"):
+            hashes[path.relative_to(d).as_posix()] = _sha256(path.read_bytes())
         self._atomic_write(d / "artifacts.json", json.dumps(hashes, indent=2, sort_keys=True).encode())
         return hashes
 
@@ -150,6 +163,44 @@ class RecordStore:
         p = self.run_dir(run_id) / name
         return json.loads(p.read_text()) if p.is_file() else None
 
+    def propagation_index(self, run_id: str, sealed: bool) -> Any | None:
+        """Completed runs require the seal; active/failed runs expose atomic partial observations."""
+        path = self.run_dir(run_id) / "propagation.json"
+        expected = (self.hashes(run_id) or {}).get("propagation.json") if sealed else None
+        if not path.is_file() and expected is None:
+            return None
+        if sealed:
+            value = self.artifact(run_id, "propagation.json")
+            if value is None:
+                raise ValueError("propagation.json failed its seal check")
+            return value
+        return json.loads(path.read_text())
+
+    def propagation_tensor(self, run_id: str, reference: dict[str, Any], sealed: bool) -> list[float]:
+        digest = reference["sha256"]
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise ValueError("Invalid propagation blob hash")
+        name = f"blobs/{digest}.f32"
+        data = (self.run_dir(run_id) / name).read_bytes()
+        if _sha256(data) != digest:
+            raise ValueError(f"{name} failed its content hash")
+        if sealed and (self.hashes(run_id) or {}).get(name) != digest:
+            raise ValueError(f"{name} failed its seal check")
+        header, raw = data.split(b"\n", 1)
+        meta = json.loads(header)
+        if meta != {"dtype": reference["dtype"], "shape": reference["shape"]}:
+            raise ValueError(f"{name} has inconsistent tensor metadata")
+        import math
+
+        count = math.prod(meta["shape"])
+        if meta["dtype"] != "float32" or len(raw) != count * 4:
+            raise ValueError(f"{name} has invalid float32 data")
+        return list(struct.unpack(f"<{count}f", raw))
+
+    def diagnostics(self, run_id: str) -> Any | None:
+        p = self.run_dir(run_id) / "diagnostics.json"
+        return json.loads(p.read_text()) if p.is_file() else None
+
     def hashes(self, run_id: str) -> dict[str, str] | None:
         p = self.run_dir(run_id) / "artifacts.json"
         return json.loads(p.read_text()) if p.is_file() else None
@@ -161,7 +212,8 @@ class RecordStore:
             raise FileNotFoundError("record is not sealed")
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-            for name in (*ARTIFACTS, "events.jsonl", "artifacts.json", *ANNOTATIONS):
+            for name in (*ARTIFACTS, "events.jsonl", "artifacts.json", *ANNOTATIONS, *DIAGNOSTICS,
+                         *(p.relative_to(d).as_posix() for p in (d / "blobs").glob("*.f32"))):
                 if (d / name).is_file():
                     z.write(d / name, arcname=f"{run_id}/{name}")
         return buf.getvalue()

@@ -4,6 +4,7 @@
   --on-accent: #081120; --line-hover: #3b4658; --edge: #4a5568; --well: #10151c; --zero: #5b667a; --axis: #3a4454;
   --error-bg: #3a1d1d; --error-text: #ffb4ae; --before: rgba(167, 139, 250, .35); --box-fill: rgba(106, 169, 255, .25);
   --k-lin: #1a2638; --k-act: #2a2140; --k-spec: #33281a; --k-io: #17302a; --k-misc: #222a33;
+  --rail: #12161d; --sunken: rgba(0, 0, 0, .18); --scroll: #3b4658; --scroll-idle: rgba(139, 149, 167, .18); --shadow: 0 1px 2px rgba(0, 0, 0, .25);
   color-scheme: dark;
   font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 14px; color: var(--text); background: var(--bg);
 }
@@ -13,6 +14,7 @@
   --on-accent: #ffffff; --line-hover: #aab4c3; --edge: #9aa5b4; --well: #e6eaf0; --zero: #8792a3; --axis: #c3cad5;
   --error-bg: #fdecea; --error-text: #9b211b; --before: rgba(124, 77, 219, .28); --box-fill: rgba(37, 99, 235, .18);
   --k-lin: #e3edfb; --k-act: #eee7fb; --k-spec: #fbf0de; --k-io: #e0f4ec; --k-misc: #eceff3;
+  --rail: #eceff4; --sunken: rgba(27, 34, 48, .04); --scroll: #aab4c3; --scroll-idle: rgba(93, 104, 121, .2); --shadow: 0 1px 3px rgba(27, 34, 48, .08);
   color-scheme: light;
 }
 * { box-sizing: border-box; }
@@ -39,16 +41,35 @@ h3 { font-size: 15px; margin: 12px 0 8px; }
 .badge.good { border-color: var(--good); color: var(--good); } .badge.warn { border-color: var(--warn); color: var(--warn); }
 .badge.bad { border-color: var(--bad); color: var(--bad); } .badge.muted { color: var(--muted); }
 
-.sidebar { grid-area: side; overflow: auto; border-right: 1px solid var(--line); padding: 12px; display: flex; flex-direction: column; gap: 12px; }
-.center { grid-area: center; overflow: auto; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+.sidebar { grid-area: side; overflow: auto; border-right: 1px solid var(--line); padding: 14px 12px; display: flex; flex-direction: column; gap: 14px; background: var(--rail); }
+.center { grid-area: center; overflow: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; }
 .inspector { grid-area: insp; border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; background: var(--panel); }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.panel { background: var(--panel); border: 1px solid color-mix(in srgb, var(--line) 75%, transparent); border-radius: 12px; padding: 14px; box-shadow: var(--shadow); }
+
+/* Scroll regions: one thin themed scrollbar style everywhere, faint until the region is hovered;
+   nested regions sit in a sunken well and fade at the edge that has more content. */
+.sidebar, .center, .tabbody, .insphistory, .scrolllist, .graphwrap, .tblwrap, .steps, .tabs, .batchchips .chips, .presencelist, .prop-network, .prop-layer {
+  scrollbar-width: thin; scrollbar-color: var(--scroll-idle) transparent;
+}
+:is(.sidebar, .center, .tabbody, .insphistory, .scrolllist, .graphwrap, .tblwrap, .steps, .tabs, .batchchips .chips, .presencelist, .prop-network, .prop-layer):hover { scrollbar-color: var(--scroll) transparent; }
+.sidebar, .center, .tabbody, .insphistory { scrollbar-gutter: stable; }
+.scrolllist, .batchchips .chips, .presencelist { background: var(--sunken); border-radius: 10px; padding: 6px; }
+@property --fade-top { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --fade-bottom { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@keyframes scrollfade { 0% { --fade-top: 0px; --fade-bottom: 22px; } 8%, 92% { --fade-top: 22px; --fade-bottom: 22px; } 100% { --fade-top: 22px; --fade-bottom: 0px; } }
+@supports (animation-timeline: scroll()) {
+  /* The scroll timeline is inactive when nothing overflows, so short regions get no fade. */
+  .scrolllist, .tabbody, .insphistory, .batchchips .chips, .presencelist {
+    mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent 100%);
+    animation: scrollfade linear both; animation-timeline: scroll(self);
+  }
+}
 .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } .split.stack { grid-template-columns: 1fr; }
 
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.scrolllist { overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+.scrolllist { overflow-y: auto; overscroll-behavior: contain; }
 .scrolllist > li { flex-shrink: 0; }
-.item { width: 100%; text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+.item { width: 100%; text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; transition: border-color .15s, background-color .15s; }
 .item:hover { border-color: var(--line-hover); } .item.active { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
 .item .title { font-weight: 600; } .item .sub { color: var(--muted); font-size: 12px; } .item .sub.err { color: var(--error-text); }
 .chips { display: flex; gap: 4px; flex-wrap: wrap; }
@@ -75,16 +96,18 @@ a.button.secondary { background: var(--panel2); color: inherit; border: 1px soli
 .danger { background: transparent; color: var(--bad); border: 1px solid var(--bad); border-radius: 6px; padding: 3px 10px; font-weight: 600; }
 .danger:hover:not(:disabled) { background: var(--error-bg); }
 .runitem.live { display: flex; gap: 6px; align-items: stretch; } .runitem.live .item { flex: 1; min-width: 0; }
+.runitem.tools { position: relative; } .runitem.tools .item .title { padding-right: 76px; }
+.runitem .snapshot { position: absolute; top: 6px; right: 8px; text-decoration: none; }
 .bannerrow { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
 .verdict { font-size: 13px; display: flex; flex-direction: column; gap: 6px; margin-top: 0; }
 .verdict.bannerrow { flex-direction: row; }
 .verdict .vbig { font-size: 16px; letter-spacing: .05em; }
 .verdicthead { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .verdictce { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.ceactions { display: flex; gap: 6px; flex-wrap: wrap; } .cecard.saved { border-color: var(--good); }
+.ceactions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; } .cecard.saved { border-color: var(--good); }
 
 /* margin:auto centers a narrow graph yet keeps a wide one scrollable from its first layer. */
-.graphwrap { overflow: auto; } .graphwrap .graph { display: block; margin: 0 auto; }
+.graphwrap { overflow: auto; max-height: min(40vh, 420px); overscroll-behavior: contain; } .graphwrap .graph { display: block; margin: 0 auto; }
 .modes { padding: 0; } .modes .tabs { padding: 0 6px; } .modebody { padding: 12px; }
 .graph .edge { fill: none; stroke: var(--edge); stroke-width: 1.5; } .arrowhead { fill: var(--edge); }
 .node { cursor: pointer; } .node rect { fill: var(--panel2); stroke: var(--line); stroke-width: 1.5; }
@@ -151,10 +174,12 @@ a.button.secondary { background: var(--panel2); color: inherit; border: 1px soli
 .fuzzadvanced > button { margin-top: 8px; }
 .fuzzgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .fuzzgrid label small { color: var(--muted); }
+.fuzzsettings .wide { grid-column: span 2; }
 .batchrow { display: grid; grid-template-columns: 90px 1fr; gap: 8px; align-items: end; }
 .batchchips summary { cursor: pointer; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .batchchips .chips { margin-top: 6px; max-height: 84px; overflow-y: auto; }
-.batchchips .chip { cursor: pointer; } .batchchips .chip.active { border-color: var(--accent); color: var(--accent); }
+.batchchips .chip { cursor: pointer; } .batchchips button.chip { line-height: inherit; }
+.ceselect { font-size: 12px; } .ceselect select { font-size: 12px; max-width: 220px; } .batchchips .chip.active { border-color: var(--accent); color: var(--accent); }
 .item .sub.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .sw.ce { background: var(--bad); } .sw.seed { background: var(--muted); }
 .fuzzchart .cov { fill: none; stroke: var(--accent); stroke-width: 2; }
@@ -213,7 +238,25 @@ a.button.secondary { background: var(--panel2); color: inherit; border: 1px soli
 .barrow.outrow { grid-template-columns: 28px 1fr 150px 48px; } .barrow.outrow.pred { background: var(--panel2); }
 .bar.shift { background: var(--bad); opacity: .3; } .outrow .tags { display: flex; gap: 3px; }
 .insptop { flex: 1 1 50%; min-height: 0; display: flex; flex-direction: column; }
-.insphistory { flex: 1 1 50%; min-height: 0; overflow: auto; border-top: 1px solid var(--line); padding: 12px; }
+.insphistory { flex: 1 1 50%; min-height: 0; overflow: auto; border-top: 1px solid var(--line); padding: 12px; background: var(--rail); }
+/* Online-visitor bar under Run history (workspace/Presence.tsx) */
+.presence { position: relative; cursor: default; flex: none; display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--line); padding: 8px 12px; font-size: 12px; color: var(--muted); }
+.presence b { color: var(--text); font-variant-numeric: tabular-nums; animation: presencepop .4s ease-out; }
+.presencedot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 0 var(--good); animation: presencepulse 2s ease-out infinite; }
+.presencedot.off { background: var(--muted); animation: none; }
+@keyframes presencepulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 60%, transparent); } 100% { box-shadow: 0 0 0 6px transparent; } }
+@keyframes presencepop { 0% { opacity: .3; } 100% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .presencedot, .presence b { animation: none; } }
+.presence:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.presencepop { position: absolute; right: 8px; bottom: calc(100% + 6px); z-index: 50; width: 340px; max-width: calc(100vw - 24px); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, .35); color: var(--text); }
+.worldmap { display: block; width: 100%; aspect-ratio: 2 / 1; background: var(--bg); border-radius: 6px; }
+.worldmap path { fill: var(--panel2); stroke: var(--line); stroke-width: .4; }
+.worldmap path.on { stroke: var(--accent); }
+.worldmap.loading { display: grid; place-items: center; color: var(--muted); font-size: 12px; }
+.presencelist { list-style: none; margin: 8px 0 0; padding: 0; max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
+.presencelist li { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+.presencelist b { font-variant-numeric: tabular-nums; animation: none; }
+.presencepop .note { margin: 6px 0 0; font-size: 11px; }
 
 @media (max-width: 1100px) {
   .shell { grid-template-columns: 260px minmax(0, 1fr); grid-template-areas: "top top" "side center" "insp insp"; grid-template-rows: auto minmax(0, 1fr) auto; height: auto; min-height: 100vh; }
@@ -236,8 +279,9 @@ button.badge { background: transparent; color: inherit; }
 .seg button.on { color: var(--text); border-color: var(--accent); box-shadow: inset 0 -2px 0 var(--accent); }
 .licform { display: flex; flex-direction: column; gap: 8px; }
 .licform label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
-.licform input, .licform textarea { color: var(--text); min-width: 0; }
+.licform input, .licform textarea, .licform select { color: var(--text); min-width: 0; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.urlrow { display: flex; gap: 6px; } .urlrow input { flex: 1; }
 .secondary { background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; }
 .banner { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin: 10px 0; font-size: 12px; overflow-wrap: anywhere; }
 .banner.good { border-color: var(--good); } .banner.good b { color: var(--good); }

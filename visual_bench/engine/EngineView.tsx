@@ -1,6 +1,8 @@
 import { useEngine } from "./hooks";
 import { Empty } from "../shared/ui/Empty";
 import { GurobiLicensePanel } from "./GurobiLicensePanel";
+import { EngineSourcePanel } from "./EngineSourcePanel";
+import { ApiChecks } from "./ApiChecks";
 
 export function EngineView() {
   const engine = useEngine();
@@ -14,7 +16,11 @@ export function EngineView() {
           <span>CUDA visible</span><b>{engine.data.cuda_available ? "yes" : "no"}</b>
         </div>
       ) : <Empty title={engine.status === "error" ? engine.error.message : "Probing ACT…"} text="" />}
+      {engine.status === "success" && <ApiChecks checks={engine.data.api_checks} />}
       <p className="note">Each run records the torch device ACT actually computed on (see the run list).</p>
+
+      <h3>ACT source</h3>
+      <EngineSourcePanel />
 
       <h3>Gurobi license</h3>
       <GurobiLicensePanel />

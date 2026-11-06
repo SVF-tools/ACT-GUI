@@ -8,6 +8,11 @@ scipy==1.16.3
 sympy==1.14.0
 onnx==1.19.1
 onnx2torch==1.5.15
+# ACT folds dynamic Shape/Reshape chains with onnxsim before onnx2torch; without it, models such
+# as vit_2023 fail to convert (BatchNorm input shape cannot be inferred).
+onnxsim==0.6.2
+# onnxsim imports onnxruntime and otherwise pip-installs it at runtime.
+onnxruntime==1.22.0
 protobuf==6.31.1
 PyYAML==6.0.3
 psutil==7.1.3

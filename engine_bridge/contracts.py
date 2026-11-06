@@ -16,6 +16,24 @@ Method = Literal["interval", "bab", "fuzz"]
 # interval = IntervalTF bounds, dual = ACT DualSolver, hybridz = HybridzTF + HZSolver.
 Domain = Literal["interval", "dual", "hybridz"]
 DOMAINS: tuple[Domain, ...] = ("interval", "dual", "hybridz")
+# Dual alpha handling of verify_once: fixed slopes (one backward pass), Adam over alpha with the forward bounds
+# kept fixed, or Adam over alpha recomputing the forward bounds from the current alpha every iteration.
+DualAlpha = Literal["fixed", "optimize", "optimize_refresh"]
+
+
+@dataclass(frozen=True)
+class DualOptions:
+    """DualSolver settings of a dual verify_once run. Defaults equal ACT's DualConfig; alpha "fixed" is ACT's
+    verify_once default, so DualOptions() calls verify_once exactly as before (no extra ACT API needed)."""
+    alpha: DualAlpha = "fixed"
+    iterations: int = 50
+    lr_alpha: float = 0.1
+    lr_decay: float = 0.98
+    per_class_alpha: bool = True
+    stagnation_patience: int = 0
+    stagnation_tol: float = 1e-5
+    max_time_s: float = 0.0
+    forward_lin_max_perturbed: int = 100
 
 
 class BridgeError(Exception):
@@ -43,6 +61,15 @@ class Diagnostic:
 
 
 @dataclass(frozen=True)
+class ApiCheck:
+    """One ACT symbol a capability's adapter calls, checked on the imported checkout."""
+    capability: str
+    symbol: str
+    ok: bool
+    detail: str
+
+
+@dataclass(frozen=True)
 class EngineInfo:
     act_root: str
     commit: str | None
@@ -53,6 +80,7 @@ class EngineInfo:
     cuda_available: bool | None
     capabilities: tuple[Capability, ...]
     diagnostics: tuple[Diagnostic, ...]
+    api_checks: tuple[ApiCheck, ...] = ()
 
     @property
     def usable(self) -> bool:
@@ -148,7 +176,7 @@ class ModelDescription:
 class LayerState:
     layer_id: int
     kind: str
-    stage: Literal["after"]
+    stage: Literal["after", "pre"]
     lb: tuple[float, ...]
     ub: tuple[float, ...]
     shape: tuple[int, ...]
@@ -157,10 +185,21 @@ class LayerState:
 
 @dataclass(frozen=True)
 class LayerStates:
-    method: Literal["interval"]
+    method: Domain
     availability: Availability
     layers: tuple[LayerState, ...]
     provenance: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class LaneOutcome:
+    """ACT's verdict for one INPUT row of a batched net, with that row's counterexample when ACT reported one."""
+    row: int
+    verdict: Verdict
+    act_status: str
+    counterexample: tuple[float, ...] | None = None
+    counterexample_output: tuple[float, ...] | None = None  # as RunOutcome.counterexample_output, for this row
+    counterexample_output_error: str | None = None
 
 
 @dataclass(frozen=True)
@@ -173,6 +212,12 @@ class RunOutcome:
     counterexample: tuple[float, ...] | None
     device: str  # torch default device after the ACT call, e.g. "cpu" or "cuda:0"
     domain: Domain | None = None  # set for verify_once runs; None for BaB
+    # Batched nets only: ACT's per-row verdicts; verdict/act_status then summarize them (see execution/verify.py).
+    rows: tuple[LaneOutcome, ...] = ()
+    counterexample_row: int | None = None  # the row `counterexample` belongs to (batched nets)
+    # ACT's rebuilt model (ACTToTorch) evaluated at the counterexample, for export; the verdict stays ACT's.
+    counterexample_output: tuple[float, ...] | None = None
+    counterexample_output_error: str | None = None  # why counterexample_output could not be computed
 
 
 @dataclass(frozen=True)

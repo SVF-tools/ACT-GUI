@@ -13,7 +13,9 @@ from engine_bridge.contracts import BridgeError, Domain, Method
 from engine_bridge.engine_session import act_imports
 from engine_bridge.execution import run_fuzzing, run_verification
 from engine_bridge.model_spec import describe_model
-from engine_bridge.testing import CATALOG, MODELS, model_path, native_net
+from engine_bridge.model_spec import sources
+from engine_bridge.model_spec.describe import load_net
+from engine_bridge.testing import CATALOG, MODELS, model_path, native_net, require_sources
 
 
 @pytest.mark.parametrize("model_id,method", [(m["id"], meth) for m in CATALOG["models"] for meth in m["methods"]])
@@ -47,10 +49,50 @@ def test_domain_verdict_matches_native_verify_once(model_id, domain):
     assert out.domain == domain
     assert out.act_status == native_domain_status(model_id, domain)
 
+def test_bab_counterexample_carries_the_output_of_acts_rebuilt_model():
+    out = run_verification(model_path("unsafe_linear"), "bab", 15.0)
+    assert out.verdict == "falsified" and out.counterexample is not None
+    with act_imports():
+        import torch
+        from act.front_end.verifiable_model import VerifiableModel
+        from act.pipeline.verification.act2torch import ACTToTorch
+
+        model = ACTToTorch(native_net("unsafe_linear")).run()
+        strict = VerifiableModel.get_strict_mode()
+        VerifiableModel.set_strict_mode(False)
+        try:
+            with torch.no_grad():
+                y = model(torch.tensor(out.counterexample, dtype=torch.float64).reshape(1, -1))
+        finally:
+            VerifiableModel.set_strict_mode(strict)
+        y = (y["output"] if isinstance(y, dict) else y).reshape(-1).tolist()
+    assert out.counterexample_output_error is None and out.counterexample_output == pytest.approx(y)
+
 def test_domains_reach_act_verdicts_interval_cannot():
     # Recorded native statuses: interval is UNKNOWN on both; dual / hybridz decide them.
     assert run_verification(model_path("mnist_relu_6_100"), "interval", 30.0, domain="dual").verdict == "certified"
     assert run_verification(model_path("bab_deep_mlp"), "interval", 30.0, domain="hybridz").verdict == "certified"
+
+@pytest.mark.parametrize("domain", ["interval", "hybridz"])
+def test_batched_net_reports_native_verdict_per_row_and_their_conjunction(tmp_path, domain):
+    require_sources()
+    path = tmp_path / "batch.json"
+    assert sources.build_classifier_net("mnist_conv_small", [3, 0, 7], 0.01, path).input_rows == 3
+    out = run_verification(path, "interval", 30.0, domain=domain)
+    with act_imports():
+        from act.back_end.verifier import verify_once
+        from engine_bridge.execution.verify import select_domain
+
+        select_domain(domain)
+        kw: dict[str, Any] = {"timelimit": 30.0, "hybridz_tolerance": 1e-7} if domain == "hybridz" else {}
+        native = [r.status.name for r in verify_once(load_net(path), **kw)]
+        select_domain("interval")
+    assert [(r.row, r.act_status) for r in out.rows] == list(enumerate(native))
+    statuses = {r.verdict for r in out.rows}
+    assert out.verdict == next(v for v in ("falsified", "error", "timeout", "unknown", "certified") if v in statuses)
+    assert out.metadata["batch"] == 3 and (out.counterexample_row is None) == (out.counterexample is None)
+    assert all((r.counterexample is None) == (r.counterexample_output is None and r.counterexample_output_error is None)
+               for r in out.rows)  # every row ACT falsified carries its own counterexample and output
 
 def test_fuzzing_reports_act_counterexample_inside_the_input_box():
     progress, live = [], []

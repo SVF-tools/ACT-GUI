@@ -5,12 +5,13 @@ Runs are blocking; the workbench executes them inside a worker process.
 """
 from __future__ import annotations
 
+import dataclasses
 import math
 import time
 from pathlib import Path
 from typing import Any
 
-from engine_bridge.contracts import DOMAINS, BridgeError, Domain, Method, RunOutcome, Verdict
+from engine_bridge.contracts import DOMAINS, BridgeError, Domain, DualOptions, LaneOutcome, Method, RunOutcome, Verdict
 from engine_bridge.engine_session import act_imports
 from engine_bridge.model_spec.describe import load_net
 
@@ -43,6 +44,74 @@ def _outcome(method: Method, result: Any, elapsed: float, domain: Domain | None 
     )
 
 
+# A batched net's property is the conjunction of its rows: any FALSIFIED row falsifies it, it is CERTIFIED only when
+# every row is, and otherwise the first of these ACT statuses that some row reports wins.
+_BATCH_PRECEDENCE: tuple[Verdict, ...] = ("falsified", "error", "timeout", "unknown", "certified")
+
+
+def _batch_outcome(results: list[Any], elapsed: float, domain: Domain) -> RunOutcome:
+    import torch
+
+    rows = tuple(LaneOutcome(row=i, verdict=_STATUS_MAP.get(r.status.name) or "error", act_status=r.status.name,
+                             counterexample=None if r.counterexample is None
+                             else tuple(float(x) for x in r.counterexample.reshape(-1).tolist()))
+                 for i, r in enumerate(results))  # verify_once returns one result per lane, in row order
+    verdict: Verdict = next(v for v in _BATCH_PRECEDENCE if any(r.verdict == v for r in rows))
+    ce_row = next((r.row for r in rows if r.verdict == "falsified" and results[r.row].counterexample is not None), None)
+    ce = results[ce_row].counterexample if ce_row is not None else None
+    counts: dict[str, object] = {f"rows_{v}": sum(r.verdict == v for r in rows) for v in _BATCH_PRECEDENCE}
+    return RunOutcome(
+        method="interval", verdict=verdict, act_status=verdict.upper(), elapsed_s=round(elapsed, 4),
+        metadata={"batch": len(rows), **counts},
+        counterexample=tuple(float(x) for x in ce.reshape(-1).tolist()) if ce is not None else None,
+        device=str(torch.get_default_device()), domain=domain, rows=rows, counterexample_row=ce_row,
+    )
+
+
+def _with_output(outcome: RunOutcome, net: Any, ces: dict[int, Any]) -> RunOutcome:
+    """Add the network output at each of ACT's counterexamples ({row: x}), from ACT's own rebuilt model (ACTToTorch,
+    the converter ACT's BaB uses for concrete counterexample checks), so every counterexample exports as a VNN-COMP
+    witness: on its row (batched nets) and, for the summary counterexample_row, on the outcome itself.
+
+    The rebuilt model maps one lane per INPUT row, so each x goes into its row of the full batch and one forward pass
+    evaluates them all. A failure is reported on the outcome; it only disables the export, never the verdict or
+    ACT's counterexample.
+    """
+    if not ces:
+        return outcome
+    import torch
+    from act.front_end.verifiable_model import InputLayer, VerifiableModel
+    from act.pipeline.verification.act2torch import ACTToTorch
+
+    ys: dict[int, tuple[float, ...]] = {}
+    err: str | None = None
+    try:
+        model = ACTToTorch(net).run()
+        full = next(c for c in model.children() if isinstance(c, InputLayer)).input_tensor.clone()
+        for row, x in ces.items():
+            full[row] = x.reshape(full[row].shape).to(device=full.device, dtype=full.dtype)
+        strict = VerifiableModel.get_strict_mode()
+        VerifiableModel.set_strict_mode(False)  # the property is violated here by construction
+        try:
+            with torch.no_grad():
+                out = model(full)
+        finally:
+            VerifiableModel.set_strict_mode(strict)
+        y = out["output"] if isinstance(out, dict) else out
+        ys = {row: tuple(float(v) for v in y[row].reshape(-1).tolist()) for row in ces}
+    except Exception as exc:  # noqa: BLE001 - reported on the outcome, see docstring
+        err = f"{type(exc).__name__}: {exc}"
+    rows = tuple(dataclasses.replace(r, counterexample_output=ys.get(r.row),
+                                     counterexample_output_error=err if r.row in ces else None) for r in outcome.rows)
+    top = outcome.counterexample_row or 0
+    return dataclasses.replace(outcome, rows=rows, counterexample_output=ys.get(top), counterexample_output_error=err)
+
+
+def _ces(results: list[Any]) -> dict[int, Any]:
+    """ACT's counterexample per lane, for lanes that have one."""
+    return {i: r.counterexample for i, r in enumerate(results) if r.counterexample is not None}
+
+
 def select_domain(domain: Domain) -> None:
     """Set ACT's process-global solver and transfer-function modes the way act/config/pipeline_cli.py does.
 
@@ -59,8 +128,25 @@ def select_domain(domain: Domain) -> None:
         set_transfer_function_mode("interval")
 
 
-def run_verification(model_path: Path, method: Method, time_budget_s: float,
-                     domain: Domain = "interval") -> RunOutcome:
+def dual_kwargs(options: DualOptions) -> dict[str, Any]:
+    """verify_once keywords for DualOptions; the defaults add none, so a plain verify_once runs (capability verify.dual).
+    Anything else needs verify.dual.options. Call inside act_imports()."""
+    if options == DualOptions():
+        return {}
+    from act.config.config import DualConfig
+
+    config = DualConfig(
+        n_iters=options.iterations, lr_alpha=options.lr_alpha, lr_decay=options.lr_decay,
+        per_class_alpha=options.per_class_alpha, stagnation_patience=options.stagnation_patience,
+        stagnation_tol=options.stagnation_tol, max_time=options.max_time_s,
+        forward_lin_max_perturbed=options.forward_lin_max_perturbed,
+    )
+    return {"dual_iters": 0 if options.alpha == "fixed" else options.iterations, "dual_config": config,
+            "dual_refresh_forward": options.alpha == "optimize_refresh"}
+
+
+def run_verification(model_path: Path, method: Method, time_budget_s: float, domain: Domain = "interval",
+                     dual: DualOptions | None = None, hybridz_tolerance: float = 1e-7) -> RunOutcome:
     if method not in ("interval", "bab"):
         raise BridgeError("unsupported_method", f"Unknown method {method!r}")
     if domain not in DOMAINS:
@@ -75,13 +161,16 @@ def run_verification(model_path: Path, method: Method, time_budget_s: float,
             select_domain(domain)
             # HybridZ's MILP verdict solver takes the run budget as its time limit (as pipeline_cli --timeout).
             kwargs: dict[str, Any] = (
-                {"timelimit": float(time_budget_s), "hybridz_tolerance": 1e-7} if domain == "hybridz" else {})
+                {"timelimit": float(time_budget_s), "hybridz_tolerance": float(hybridz_tolerance)}
+                if domain == "hybridz" else dual_kwargs(dual or DualOptions()) if domain == "dual" else {})
             t = time.perf_counter()
             results = verify_once(net, **kwargs)
             elapsed = time.perf_counter() - t
-            if len(results) != 1:
-                raise BridgeError("unsupported_batch", f"Expected one input lane, ACT returned {len(results)}")
-            return _outcome("interval", results[0], elapsed, domain)
+            if not results:
+                raise BridgeError("unsupported_batch", "ACT returned no input lane")
+            if len(results) == 1:
+                return _with_output(_outcome("interval", results[0], elapsed, domain), net, _ces(results))
+            return _with_output(_batch_outcome(results, elapsed, domain), net, _ces(results))
         select_domain("interval")  # BaB keeps its own bounding path; reset any earlier selection
         from act.back_end.bab.bab import verify_bab_batched
         from act.back_end.solver.solver_torchlp import TorchLPSolver
@@ -94,4 +183,4 @@ def run_verification(model_path: Path, method: Method, time_budget_s: float,
             max_batch_size=BackendConfig.from_yaml().bab_max_batch_size,
             time_budget_s=float(time_budget_s), dual_config=pc.dual,
         )
-        return _outcome("bab", result, time.perf_counter() - t)
+        return _with_output(_outcome("bab", result, time.perf_counter() - t), net, _ces([result]))

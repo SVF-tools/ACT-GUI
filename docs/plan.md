@@ -29,16 +29,16 @@ BASE-02 does not wait for ACT; only BASE-03 needs the pinned engine. Development
 
 | Module | Owner | Task IDs | Detailed plan |
 | --- | --- | --- | --- |
-| visual_bench/workspace | C | WS-01, WS-02, WS-03 | [README](../visual_bench/workspace/README.md) |
-| visual_bench/model_spec | C | MSV-01, MSV-02, MSV-03, MSV-04 | [README](../visual_bench/model_spec/README.md) |
-| visual_bench/verification | B | VER-01, VER-02, VER-03, VER-04, VER-07 (stop, verdict banner) | [README](../visual_bench/verification/README.md) |
+| visual_bench/workspace | C | WS-01, WS-02, WS-03, WS-04 | [README](../visual_bench/workspace/README.md) |
+| visual_bench/model_spec | C | MSV-01, MSV-02, MSV-03, MSV-04, MSV-05 | [README](../visual_bench/model_spec/README.md) |
+| visual_bench/verification | B | VER-01, VER-02, VER-03, VER-04, VER-07 (stop, verdict banner), VER-11 (counterexample save/export), VER-12 (run diagnostics, reproduction snapshot) | [README](../visual_bench/verification/README.md) |
 | visual_bench/fuzzing | B (service), C (views) | VER-06, VER-07 (saved counterexamples) | [README](../visual_bench/fuzzing/README.md) |
-| visual_bench/engine | B | VER-05 | [README](../visual_bench/engine/README.md) |
+| visual_bench/engine | B | VER-05, VER-08 (ACT branch switching), VER-09 (capability gating), VER-10 (user-entered repositories) | [README](../visual_bench/engine/README.md) |
 | visual_bench/bab | C | BAB-01, BAB-02, BAB-03 | [README](../visual_bench/bab/README.md) |
 | visual_bench/analysis | D | ANA-01, ANA-02, ANA-03 | [README](../visual_bench/analysis/README.md) |
 | visual_bench/assistant | B | AI-01, AI-02, AI-03, AI-04 | [README](../visual_bench/assistant/README.md) |
 | visual_bench/records | B | REC-01, REC-02, REC-03, REC-04 | [README](../visual_bench/records/README.md) |
-| engine_bridge/engine_session | B | ES-01, ES-02, ES-03, ES-04 | [README](../engine_bridge/engine_session/README.md) |
+| engine_bridge/engine_session | B | ES-01, ES-02, ES-03, ES-04, ES-05, ES-06 | [README](../engine_bridge/engine_session/README.md) |
 | engine_bridge/model_spec | B | MSB-01, MSB-02, MSB-03, MSB-04 | [README](../engine_bridge/model_spec/README.md) |
 | engine_bridge/execution | B | EXE-01, EXE-02, EXE-03, EXE-04, EXE-05 | [README](../engine_bridge/execution/README.md) |
 | engine_bridge/inspection | A | INSP-01, INSP-02, INSP-03 | [README](../engine_bridge/inspection/README.md) |
@@ -70,8 +70,10 @@ A owns ACT public-interface and scientific-semantics work. BASE-01 produces the 
 | ACT-03 | A | Committed node/wave observation hooks with commit and rollback points | EVT-02 | EVT-01 | A native ACT test shows rolled-back work never appears as committed; batch identity, sequence, and revision are emitted. |
 | ACT-04 | A | Geometry/projection export with coordinates, representation, and guarantee | INSP-02 | ACT-01 | A native ACT test exports a declared projection with its guarantee; interval-only methods report interval-only. |
 | ACT-05 | A | Pause/step/split/cancel at safe boundaries with explicit rejection results | EXE-03 | ACT-02, ACT-03 | Each supported control has a native ACT test, including stale-target and failed-precondition rejection; unsupported controls are declared unsupported. |
+| ACT-06 | A | Per-layer, per-neuron propagation records for `verify_once` (branch `act-gui-match` of guanqin-123/ACT, API `act/back_end/observe.py`; the branch's `verify_once` dual path also falsifies with the concrete dual witness) | INSP-04, INSP-05 | ACT-01 | Native ACT tests: records keyed by scope/domain/pass/layer/stage/version arrive in propagation order; last versions equal `collect_facts` facts bitwise; dual alpha equals `DualResult.alpha_state`; verdicts bitwise equal with the observer off/on; measured observer-off overhead vs SVF main is reported (< 1% target). |
+| ACT-07 | A | `verify_once` dual options: alpha iterations with fixed or recomputed forward bounds and a `DualConfig` optimizer policy (`dual_iters`, `dual_config`, `dual_refresh_forward`; branch `act-gui-match`) | EXE-06, VER-14 | ACT-06 | Defaults keep `verify_once` bitwise unchanged; optimized alpha tightens the dual bound on `bab_deep_mlp` (GUI test `test_dual_alpha_optimization_reaches_act`). |
 
-Each ACT task completes either with a linked ACT issue/PR whose tested commit becomes the new pinned GUI baseline, or with BASE-01 evidence that the current baseline already provides the capability (closed with no ACT change). Keep the GUI baseline pinned; do not silently track ACT main.
+Each ACT task completes either with a linked ACT issue/PR whose tested commit becomes the new pinned GUI baseline, or with BASE-01 evidence that the current baseline already provides the capability (closed with no ACT change). Keep the GUI baseline pinned; do not silently track ACT main. Switching to another branch in the Engine tab (VER-08) is an explicit, recorded user choice and does not move the pinned baseline.
 
 ## Team and Review
 
@@ -104,6 +106,9 @@ Recorded 2026-11-03 against ACT `deff2fb0c031` (branch CLIMB, tracked tree clean
 | ES-01 | First version | Probe with capabilities, missing-ACT and version-mismatch diagnostics. ES-02 (explicit handles) not started; each call loads the model. |
 | MSB-01..03 | First version | JSON ACT nets with box INPUT_SPEC and ASSERT; parity tests vs native DAG/spec. Other spec kinds raise `unsupported_spec`. No A review yet. |
 | MSB-04, MSV-04 | First version | Model sources: VNN-LIB instances (ACT `create_specs_from_paths`) and ONNX image classifiers with a chosen MNIST/CIFAR-10 test image and eps; built nets stored content-addressed with their parameters; Load model panel. ACT torchvision-zoo models are not offered (untrained, 3x224x224 inputs exceed the bridge's spec limits). The BaVerLy CIFAR-10 model reaches 36% clean accuracy on raw pixels (no tried normalization exceeds 44%); ACT's interval BIAS transfer function does not accept 4-D constants, so no normalization layer is prepended. |
+| MSV-05 | First version | 2026-11-05: built models record the ACT commit and source they were built on; after a branch switch a model whose net the active engine cannot load is marked "needs rebuild" and rebuilds from its recorded settings (`POST /api/models/{id}/rebuild`). See [model_spec](../visual_bench/model_spec/README.md#3-tasks). |
+| VER-11 | First version | 2026-11-05: falsified verify_once/BaB runs save ACT's counterexample on the run record and export it as a VNN-COMP witness (Y from ACT's ACTToTorch model) or PNG, like fuzz counterexamples. See [verification](../visual_bench/verification/README.md#3-tasks). |
+| VER-12 | First version | 2026-11-05: every run that reaches a worker records diagnostics (warnings, WARNING+ logs, ACT's printed [WARN]/[ERROR] lines, exception chain located at the innermost ACT frame, worker logs, engine snapshot); Run History shows them and downloads a reproduction snapshot with request, ACT net, engine info and `reproduce.py`. See [verification](../visual_bench/verification/README.md#3-tasks). |
 | EXE-01 | First version | `verify_once` (interval / dual / hybridz domain, selectable per run) and `verify_bab_batched` (same entry as ACT's pipeline CLI); verdicts match recorded native results. EXE-02/03 blocked on ACT-02/05. |
 | INSP-01 | First version | Interval after-states per layer, recorded by the run worker; "before" = predecessor's after. No paging (>65536 values rejected). INSP-02/03 not started. |
 | EVT-01 | First version | Coverage audit: summary-only BaB metadata. EVT-02/03 blocked on ACT-03. |
@@ -113,12 +118,14 @@ Recorded 2026-11-03 against ACT `deff2fb0c031` (branch CLIMB, tracked tree clean
 | REC-01 | First version | Manifest, hashed artifacts, sealed records, hash-checked reads, zip export without absolute paths. |
 | REC-02/03 | Partial | Atomic writes, torn-tail recovery, interrupted-run marking, event replay. No commit batches (needs EVT-02). REC-04 export only, no import. |
 | WS-01/02 | First version | Selection reducer + latest-request guard (vitest). WS-03 not started. |
+| WS-04 | Implemented | Online-visitor bar: `POST /api/presence` heartbeat, in-memory 90 s window (pytest `visual_bench/workspace`). |
 | MSV-01 | First version | Model list, SVG DAG, spec and layer detail on real data; image-shaped specs render as images with sampled perturbations. MSV-02 renderer evaluation and MSV-03 drafts not started. |
 | ANA-01 | First version | Stepper over recorded layer states, before/after bars, value selection. ANA-02: interval-box 2-D projection only. ANA-03 not started. |
 | BAB-01..03 | Not started | Blocked on committed node events (ACT-03); the BaB tab shows coverage and the summary only. |
 | AI-01 | First version | Frozen context, typed evidence, deterministic fake provider, cited ids must resolve. AI-02 needs a real provider (not configured). |
 | EXE-04, VER-06 | First version | ACTFuzzer as run method `fuzz` on every catalog model (`engine_bridge/execution/fuzz.py`, worker progress pipe, `fuzz.progress` SSE events, sealed `fuzzing.json`, `GET /api/runs/{id}/fuzzing`, Fuzzing tab with live timeline, strategies, and counterexamples). Progress relies on ACTFuzzer's private `_print_progress`; no public ACT observer exists. Fuzzing reports `falsified` or `unknown`, never `certified`. |
 | ES-04, VER-05 | First version | Gurobi probe in a subprocess (`engine_bridge/engine_session/session.py`), license upload/remove/status API and the Engine tab; uploaded license stored 0600 and passed to run workers. Current methods do not use Gurobi. |
+| ES-05, ES-06, VER-08..10 | First version | 2026-11-05: the Engine tab switches the imported ACT code between the pinned baseline and a branch head of any ACT fork: operator-configured remotes (`ACT_GUI_ACT_REMOTES`, default SVF-tools and guanqin-123) or an https URL a user enters (remembered once it imports as ACT; `ACT_GUI_ALLOW_CUSTOM_REMOTES=0` disables entry). Entering a URL runs that repository's code on the server, so a public deployment needs access control (DIST-01). A switch restarts the service process, because ACT cannot be re-imported in a running process. Catalog nets, `data/` and `literature/` stay on the baseline `ACT_ROOT`. Every capability is gated on API checks of the ACT symbols its adapter calls (`engine_session/parity.py`), and failing features are disabled in the browser. These are interface checks: a non-baseline commit keeps the `version_mismatch` warning, and its numerical results are not baseline-certified. |
 | DIST-02 | First version | `Dockerfile`, `compose.yaml` (+ `compose.gpu.yaml`, `compose.gurobi.yaml`), `scripts/docker_build.sh`. No registry publishing or CI yet; the pinned ACT commit is not yet pushed upstream. |
 | STRUCT-01 | First version | 2026-11-04 module-slice restructure (docs/design.md section 3): per-module `schemas.py`/`service.py`/`routes.py` composed in `workbench.py`; new `fuzzing` and `engine` modules split out of verification; browser `shared/` layer, per-module `api.ts`/`hooks.ts` on TanStack Query, mode registry; tests moved next to their modules; ACT method/option/provenance knowledge moved to `engine_bridge/execution`. HTTP paths and payloads unchanged (`npm run check:types` drift check; the only generated change is a docstring path). |
 | DIST-01, PERF-01, REL-01 | Not started | The container serves one origin on loopback, but remote HTTPS/authentication mode is not implemented. |

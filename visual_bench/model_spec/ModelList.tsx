@@ -2,6 +2,8 @@ import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { fmt, indexRanges } from "../shared/wire";
 import type { ModelSummary } from "../generated/wire";
 import type { UseQueryResult } from "@tanstack/react-query";
+import { builtWithLabel } from "./RebuildNotice";
+import { batchRows } from "./hooks";
 
 export function ModelList({ models, selected, onSelect }: {
   models: UseQueryResult<ModelSummary[]>; selected: string | null; onSelect: (id: string) => void;
@@ -26,6 +28,9 @@ export function ModelList({ models, selected, onSelect }: {
                   <span className="chips">
                     {m.source && m.source !== "catalog" && <span className="chip">{m.source === "torch" ? "torch" : "vnn-lib"}</span>}
                     {m.source === "torch" && <TorchChips p={m.params ?? {}} />}
+                    {m.source === "vnnlib" && typeof m.params?.batch === "number" && (
+                      <span className="chip" title={`properties ${batchRows(m.params)?.labels.join(", ")}`}>batch {m.params.batch}</span>)}
+                    <EngineChip m={m} />
                     {Object.entries(m.native).map(([method, r]) => (
                       <span key={method} className={`chip v-${r.status.toLowerCase()}`} title="recorded native ACT result (fixtures/catalog.json)">
                         {method}: {r.status.toLowerCase()}
@@ -42,8 +47,9 @@ export function ModelList({ models, selected, onSelect }: {
   );
 }
 
-// Shows the first VISIBLE items and scrolls the rest inside the group; items vary in height, so measure.
+// Shows the first VISIBLE items plus a PEEK of the next one (the cue that the group scrolls); items vary in height, so measure.
 const VISIBLE = 3;
+const PEEK = 28;
 function ScrollList({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLUListElement>(null);
   useLayoutEffect(() => {
@@ -51,7 +57,9 @@ function ScrollList({ children }: { children: ReactNode }) {
     if (!ul) return;
     const fit = () => {
       const last = ul.children[VISIBLE - 1] as HTMLElement | undefined;
-      ul.style.maxHeight = ul.children.length > VISIBLE && last ? `${last.offsetTop - ul.offsetTop + last.offsetHeight}px` : "";
+      ul.style.maxHeight = ul.children.length > VISIBLE && last
+        ? `${last.offsetTop - ul.offsetTop + last.offsetHeight + PEEK}px`
+        : "";
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -59,6 +67,18 @@ function ScrollList({ children }: { children: ReactNode }) {
     return () => ro.disconnect();
   });
   return <ul ref={ref} className="list scrolllist">{children}</ul>;
+}
+
+// Built models whose net the active ACT engine fails to load, or that came from another ACT commit and are not tried yet.
+function EngineChip({ m }: { m: ModelSummary }) {
+  const built = `built on ${builtWithLabel(m.built_with)}`;
+  if (m.engine_check === "load_failed") {
+    return <span className="chip bad" title={`${built}; the active ACT engine cannot load it. Select it to rebuild.`}>needs rebuild</span>;
+  }
+  if (m.engine_check === "unchecked" && m.built_with) {
+    return <span className="chip warn" title={`${built}; not yet loaded on the active engine`}>ACT {m.built_with.commit?.slice(0, 8)}</span>;
+  }
+  return null;
 }
 
 function TorchChips({ p }: { p: Record<string, unknown> }) {
