@@ -68,7 +68,7 @@ Edit [describe.py](describe.py):
 * `load_net(path)` is the only ACT JSON loader and raises structured `BridgeError` values for missing or unreadable files.
 * `describe_model(path)` maps ACT layers, predecessor/successor IDs, shapes, parameter summaries, `INPUT_SPEC` boxes, and one `ASSERT` into `ModelDescription`.
 * Output layout comes from ACT's `params["output_shape"]` when present (including its native batch axis), or the older `get_output_shape()` API. Propagation inspection removes the batch axis for neuron coordinates while tensor references retain it. The synthetic convolution mapping regression lives in `../inspection/test_propagation.py`.
-* `_MAX_SPEC_VALUES` and `_MAX_SPEC_ROWS` are deliberate payload limits. `_MAX_SPEC_VALUES` covers the largest VNN-COMP input in ACT's data (vggnet16_2022, 3x224x224). A larger or non-box input specification must raise `unsupported_spec`, not be truncated.
+* `_MAX_SPEC_VALUES` and `_MAX_SPEC_ROWS` are deliberate payload limits. `_MAX_SPEC_VALUES` covers the largest VNN-COMP input in ACT's data (smart_turn_multimodal_2026: 80x800 audio plus 3x32x112x112 video, which ACT packs into one flat input row). A larger or non-box input specification must raise `unsupported_spec`, not be truncated. The bridge keeps full bounds for the service; the workbench wire omits lb/ub/center above `contracts.DISPLAY_VALUES` (3x224x224) values per row, so the browser shows the shape and a "too large to display" note.
 * `file_sha256(path)` supplies snapshot identity for the workbench.
 
 Keep ACT objects and tensors inside the bridge. Update [test_model_spec.py](test_model_spec.py) against native ACT calls and check repeated descriptions for stable equality and primitive leaves.

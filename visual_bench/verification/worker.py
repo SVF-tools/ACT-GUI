@@ -100,6 +100,8 @@ def main(request_path: str, output_path: str, progress_fd: int) -> int:
                     out["layer_states"] = dataclasses.asdict(interval_layer_states(Path(req["model_path"])))
                 except BridgeError as err:
                     out["layer_states_error"] = {"code": err.code, "message": err.message}
+                except Exception as exc:  # e.g. CUDA OOM on a huge net: ACT's outcome above stands without them
+                    out["layer_states_error"] = {"code": "unexpected_exception", "message": f"{type(exc).__name__}: {exc}"}
             if "layer_states_error" in out:
                 capture.note("layer_states_" + out["layer_states_error"]["code"], out["layer_states_error"]["message"])
         except BridgeError as err:

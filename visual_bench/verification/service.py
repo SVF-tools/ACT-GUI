@@ -25,6 +25,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Protocol
 
+from engine_bridge.contracts import DISPLAY_VALUES
 from engine_bridge.execution import required_capability
 from visual_bench.config import REPO_ROOT, requested_device
 from visual_bench.engine.service import EngineService
@@ -41,6 +42,9 @@ from visual_bench.wire import ErrorBody
 log = logging.getLogger(__name__)
 
 WORKER_GRACE_S = 120.0
+# The worker loads the ACT net before ACT's budget starts; its deadline adds this much per byte of the net file.
+# Conservative JSON parse rate: the 1.9 GB smart_turn_multimodal_2026 net loads in about 100 s.
+LOAD_BYTES_PER_S = 10e6
 SAVED = "saved_counterexamples.json"  # run annotation shared with the fuzzing module (user-saved counterexamples)
 STOP_GRACE_S = 10.0  # a stopped fuzz worker finishes its current iteration within this, else it is killed
 
@@ -212,7 +216,8 @@ class RunService:
                         killed.set()
                         proc.kill()
 
-                    timer = threading.Timer(req.time_budget_s + WORKER_GRACE_S, kill)
+                    load_s = model_path.stat().st_size / LOAD_BYTES_PER_S
+                    timer = threading.Timer(req.time_budget_s + WORKER_GRACE_S + load_s, kill)
                     timer.start()
                     try:
                         with os.fdopen(read_fd) as progress:
@@ -307,7 +312,8 @@ class RunService:
     def request(self, run_id: str) -> S.RunRequest:
         return S.RunRequest.model_validate(self.records.manifest(run_id)["request"])
 
-    def get(self, run_id: str) -> S.RunOut:
+    def get(self, run_id: str, *, full: bool = False) -> S.RunOut:
+        """A run; counterexample inputs above DISPLAY_VALUES values are None unless `full` (save reads them)."""
         if not self.records.exists(run_id):
             raise AppError(404, "run_not_found", f"Unknown run {run_id!r}")
         m = self.records.manifest(run_id)
@@ -323,6 +329,8 @@ class RunService:
                 status, error = "failed", ErrorBody(code="record_corrupt", message="result.json failed its hash check")
             else:
                 result = S.RunResultOut.model_validate(raw)
+                if not full:
+                    result = _displayable(result)
         elif status == "failed" and last:
             error = ErrorBody(code=str(last["payload"].get("code")), message=str(last["payload"].get("message")))
         # Records written before domains existed are interval-domain verify_once runs.
@@ -363,7 +371,7 @@ class RunService:
     def save_counterexample(self, run_id: str, row: int | None = None) -> tuple[S.RunOut, bool]:
         """Save ACT's counterexample of a verify_once/BaB run (of batch row `row`; default: the summary one) on its
         record; saving the same row again is a no-op."""
-        run = self.get(run_id)
+        run = self.get(run_id, full=True)
         if run.method == "fuzz":
             raise AppError(422, "unsupported_method", "Fuzz runs save counterexamples by index (saved-counterexamples).")
         ce = self._row_counterexample(run.result, row)
@@ -422,3 +430,11 @@ class RunService:
 
     def list(self) -> S.RunList:
         return S.RunList(runs=[self.get(r) for r in self.records.run_ids()])
+
+
+def _displayable(r: S.RunResultOut) -> S.RunResultOut:
+    """The result with counterexample inputs above DISPLAY_VALUES values omitted (records keep them)."""
+    def shown(xs: list[float] | None) -> list[float] | None:
+        return None if xs is None or len(xs) > DISPLAY_VALUES else xs
+    return r.model_copy(update={"counterexample": shown(r.counterexample),
+                                "rows": [x.model_copy(update={"counterexample": shown(x.counterexample)}) for x in r.rows]})

@@ -62,14 +62,15 @@ class FuzzCounterexampleOut(Wire):
     spec_row: int
     severity: WireNumber
     true_class: int | None
-    input: list[WireNumber]
+    # Input-sized vectors are None above DISPLAY_VALUES values (too large to display); the record keeps `input`.
+    input: list[WireNumber] | None
     output: list[WireNumber]
-    seed_input: list[WireNumber]
+    seed_input: list[WireNumber] | None
     seed_output: list[WireNumber] | None = None  # absent in records written before it was captured
 
 class FuzzSeedOut(Wire):
     row: int
-    input: list[WireNumber]
+    input: list[WireNumber] | None  # None above DISPLAY_VALUES values
     output: list[WireNumber]
 
 class FuzzSummaryOut(Wire):
@@ -95,8 +96,8 @@ class FuzzFrameOut(Wire):
     seed_row: int
     depth: int
     violation: bool
-    input: list[WireNumber]
-    seed_input: list[WireNumber]
+    input: list[WireNumber] | None  # None above DISPLAY_VALUES values
+    seed_input: list[WireNumber] | None
     counterexample: FuzzCounterexampleOut | None = None  # ACT's newest counterexample of a violating iteration
 
 class SavedCounterexampleOut(Wire):

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fmt, num } from "../shared/wire";
+import { fmt, num, tooLarge, type WireNumber } from "../shared/wire";
 import type { InputSpecOut, ModelDescriptionOut, OutputSpecOut } from "../generated/wire";
 import { classLabel, specImageShape } from "../shared/ui/pixels";
 import { InputDomain } from "./InputDomain";
@@ -47,19 +47,26 @@ export function SpecPanel({ model, selectedLayer }: { model: ModelDescriptionOut
   );
 }
 
+/** An input spec whose bounds the service sent (they are omitted when too large to display). */
+export type ShownSpec = InputSpecOut & { lb: WireNumber[]; ub: WireNumber[] };
+
 // A spec with several rows (a batch) is shown one row at a time; each row is one input of the batch.
 function InputSpecView({ s }: { s: InputSpecOut }) {
   const rows = s.shape.length === 4 && s.shape[0]! > 1 ? s.shape[0]! : 1;
   const [row, setRow] = useState(0);
+  const title = <>Input domain · {s.kind} (layer {s.layer_id}){s.dataset ? ` · ${s.dataset}` : ""}</>;
+  if (s.lb === null || s.ub === null) {
+    return <div className="spec"><div className="label">{title}</div><div className="note">{tooLarge(s.shape.slice(1).reduce((a, b) => a * b, 1))}</div></div>;
+  }
   const r = Math.min(row, rows - 1);
   const per = s.lb.length / rows;
   const cut = <T,>(xs: T[]) => xs.slice(r * per, (r + 1) * per);
-  const spec: InputSpecOut = rows === 1 ? s : { ...s, lb: cut(s.lb), ub: cut(s.ub), center: s.center ? cut(s.center) : null,
-    shape: [1, ...s.shape.slice(1)] };
+  const spec: ShownSpec = rows === 1 ? { ...s, lb: s.lb, ub: s.ub }
+    : { ...s, lb: cut(s.lb), ub: cut(s.ub), center: s.center ? cut(s.center) : null, shape: [1, ...s.shape.slice(1)] };
   const shape = specImageShape(spec.shape, spec.dataset);
   return (
     <div className="spec">
-      <div className="label">Input domain · {s.kind} (layer {s.layer_id}){s.dataset ? ` · ${s.dataset}` : ""}
+      <div className="label">{title}
         {rows > 1 && <> · batch of {rows} rows{" "}
           <select value={r} onChange={(e) => setRow(Number(e.target.value))} aria-label="batch row">
             {Array.from({ length: rows }, (_, k) => <option key={k} value={k}>row {k}</option>)}
@@ -75,7 +82,7 @@ function InputSpecView({ s }: { s: InputSpecOut }) {
   );
 }
 
-function BoundsTable({ s }: { s: InputSpecOut }) {
+function BoundsTable({ s }: { s: ShownSpec }) {
   return (
     <>
       <table className="tbl">

@@ -16,6 +16,10 @@ Method = Literal["interval", "bab", "fuzz"]
 # interval = IntervalTF bounds, dual = ACT DualSolver, hybridz = HybridzTF + HZSolver.
 Domain = Literal["interval", "dual", "hybridz"]
 DOMAINS: tuple[Domain, ...] = ("interval", "dual", "hybridz")
+# Input-sized vectors kept for display only (fuzz frames and seeds, a counterexample's seed) are omitted (None)
+# above this many values, the largest image input in ACT's data (3x224x224); larger inputs such as the packed
+# 1,268,224-value smart_turn_multimodal_2026 input would make records and responses hundreds of MB.
+DISPLAY_VALUES = 3 * 224 * 224
 # Dual alpha handling of verify_once: fixed slopes (one backward pass), Adam over alpha with the forward bounds
 # kept fixed, or Adam over alpha recomputing the forward bounds from the current alpha every iteration.
 DualAlpha = Literal["fixed", "optimize", "optimize_refresh"]
@@ -250,7 +254,7 @@ class FuzzCounterexample:
     true_class: int | None
     input: tuple[float, ...]  # flattened; ACT checked it satisfies the input spec
     output: tuple[float, ...]
-    seed_input: tuple[float, ...]
+    seed_input: tuple[float, ...] | None  # None above DISPLAY_VALUES values
     seed_output: tuple[float, ...]  # ACT model output on seed_input (the unmutated input)
 
 
@@ -258,7 +262,7 @@ class FuzzCounterexample:
 class FuzzSeed:
     """An initial seed (one INPUT row) and the ACT model's output on it."""
     row: int
-    input: tuple[float, ...]
+    input: tuple[float, ...] | None  # None above DISPLAY_VALUES values
     output: tuple[float, ...]
 
 
@@ -271,8 +275,8 @@ class FuzzFrame:
     seed_row: int  # INPUT row the mutated lane descends from (FuzzingSeed.original_index)
     depth: int  # mutations applied since that INPUT row, including this one
     violation: bool  # the iteration added a counterexample to ACT's list
-    input: tuple[float, ...]  # flattened mutated input that ACT ran through the model
-    seed_input: tuple[float, ...]  # flattened original INPUT row (FuzzingSeed.original_tensor)
+    input: tuple[float, ...] | None  # flattened mutated input that ACT ran through the model (None above DISPLAY_VALUES)
+    seed_input: tuple[float, ...] | None  # flattened original INPUT row (FuzzingSeed.original_tensor), likewise
     # Newest counterexample ACT reported in this iteration (violation only); it need not be lane 0.
     counterexample: FuzzCounterexample | None = None
 

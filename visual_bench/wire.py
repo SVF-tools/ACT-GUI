@@ -13,8 +13,10 @@ from typing import Literal, Union
 
 from pydantic import BaseModel, ConfigDict
 
+from engine_bridge.contracts import DISPLAY_VALUES
+
 __all__ = ['WireNumber', 'Scalar', 'Availability', 'Verdict', 'Method', 'Domain', 'RunState', 'wire_number',
-           'wire_numbers', 'Wire', 'ErrorBody', 'ErrorResponse', 'HealthOut']
+           'wire_numbers', 'display_numbers', 'Wire', 'ErrorBody', 'ErrorResponse', 'HealthOut']
 
 WireNumber = Union[float, Literal["Infinity", "-Infinity", "NaN"]]
 Scalar = Union[str, int, float, bool, None]
@@ -36,6 +38,11 @@ def wire_number(x: float) -> WireNumber:
 
 def wire_numbers(xs: "list[float] | tuple[float, ...]") -> list[WireNumber]:
     return [wire_number(x) for x in xs]
+
+
+def display_numbers(xs: "list[float] | tuple[float, ...] | None") -> list[WireNumber] | None:
+    """An input-sized vector for the browser; None when absent or above DISPLAY_VALUES values (records keep it)."""
+    return None if xs is None or len(xs) > DISPLAY_VALUES else wire_numbers(xs)
 
 
 class Wire(BaseModel):

@@ -1,8 +1,8 @@
 // Image view of an INPUT_SPEC box: clean input, bounds, allowed change per pixel, and sampled perturbations inside the box.
 import { useMemo, useState } from "react";
 import { fmt, num } from "../shared/wire";
-import type { InputSpecOut } from "../generated/wire";
 import { PerturbCompare, Pixels, type Shape } from "../shared/ui/pixels";
+import type { ShownSpec } from "./SpecPanel";
 
 type Pattern = "sign" | "uniform" | "lower" | "upper";
 const PATTERNS: { id: Pattern; label: string }[] = [
@@ -34,7 +34,7 @@ function sample(lb: number[], ub: number[], pattern: Pattern, seed: number): num
   });
 }
 
-export function InputDomain({ spec, shape }: { spec: InputSpecOut; shape: Shape }) {
+export function InputDomain({ spec, shape }: { spec: ShownSpec; shape: Shape }) {
   const lb = useMemo(() => spec.lb.map(num), [spec]);
   const ub = useMemo(() => spec.ub.map(num), [spec]);
   const center = useMemo(() => (spec.center ? spec.center.map(num) : lb.map((l, i) => (l + ub[i]!) / 2)), [spec, lb, ub]);

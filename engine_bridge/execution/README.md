@@ -93,6 +93,7 @@ Edit [fuzz.py](fuzz.py):
 * `split_options()` separates run arguments from `FuzzingConfig` hyperparameters.
 * `fuzzing_defaults()` reads the pinned ACT configuration.
 * `PROVENANCE` documents the ACT call, config source, and display frames.
+* Display-only input vectors (frame input and seed input, seed rows, a counterexample's seed input) are None above `contracts.DISPLAY_VALUES` values; a counterexample keeps its full `input` for save and export, and recorded frames drop a large counterexample already listed in `counterexamples`.
 * Progress and frames are observations between ACT iterations. Counterexamples are only ACT PropertyChecker results. Fuzzing returns `falsified` or `unknown`, never `certified`.
 
 The current implementation relies on ACTFuzzer's private `_print_progress` and `mutation_engine.mutate` seams. Recheck both against the pinned ACT commit when changing ACT.

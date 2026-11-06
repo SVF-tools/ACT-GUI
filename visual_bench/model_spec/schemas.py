@@ -120,8 +120,9 @@ class LayerOut(Wire):
 class InputSpecOut(Wire):
     layer_id: int
     kind: str
-    lb: list[WireNumber]
-    ub: list[WireNumber]
+    # lb/ub/center are None above DISPLAY_VALUES values per row (too large to display); shape is always given.
+    lb: list[WireNumber] | None
+    ub: list[WireNumber] | None
     shape: list[int]  # lb/ub tensor shape as ACT stores it (images: N, C, H, W)
     center: list[WireNumber] | None  # unperturbed input, when the spec records one
     dataset: str | None  # dataset name from the INPUT layer, e.g. "mnist", "cifar10"

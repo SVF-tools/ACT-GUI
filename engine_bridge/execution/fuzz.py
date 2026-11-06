@@ -13,6 +13,7 @@ result unchanged. Both seams are pinned to the baseline in engine_session capabi
 """
 from __future__ import annotations
 
+import dataclasses
 import math
 import random
 import tempfile
@@ -22,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from engine_bridge.contracts import (
-    BridgeError, FuzzCounterexample, FuzzFrame, FuzzOutcome, FuzzProgress, FuzzSeed, FuzzStrategyStats,
+    DISPLAY_VALUES, BridgeError, FuzzCounterexample, FuzzFrame, FuzzOutcome, FuzzProgress, FuzzSeed, FuzzStrategyStats,
 )
 from engine_bridge.engine_session import act_imports
 from engine_bridge.model_spec.describe import load_net
@@ -55,6 +56,20 @@ def split_options(options: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str,
 
 def _floats(t: Any) -> tuple[float, ...]:
     return tuple(float(x) for x in t.detach().reshape(-1).tolist())
+
+
+def _dedupe_large_hits(frames: list[FuzzFrame], ces: tuple[FuzzCounterexample, ...]) -> tuple[FuzzFrame, ...]:
+    """Recorded frames drop a counterexample that is above DISPLAY_VALUES values and already in `ces`;
+    the record keeps one copy of each large input (save and export read it from there)."""
+    listed = {c.index for c in ces}
+    return tuple(dataclasses.replace(fr, counterexample=None)
+                 if fr.counterexample is not None and fr.counterexample.index in listed
+                 and len(fr.counterexample.input) > DISPLAY_VALUES else fr for fr in frames)
+
+
+def _shown(t: Any) -> tuple[float, ...] | None:
+    """A display-only vector, omitted above DISPLAY_VALUES values."""
+    return _floats(t) if t.numel() <= DISPLAY_VALUES else None
 
 
 def fuzzing_defaults() -> dict[str, Any]:
@@ -165,7 +180,7 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
             index=i, iteration=at[0], elapsed_s=round(at[1], 4), strategy=at[2],
             kind=str(getattr(ce.kind, "value", ce.kind)), spec_row=int(ce.spec_row), severity=float(ce.severity),
             true_class=ce.true_class, input=_floats(ce.input), output=_floats(ce.output),
-            seed_input=_floats(ce.seed_input), seed_output=_floats(seed_out),
+            seed_input=_shown(ce.seed_input), seed_output=_floats(seed_out),
         )
 
     def frame(iteration: int, violation: bool) -> FuzzFrame | None:
@@ -183,7 +198,7 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
                         forward_at(ce.seed_input, int(ce.spec_row)))
         return FuzzFrame(iteration=iteration, elapsed_s=round(elapsed, 4), strategy=name,
                          seed_row=int(s.original_index[0]), depth=int(s.depth[0]) + 1, violation=violation,
-                         input=_floats(x[0]), seed_input=_floats(s.original_tensor[0]), counterexample=hit)
+                         input=_shown(x[0]), seed_input=_shown(s.original_tensor[0]), counterexample=hit)
 
     def keep_frame(fr: FuzzFrame) -> None:
         frames.append(fr)
@@ -239,7 +254,7 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
     kept = report.counterexamples[:COUNTEREXAMPLE_LIMIT]
     seed_outs = [forward_at(ce.seed_input, int(ce.spec_row)) for ce in kept]
     seed_rows = rows[:SEED_LIMIT]
-    seeds = tuple(FuzzSeed(row=i, input=_floats(x), output=_floats(y))
+    seeds = tuple(FuzzSeed(row=i, input=_shown(x), output=_floats(y))
                   for i, (x, y) in enumerate(zip(seed_rows, forward(rows)[:SEED_LIMIT], strict=True)))
     ces = tuple(to_ce(i, ce, found[i], seed_outs[i]) for i, ce in enumerate(kept))
     n = len(report.counterexamples)
@@ -259,7 +274,7 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
         seeds_explored=int(report.seeds_explored), total_mutations=int(report.total_mutations),
         counterexample_count=n, never_activated_count=int(report.num_of_never_activated_neurons),
         never_activated_sample=tuple(f"{layer}[{idx}]" for layer, idx in report.never_activated_neurons),
-        counterexamples=ces, seeds=seeds, frames=tuple(frames), timeline=tuple(timeline),
+        counterexamples=ces, seeds=seeds, frames=_dedupe_large_hits(frames, ces), timeline=tuple(timeline),
         strategies=tuple(FuzzStrategyStats(name=k, weight=weights.get(k, 0.0), selected=selected[k],
                                            violations=violations[k]) for k in selected),
         config=config, rng_seed=rng_seed, device=str(fuzzer.device), stopped=stopped,

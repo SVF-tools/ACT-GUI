@@ -14,7 +14,7 @@ export function modelShape(model: ModelDescriptionOut | null, d: number): Shape 
 
 export function inputBox(model: ModelDescriptionOut | null, d: number): Box {
   const b = model?.input_specs[0];
-  return b && b.lb.length === d ? { lb: b.lb.map(num), ub: b.ub.map(num) } : null;
+  return b && b.lb && b.ub && b.lb.length === d ? { lb: b.lb.map(num), ub: b.ub.map(num) } : null;
 }
 
 export function argmax(ys: number[]): number {
@@ -30,19 +30,21 @@ export function finiteRange(xs: number[]): [number, number] {
 }
 
 // Display-side summary of one ACT counterexample; "predicted" is argmax of the output ACT recorded.
+// shown is false when the service omitted the input vectors as too large to display (x, seed, delta are empty).
 export type Ce = {
-  ce: FuzzCounterexampleOut; x: number[]; seed: number[]; y: number[]; ySeed: number[] | null;
+  ce: FuzzCounterexampleOut; shown: boolean; x: number[]; seed: number[]; y: number[]; ySeed: number[] | null;
   pred: number; seedPred: number | null; delta: number[]; linf: number; l2: number; changed: number; misclassified: boolean;
 };
 
 export function analyze(ce: FuzzCounterexampleOut): Ce {
-  const x = ce.input.map(num), seed = ce.seed_input.map(num), y = ce.output.map(num);
+  const shown = ce.input !== null && ce.seed_input !== null;
+  const x = shown ? ce.input!.map(num) : [], seed = shown ? ce.seed_input!.map(num) : [], y = ce.output.map(num);
   const ySeed = ce.seed_output ? ce.seed_output.map(num) : null;
   const delta = x.map((v, i) => v - seed[i]!);
   let linf = 0, sq = 0, changed = 0;
   for (const d of delta) { linf = Math.max(linf, Math.abs(d)); sq += d * d; if (Math.abs(d) > 1e-9) changed++; }
   const pred = argmax(y);
-  return { ce, x, seed, y, ySeed, pred, seedPred: ySeed ? argmax(ySeed) : null, delta, linf, l2: Math.sqrt(sq), changed,
+  return { ce, shown, x, seed, y, ySeed, pred, seedPred: ySeed ? argmax(ySeed) : null, delta, linf, l2: Math.sqrt(sq), changed,
            misclassified: ce.true_class !== null && pred !== ce.true_class };
 }
 

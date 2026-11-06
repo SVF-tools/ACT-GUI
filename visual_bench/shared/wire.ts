@@ -18,6 +18,11 @@ export function num(x: WireNumber): number {
   return x === "Infinity" ? Infinity : x === "-Infinity" ? -Infinity : NaN;
 }
 
+/** Note for an input-sized vector the service omitted (above engine_bridge.contracts.DISPLAY_VALUES). */
+export function tooLarge(values: number): string {
+  return `${values.toLocaleString()} input values, too large to display`;
+}
+
 export function fmt(x: number, digits = 4): string {
   if (!Number.isFinite(x)) return String(x);
   return Math.abs(x) >= 1e4 || (Math.abs(x) < 1e-3 && x !== 0) ? x.toExponential(2) : x.toFixed(digits);

@@ -17,7 +17,7 @@ from visual_bench.model_spec.service import ModelService
 from visual_bench.records import RecordStore
 from visual_bench.records.store import now_iso
 from visual_bench.verification.service import SAVED, RunService, vnncomp_sat
-from visual_bench.wire import wire_number, wire_numbers
+from visual_bench.wire import display_numbers, wire_number, wire_numbers
 
 
 class FuzzingService:
@@ -51,7 +51,7 @@ class FuzzingService:
                                 summary=None, timeline=live, strategies=[],
                                 counterexamples=[counterexample_out(c) for c in hits],
                                 frames=[frame_out(latest)] if latest else [], **base)
-        seeds = [S.FuzzSeedOut(row=s["row"], input=wire_numbers(s["input"]), output=wire_numbers(s["output"]))
+        seeds = [S.FuzzSeedOut(row=s["row"], input=display_numbers(s["input"]), output=wire_numbers(s["output"]))
                  for s in raw.get("seeds", [])]
         summary = S.FuzzSummaryOut.model_validate({k: raw[k] for k in S.FuzzSummaryOut.model_fields if k in raw})
         base["config"] = raw["config"]
@@ -102,14 +102,14 @@ class FuzzingService:
 
 
 def counterexample_out(c: dict[str, Any]) -> S.FuzzCounterexampleOut:
-    return S.FuzzCounterexampleOut(**{**c, "severity": wire_number(c["severity"]), "input": wire_numbers(c["input"]),
-                                      "output": wire_numbers(c["output"]), "seed_input": wire_numbers(c["seed_input"]),
+    return S.FuzzCounterexampleOut(**{**c, "severity": wire_number(c["severity"]), "input": display_numbers(c["input"]),
+                                      "output": wire_numbers(c["output"]), "seed_input": display_numbers(c["seed_input"]),
                                       "seed_output": None if c.get("seed_output") is None else
                                       wire_numbers(c["seed_output"])})
 
 
 def frame_out(fr: dict[str, Any]) -> S.FuzzFrameOut:
     ce = fr.get("counterexample")
-    return S.FuzzFrameOut.model_validate({**fr, "input": wire_numbers(fr["input"]),
-                                          "seed_input": wire_numbers(fr["seed_input"]),
+    return S.FuzzFrameOut.model_validate({**fr, "input": display_numbers(fr["input"]),
+                                          "seed_input": display_numbers(fr["seed_input"]),
                                           "counterexample": counterexample_out(ce) if ce else None})
