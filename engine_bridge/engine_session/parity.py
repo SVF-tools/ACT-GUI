@@ -10,6 +10,8 @@ from __future__ import annotations
 import importlib
 import inspect
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, cast
 
 from engine_bridge.contracts import ApiCheck
@@ -88,6 +90,18 @@ def requirements() -> dict[str, tuple[Requirement, ...]]:
         ),
         "verify.bab": bab,
         "events.bab_summary": bab,
+        "fuzz.control": (
+            Requirement("act.pipeline.gui.observe:observe", positional=1),
+            *(Requirement(f"act.pipeline.gui.fuzzing:{name}") for name in
+              ("FuzzControl", "fuzzing_options", "FuzzStep", "FuzzStart", "FuzzConfigChange", "FuzzEnd")),
+            Requirement("act.pipeline.gui.fuzzing:FuzzControl.pause", positional=1),
+            Requirement("act.pipeline.gui.fuzzing:FuzzControl.resume", positional=1),
+            Requirement("act.pipeline.gui.fuzzing:FuzzControl.request_stop", positional=1),
+            Requirement("act.pipeline.gui.fuzzing:FuzzControl.update", positional=1),
+            Requirement("act.pipeline.fuzzing.actfuzzer:validate_live_changes", positional=1),
+            Requirement("act.pipeline.fuzzing.actfuzzer:ACTFuzzer",
+                        ("wrapped_model", "initial_seeds", "config", "control")),
+        ),
         "fuzz.actfuzzer": (
             Requirement(f"{_SERIALIZATION}:load_net_from_file", positional=1),
             Requirement("act.pipeline.fuzzing.actfuzzer:ACTFuzzer", ("wrapped_model", "initial_seeds", "config")),
@@ -166,3 +180,21 @@ def check_api() -> tuple[ApiCheck, ...]:
             problem = _check(req)
             out.append(ApiCheck(capability, req.symbol, problem is None, problem or "ok"))
     return tuple(out)
+
+
+def capability_available(name: str) -> bool:
+    """Check one optional API surface, cached by capability and active checkout path."""
+    from engine_bridge.engine_session.session import act_code_root
+
+    return _capability_available(name, str(act_code_root()))
+
+
+@lru_cache(maxsize=32)
+def _capability_available(name: str, root: str) -> bool:
+    from engine_bridge.engine_session.session import act_imports
+
+    reqs = requirements().get(name)
+    if not reqs:
+        return False
+    with act_imports(Path(root)):
+        return all(_check(req) is None for req in reqs)

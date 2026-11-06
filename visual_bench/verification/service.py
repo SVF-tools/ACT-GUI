@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import traceback
 import uuid
 from dataclasses import asdict
@@ -26,7 +27,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from engine_bridge.contracts import DISPLAY_VALUES
-from engine_bridge.execution import required_capability
+from engine_bridge.execution import fuzzing_options, required_capability
 from visual_bench.config import REPO_ROOT, requested_device
 from visual_bench.engine.service import EngineService
 from visual_bench.errors import AppError
@@ -78,6 +79,7 @@ class RunService:
         self._active: dict[str, threading.Thread] = {}
         self._procs: dict[str, subprocess.Popen[bytes]] = {}
         self._stop: dict[str, threading.Event] = {}
+        self._control_writes: dict[str, int] = {}
         self._recover_interrupted()
 
     def _recover_interrupted(self) -> None:
@@ -126,12 +128,18 @@ class RunService:
             path = self.models.path(req.model_id)
             run_id = "run-" + uuid.uuid4().hex[:12]
             env, license_source = self._worker_env()
+            fuzz_live = None
+            if req.fuzz is not None and self.engine.capability_available("fuzz.control"):
+                values = {**req.fuzz.model_dump(), "timeout_seconds": req.time_budget_s,
+                          "stop_on_first_violation": req.fuzz.stop_on_first}
+                fuzz_live = {o.name: values.get(o.name, o.default) for o in fuzzing_options() if o.live}
             self.records.create(run_id, {
                 "run_id": run_id, "created_at": now_iso(), "request": req.model_dump(),
                 "model": {"act_path": entry["act_path"], "sha256": entry["sha256"]},
                 "act": {"commit": self.engine.info.commit, "expected_commit": self.engine.expected_commit,
                         "source": self.engine.source.model_dump()},
-                "execution": {"requested_device": requested_device(), "gurobi_license": license_source},
+                "execution": {"requested_device": requested_device(), "gurobi_license": license_source,
+                              "fuzz_live": fuzz_live},
             })
             self.records.append_event(run_id, "run.queued", "queued", {"method": req.method})
             context = {"engine": self._engine_snapshot(),
@@ -155,8 +163,35 @@ class RunService:
             proc = self._procs.get(run_id)
         self.records.append_event(run_id, "run.stop_requested", run.status, {})
         if proc is not None:
+            with self._lock:
+                fd = self._control_writes.get(run_id)
+                if fd is not None:
+                    try:
+                        os.write(fd, b'{"action":"stop"}\n')
+                    except BrokenPipeError:
+                        pass  # SIGTERM below is the stop fallback
             self._signal_stop(proc, run.method)
         return self.get(run_id)
+
+    def send_fuzz_control(self, run_id: str, action: str, changes: dict[str, Any] | None = None) -> None:
+        """Send a validated command to a running fuzz worker; stop retains the shared signal fallback."""
+        with self._lock:
+            run = self.get(run_id)
+            proc = self._procs.get(run_id)
+            fd = self._control_writes.get(run_id)
+            if run.method != "fuzz" or run.status != "running" or proc is None or proc.poll() is not None:
+                raise AppError(409, "run_not_running", "Live fuzz control requires a running fuzz worker.")
+            if action != "stop":
+                if not self.engine.capability_available("fuzz.control"):
+                    raise AppError(409, "capability_unavailable", "The active ACT checkout does not support fuzz.control.")
+                if fd is None:
+                    raise AppError(409, "run_not_running", "The fuzz worker control pipe is closed.")
+                try:
+                    os.write(fd, (json.dumps({"action": action, "changes": changes}) + "\n").encode())
+                except BrokenPipeError as exc:
+                    raise AppError(409, "run_not_running", "The fuzz worker control pipe is closed.") from exc
+                return
+        self.stop(run_id)
 
     # -- worker supervision ----------------------------------------------------
     def _worker_env(self) -> tuple[dict[str, str], str]:
@@ -196,18 +231,29 @@ class RunService:
                                        "record_directory": "reproduced_records"}
                 captured["tmp"] = tmp
                 read_fd, write_fd = os.pipe()
+                control_read, control_write = os.pipe() if req.method == "fuzz" else (None, None)
                 with open(err_file, "w") as stderr, open(std_file, "w") as stdout:
                     try:
                         proc = subprocess.Popen(
                             [sys.executable, "-m", "visual_bench.verification.worker", str(req_file), str(out_file),
-                             str(write_fd)],
-                            cwd=REPO_ROOT, env=env, stdout=stdout, stderr=stderr, pass_fds=(write_fd,))
+                             str(write_fd), *([str(control_read)] if control_read is not None else [])],
+                            cwd=REPO_ROOT, env=env, stdout=stdout, stderr=stderr,
+                            pass_fds=(write_fd, control_read) if control_read is not None else (write_fd,))
+                    except BaseException:
+                        os.close(read_fd)
+                        if control_write is not None:
+                            os.close(control_write)
+                        raise
                     finally:
                         os.close(write_fd)
-                    self.records.append_event(run_id, "run.started", "running", {"pid": proc.pid})
+                        if control_read is not None:
+                            os.close(control_read)
                     with self._lock:
                         self._procs[run_id] = proc
+                        if control_write is not None:
+                            self._control_writes[run_id] = control_write
                         stop_requested = self._stop[run_id].is_set()
+                        self.records.append_event(run_id, "run.started", "running", {"pid": proc.pid})
                     if stop_requested:  # stop arrived before the worker existed
                         self._signal_stop(proc, req.method)
                     killed = threading.Event()
@@ -217,19 +263,44 @@ class RunService:
                         proc.kill()
 
                     load_s = model_path.stat().st_size / LOAD_BYTES_PER_S
-                    timer = threading.Timer(req.time_budget_s + WORKER_GRACE_S + load_s, kill)
-                    timer.start()
+                    started = time.monotonic()
+                    paused_at: float | None = None
+                    paused_s = 0.0
+                    budget = req.time_budget_s
+                    timer: threading.Timer | None = None
+
+                    def deadline() -> None:
+                        nonlocal timer
+                        if timer is not None:
+                            timer.cancel()
+                        if paused_at is None:
+                            remaining = budget + WORKER_GRACE_S + load_s - (time.monotonic() - started - paused_s)
+                            timer = threading.Timer(max(0.0, remaining), kill)
+                            timer.start()
+
+                    deadline()
                     try:
                         with os.fdopen(read_fd) as progress:
                             for line in progress:  # ends at EOF: worker exited or was killed
                                 msg = json.loads(line)
+                                if "control_state" in msg:
+                                    if msg["control_state"]["paused"] and paused_at is None:
+                                        paused_at = time.monotonic()
+                                    elif not msg["control_state"]["paused"] and paused_at is not None:
+                                        paused_s += time.monotonic() - paused_at
+                                        paused_at = None
+                                    deadline()
+                                elif "timeout_seconds" in msg.get("control", {}).get("applied", {}):
+                                    budget = float(msg["control"]["applied"]["timeout_seconds"])
+                                    deadline()
                                 event = (("verify.propagation", msg["propagation"]) if "propagation" in msg
                                          else self.live.observe(run_id, msg))
                                 if event is not None:
                                     self.records.append_event(run_id, event[0], "running", event[1])
                         proc.wait()
                     finally:
-                        timer.cancel()
+                        if timer is not None:
+                            timer.cancel()
                 out = json.loads(out_file.read_text()) if out_file.is_file() else None
                 scrub = D.scrubber(D.default_roots({"<run>": tmp, "<model-dir>": model_path.parent}))
                 captured["worker"] = (out or {}).pop("diagnostics", None)
@@ -264,6 +335,9 @@ class RunService:
                 self._active.pop(run_id, None)
                 self._procs.pop(run_id, None)
                 self._stop.pop(run_id, None)
+                fd = self._control_writes.pop(run_id, None)
+                if fd is not None:
+                    os.close(fd)
 
     def _write_diagnostics(self, run_id: str, captured: dict[str, Any], failure: dict[str, str] | None) -> None:
         """Write diagnostics.json; a failure here is logged and never blocks the run's terminal event."""

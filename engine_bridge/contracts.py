@@ -225,6 +225,27 @@ class RunOutcome:
 
 
 @dataclass(frozen=True)
+class FuzzOptionSpec:
+    name: str
+    kind: str
+    live: bool
+    description: str
+    choices: tuple[str, ...]
+    minimum: float | None
+    maximum: float | None
+    exclusive_minimum: bool
+    default: object
+
+
+@dataclass(frozen=True)
+class FuzzControlChange:
+    iteration: int
+    requested: dict
+    applied: dict
+    rejected: str
+
+
+@dataclass(frozen=True)
 class FuzzProgress:
     """ACTFuzzer state after `iteration` samples (read between fuzzing iterations)."""
     iteration: int
@@ -304,6 +325,7 @@ class FuzzOutcome:
     rng_seed: int
     device: str
     stopped: bool = False  # ended early on a caller stop request; the report covers the iterations run
+    stop_reason: str = "max_iterations"
 
 
 LicenseState = Literal["licensed", "restricted", "invalid", "not_installed"]

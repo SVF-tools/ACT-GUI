@@ -15,6 +15,14 @@ def router(fuzzing: FuzzingService) -> APIRouter:
     def fuzz_defaults() -> S.FuzzOptions:
         return fuzzing.defaults()
 
+    @r.get("/fuzz/options", response_model=S.FuzzOptionsSchemaOut)
+    def fuzz_options() -> S.FuzzOptionsSchemaOut:
+        return fuzzing.options()
+
+    @r.post("/runs/{run_id}/fuzz/control", response_model=S.FuzzControlOut)
+    def fuzz_control(run_id: str, req: S.FuzzControlRequest) -> S.FuzzControlOut:
+        return fuzzing.control(run_id, req)
+
     @r.get("/runs/{run_id}/fuzzing", response_model=S.FuzzingOut)
     def fuzzing_record(run_id: str) -> S.FuzzingOut:
         return fuzzing.fuzzing(run_id)

@@ -21,6 +21,11 @@ class FuzzLive:
         """Keep a frame in memory, or return a progress point as the (kind, payload) event to commit."""
         if "progress" in msg:
             return "fuzz.progress", msg["progress"]
+        if "control" in msg:
+            return "fuzz.control", msg["control"]
+        if "control_state" in msg:
+            state = msg["control_state"]
+            return ("fuzz.paused" if state["paused"] else "fuzz.resumed"), state
         frame = msg["frame"]
         with self._lock:
             self._frames[run_id] = frame

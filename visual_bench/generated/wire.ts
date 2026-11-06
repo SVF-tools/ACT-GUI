@@ -92,10 +92,30 @@ export type Provider = string
 export type ProviderKind = ("fake" | "real")
 export type Question1 = string
 export type Sections = AnswerSection[]
+export type Iteration = number
+export type Rejected = string
+export type Action = ("pause" | "resume" | "stop" | "update")
+export type Changes = ({
+[k: string]: number | boolean | string | {
+[k: string]: number
+} | null
+} | null)
+export type RequestId = string
+export type RunId3 = string
+export type Status = ("queued" | "duplicate")
+export type Action1 = ("pause" | "resume" | "stop" | "update")
+export type Changes1 = ({
+[k: string]: number | boolean | string | {
+[k: string]: number
+} | null
+} | null)
+export type RequestId1 = string
+export type Changes2 = FuzzConfigChangeOut[]
+export type Paused = boolean
 export type ElapsedS = number
 export type Index = number
 export type Input = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
-export type Iteration = number
+export type Iteration1 = number
 export type Kind4 = string
 export type Output = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type SeedInput = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
@@ -107,7 +127,7 @@ export type TrueClass = (number | null)
 export type Depth = number
 export type ElapsedS1 = number
 export type Input1 = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
-export type Iteration1 = number
+export type Iteration2 = number
 export type SeedInput1 = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type SeedRow = number
 export type Strategy1 = (string | null)
@@ -117,6 +137,17 @@ export type Boundary = number
 export type Gradient = number
 export type Pgd = number
 export type Random = number
+export type Choices = string[]
+export type Default = (number | boolean | string | {
+[k: string]: number
+} | null)
+export type Description1 = string
+export type ExclusiveMinimum = boolean
+export type Kind5 = ("int" | "float" | "bool" | "choice" | "weights")
+export type Live1 = boolean
+export type Maximum = (number | null)
+export type Minimum = (number | null)
+export type Name2 = string
 export type ActivationThreshold = number
 export type CoverageStrategy = ("GlobalCov" | "BestInputCov")
 export type MaxIterations = number
@@ -127,15 +158,17 @@ export type PgdRestartsBinarized = number
 export type RngSeed = number
 export type SeedSelectionStrategy = ("energy" | "random")
 export type StopOnFirst = boolean
+export type LiveControl = boolean
+export type Options = FuzzOptionOut[]
 export type Corpus = number
 export type Counterexamples = number
 export type Coverage = number
 export type ElapsedS2 = number
-export type Iteration2 = number
+export type Iteration3 = number
 export type Input2 = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type Output1 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type Row = number
-export type Name2 = string
+export type Name3 = string
 export type Selected = number
 export type Violations = number
 export type Weight = number
@@ -150,43 +183,44 @@ export type NeverActivatedCount = number
 export type NeverActivatedSample = string[]
 export type RngSeed1 = number
 export type SeedsExplored = number
+export type StopReason = (string | null)
 export type Stopped = boolean
 export type TotalMutations = number
 export type Availability1 = ("available" | "pending" | "not_recorded" | "unsupported")
 export type Counterexamples1 = FuzzCounterexampleOut[]
 export type Frames = FuzzFrameOut[]
-export type RunId3 = string
+export type RunId4 = string
 export type SavedAt = string
 export type Saved = SavedCounterexampleOut[]
 export type Seeds = FuzzSeedOut[]
-export type Status = ("queued" | "running" | "completed" | "failed")
+export type Status1 = ("queued" | "running" | "completed" | "failed")
 export type Strategies = FuzzStrategyOut[]
 export type Timeline = FuzzPointOut[]
 export type Instance = string
 export type Service = string
-export type Status1 = "ok"
+export type Status2 = "ok"
 export type Version = string
 export type Tolerance = number
 export type Center = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type Dataset1 = (string | null)
-export type Kind5 = string
+export type Kind6 = string
 export type LayerId2 = number
 export type Lb = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type Shape = number[]
 export type Ub = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type InVars = number
-export type Kind6 = string
+export type Kind7 = string
 export type LayerId3 = number
 export type OutVars = number
 export type OutputShape = (number[] | null)
-export type Name3 = string
+export type Name4 = string
 export type Shape1 = (number[] | null)
 export type Value1 = (string | null)
 export type Params = ParamOut[]
 export type Preds = number[]
 export type Succs = number[]
 export type BeforeLayerIds = number[]
-export type Kind7 = string
+export type Kind8 = string
 export type LayerId4 = number
 export type Lb1 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type Shape2 = number[]
@@ -195,17 +229,17 @@ export type Ub1 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type Availability2 = ("available" | "pending" | "not_recorded" | "unsupported")
 export type Layers = LayerStateOut[]
 export type Method = (("interval" | "dual" | "hybridz") | null)
-export type RunId4 = string
+export type RunId5 = string
 export type Source1 = (LoadVnnlibRequest | LoadTorchRequest)
 export type Benchmark = string
-export type Kind8 = "vnnlib"
+export type Kind9 = "vnnlib"
 export type Onnx1 = string
 export type Vnnlib = string
 export type Vnnlibs = ([string, ...(string)[]] | null)
 export type Eps = number
 export type Index1 = number
 export type Indices = ([number, ...(number)[]] | null)
-export type Kind9 = "torch"
+export type Kind10 = "torch"
 export type SourceId1 = string
 export type ActCommit = (string | null)
 export type InputDim = number
@@ -213,7 +247,7 @@ export type InputSpecs = InputSpecOut[]
 export type Layers1 = LayerOut[]
 export type ModelId1 = string
 export type OutputDim = number
-export type Kind10 = string
+export type Kind11 = string
 export type LayerId5 = number
 export type Matrix = (number[][] | null)
 export type Rows = number
@@ -222,13 +256,13 @@ export type Thresholds = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null
 export type TrueClass1 = (number | null)
 export type Sha256 = string
 export type ActPath = string
-export type Description1 = string
+export type Description2 = string
 export type EngineCheck = (("same_commit" | "loads" | "load_failed" | "unchecked") | null)
 export type Methods = ("interval" | "bab" | "fuzz")[]
 export type ModelId2 = string
 export type ElapsedS4 = number
 export type Nodes = (number | null)
-export type Status2 = string
+export type Status3 = string
 export type Sha2561 = string
 export type Source2 = ("catalog" | "vnnlib" | "torch")
 export type ClientId = string
@@ -261,7 +295,7 @@ export type LayerKind = (string | null)
 export type OutputShape1 = number[]
 export type RecordCount = number
 export type Layers2 = PropagationLayerSummaryOut[]
-export type Kind11 = ("PhaseEvent" | "LayerBounds" | "Relaxation" | "DualBackward" | "SpecBound")
+export type Kind12 = ("PhaseEvent" | "LayerBounds" | "Relaxation" | "DualBackward" | "SpecBound")
 export type LayerKind1 = (string | null)
 export type OutputShape2 = number[]
 export type RecordId = number
@@ -272,25 +306,25 @@ export type Sha2562 = string
 export type Shape4 = number[]
 export type Phases = PropagationRecordOut[]
 export type Records = PropagationRecordOut[]
-export type RunId5 = string
+export type RunId6 = string
 export type ValueLimit = number
 export type Availability4 = ("available" | "pending" | "unavailable" | "not_recorded")
 export type Domain2 = (("interval" | "dual" | "hybridz") | null)
 export type LayerId7 = number
 export type Neuron2 = (number | null)
 export type OutputShape3 = number[]
-export type Kind12 = ("PhaseEvent" | "LayerBounds" | "Relaxation" | "DualBackward" | "SpecBound")
+export type Kind13 = ("PhaseEvent" | "LayerBounds" | "Relaxation" | "DualBackward" | "SpecBound")
 export type LayerKind2 = (string | null)
 export type OutputShape4 = number[]
 export type RecordId1 = number
 export type Shape5 = number[]
 export type TMs1 = number
 export type Records1 = PropagationLayerRecordOut[]
-export type RunId6 = string
+export type RunId7 = string
 export type ValueLimit1 = number
 export type Availability5 = ("available" | "not_configured")
-export type Kind13 = ("fake" | "real")
-export type Name4 = string
+export type Kind14 = ("fake" | "real")
+export type Name5 = string
 export type Note = string
 export type Providers = ProviderOut[]
 export type ActStatus1 = string
@@ -305,13 +339,13 @@ export type Location = (string | null)
 export type Messages = string[]
 export type Warnings = number
 export type At = string
-export type Kind14 = ("run.queued" | "run.started" | "run.stop_requested" | "run.completed" | "run.failed" | "bab.summary" | "fuzz.progress" | "verify.propagation")
+export type Kind15 = ("run.queued" | "run.started" | "run.stop_requested" | "run.completed" | "run.failed" | "bab.summary" | "fuzz.progress" | "fuzz.control" | "fuzz.paused" | "fuzz.resumed" | "verify.propagation")
 export type Payload = ({
 [k: string]: string | number | boolean | null
-} | PropagationRecordOut)
-export type RunId7 = string
+} | PropagationRecordOut | FuzzConfigChangeOut)
+export type RunId8 = string
 export type Seq = number
-export type Status3 = ("queued" | "running" | "completed" | "failed")
+export type Status4 = ("queued" | "running" | "completed" | "failed")
 export type ActCommit1 = (string | null)
 export type ClientRequestId = (string | null)
 export type CounterexampleSavedAt = (string | null)
@@ -335,10 +369,10 @@ export type Device1 = (string | null)
 export type ElapsedS5 = number
 export type Rows1 = RowVerdictOut[]
 export type Verdict1 = ("certified" | "falsified" | "unknown" | "timeout" | "error")
-export type RunId8 = string
+export type RunId9 = string
 export type SavedCounterexampleRows = number[]
 export type StartedAt = (string | null)
-export type Status4 = ("queued" | "running" | "completed" | "failed")
+export type Status5 = ("queued" | "running" | "completed" | "failed")
 export type TimeBudgetS = number
 export type Runs = RunOut[]
 export type ClientRequestId1 = (string | null)
@@ -391,10 +425,16 @@ ErrorResponse?: ErrorResponse
 EvidenceRef?: EvidenceRef
 ExplainRequest?: ExplainRequest
 ExplainResponse?: ExplainResponse
+FuzzConfigChangeOut?: FuzzConfigChangeOut
+FuzzControlOut?: FuzzControlOut
+FuzzControlRequest?: FuzzControlRequest
+FuzzControlStateOut?: FuzzControlStateOut
 FuzzCounterexampleOut?: FuzzCounterexampleOut
 FuzzFrameOut?: FuzzFrameOut
 FuzzMutationWeights?: FuzzMutationWeights
+FuzzOptionOut?: FuzzOptionOut
 FuzzOptions?: FuzzOptions
+FuzzOptionsSchemaOut?: FuzzOptionsSchemaOut
 FuzzPointOut?: FuzzPointOut
 FuzzSeedOut?: FuzzSeedOut
 FuzzStrategyOut?: FuzzStrategyOut
@@ -675,13 +715,67 @@ sections: Sections
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "FuzzConfigChangeOut".
+ */
+export interface FuzzConfigChangeOut {
+applied: Applied
+iteration: Iteration
+rejected: Rejected
+requested: Requested
+}
+export interface Applied {
+[k: string]: number | boolean | string | {
+[k: string]: number
+} | null
+}
+export interface Requested {
+[k: string]: number | boolean | string | {
+[k: string]: number
+} | null
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "FuzzControlOut".
+ */
+export interface FuzzControlOut {
+action: Action
+changes: Changes
+request_id: RequestId
+run_id: RunId3
+status: Status
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "FuzzControlRequest".
+ */
+export interface FuzzControlRequest {
+action: Action1
+changes?: Changes1
+request_id: RequestId1
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "FuzzControlStateOut".
+ */
+export interface FuzzControlStateOut {
+changes: Changes2
+live: Live
+paused: Paused
+}
+export interface Live {
+[k: string]: number | boolean | string | {
+[k: string]: number
+} | null
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "FuzzCounterexampleOut".
  */
 export interface FuzzCounterexampleOut {
 elapsed_s: ElapsedS
 index: Index
 input: Input
-iteration: Iteration
+iteration: Iteration1
 kind: Kind4
 output: Output
 seed_input: SeedInput
@@ -702,7 +796,7 @@ counterexample?: (FuzzCounterexampleOut | null)
 depth: Depth
 elapsed_s: ElapsedS1
 input: Input1
-iteration: Iteration1
+iteration: Iteration2
 seed_input: SeedInput1
 seed_row: SeedRow
 strategy: Strategy1
@@ -720,6 +814,21 @@ boundary?: Boundary
 gradient?: Gradient
 pgd?: Pgd
 random?: Random
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "FuzzOptionOut".
+ */
+export interface FuzzOptionOut {
+choices: Choices
+default: Default
+description: Description1
+exclusive_minimum: ExclusiveMinimum
+kind: Kind5
+live: Live1
+maximum: Maximum
+minimum: Minimum
+name: Name2
 }
 /**
  * ACTFuzzer settings for method "fuzz". Defaults other than max_iterations equal the fuzzing section of
@@ -744,6 +853,14 @@ stop_on_first?: StopOnFirst
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "FuzzOptionsSchemaOut".
+ */
+export interface FuzzOptionsSchemaOut {
+live_control: LiveControl
+options: Options
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "FuzzPointOut".
  */
 export interface FuzzPointOut {
@@ -751,7 +868,7 @@ corpus: Corpus
 counterexamples: Counterexamples
 coverage: Coverage
 elapsed_s: ElapsedS2
-iteration: Iteration2
+iteration: Iteration3
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -767,7 +884,7 @@ row: Row
  * via the `definition` "FuzzStrategyOut".
  */
 export interface FuzzStrategyOut {
-name: Name2
+name: Name3
 selected: Selected
 violations: Violations
 weight: Weight
@@ -788,6 +905,7 @@ never_activated_count: NeverActivatedCount
 never_activated_sample: NeverActivatedSample
 rng_seed: RngSeed1
 seeds_explored: SeedsExplored
+stop_reason?: StopReason
 stopped?: Stopped
 total_mutations: TotalMutations
 }
@@ -801,14 +919,15 @@ total_mutations: TotalMutations
 export interface FuzzingOut {
 availability: Availability1
 config: Config
+control?: (FuzzControlStateOut | null)
 counterexamples: Counterexamples1
 frames?: Frames
 options: (FuzzOptions | null)
 provenance: Provenance
-run_id: RunId3
+run_id: RunId4
 saved?: Saved
 seeds?: Seeds
-status: Status
+status: Status1
 strategies: Strategies
 summary: (FuzzSummaryOut | null)
 timeline: Timeline
@@ -836,7 +955,7 @@ saved_at: SavedAt
 export interface HealthOut {
 instance: Instance
 service: Service
-status: Status1
+status: Status2
 version: Version
 }
 /**
@@ -855,7 +974,7 @@ tolerance?: Tolerance
 export interface InputSpecOut {
 center: Center
 dataset: Dataset1
-kind: Kind5
+kind: Kind6
 layer_id: LayerId2
 lb: Lb
 shape: Shape
@@ -867,7 +986,7 @@ ub: Ub
  */
 export interface LayerOut {
 in_vars: InVars
-kind: Kind6
+kind: Kind7
 layer_id: LayerId3
 out_vars: OutVars
 output_shape: OutputShape
@@ -880,7 +999,7 @@ succs: Succs
  * via the `definition` "ParamOut".
  */
 export interface ParamOut {
-name: Name3
+name: Name4
 shape: Shape1
 value: Value1
 }
@@ -890,7 +1009,7 @@ value: Value1
  */
 export interface LayerStateOut {
 before_layer_ids: BeforeLayerIds
-kind: Kind7
+kind: Kind8
 layer_id: LayerId4
 lb: Lb1
 shape: Shape2
@@ -906,7 +1025,7 @@ availability: Availability2
 layers: Layers
 method: Method
 provenance: Provenance1
-run_id: RunId4
+run_id: RunId5
 }
 export interface Provenance1 {
 [k: string]: string
@@ -924,7 +1043,7 @@ source: Source1
  */
 export interface LoadVnnlibRequest {
 benchmark: Benchmark
-kind: Kind8
+kind: Kind9
 onnx: Onnx1
 vnnlib: Vnnlib
 vnnlibs?: Vnnlibs
@@ -937,7 +1056,7 @@ export interface LoadTorchRequest {
 eps: Eps
 index: Index1
 indices?: Indices
-kind: Kind9
+kind: Kind10
 source_id: SourceId1
 }
 /**
@@ -959,7 +1078,7 @@ sha256: Sha256
  * via the `definition` "OutputSpecOut".
  */
 export interface OutputSpecOut {
-kind: Kind10
+kind: Kind11
 layer_id: LayerId5
 matrix: Matrix
 rows: Rows
@@ -974,7 +1093,7 @@ true_class: TrueClass1
 export interface ModelSummary {
 act_path: ActPath
 built_with?: (BuiltWithOut | null)
-description: Description1
+description: Description2
 engine_check?: EngineCheck
 methods: Methods
 model_id: ModelId2
@@ -993,7 +1112,7 @@ export interface Native {
 export interface NativeResult {
 elapsed_s: ElapsedS4
 nodes: Nodes
-status: Status2
+status: Status3
 }
 export interface Params1 {
 [k: string]: string | number | boolean | null
@@ -1028,7 +1147,7 @@ ignored_records: IgnoredRecords
 layers: Layers2
 phases: Phases
 records: Records
-run_id: RunId5
+run_id: RunId6
 value_limit: ValueLimit
 }
 /**
@@ -1067,7 +1186,7 @@ version: Version1
 export interface PropagationRecordOut {
 counts: Counts1
 key: (PropagationKeyOut | null)
-kind: Kind11
+kind: Kind12
 layer_kind: LayerKind1
 metadata: Metadata
 output_shape: OutputShape2
@@ -1105,7 +1224,7 @@ layer_id: LayerId7
 neuron?: Neuron2
 output_shape: OutputShape3
 records: Records1
-run_id: RunId6
+run_id: RunId7
 value_limit: ValueLimit1
 }
 /**
@@ -1115,7 +1234,7 @@ value_limit: ValueLimit1
 export interface PropagationLayerRecordOut {
 counts: Counts2
 key: (PropagationKeyOut | null)
-kind: Kind12
+kind: Kind13
 layer_kind: LayerKind2
 metadata: Metadata1
 output_shape: OutputShape4
@@ -1150,8 +1269,8 @@ providers: Providers
  */
 export interface ProviderOut {
 availability: Availability5
-kind: Kind13
-name: Name4
+kind: Kind14
+name: Name5
 note: Note
 }
 /**
@@ -1185,11 +1304,11 @@ warnings: Warnings
  */
 export interface RunEvent {
 at: At
-kind: Kind14
+kind: Kind15
 payload: Payload
-run_id: RunId7
+run_id: RunId8
 seq: Seq
-status: Status3
+status: Status4
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -1220,10 +1339,10 @@ model_id: ModelId3
 model_sha256: ModelSha256
 native_reference: (NativeResult | null)
 result: (RunResultOut | null)
-run_id: RunId8
+run_id: RunId9
 saved_counterexample_rows?: SavedCounterexampleRows
 started_at: StartedAt
-status: Status4
+status: Status5
 time_budget_s: TimeBudgetS
 }
 /**

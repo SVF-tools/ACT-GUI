@@ -63,6 +63,7 @@ _BASELINE_CAPABILITIES = (
     Capability("verify.hybridz", "available", "act.back_end.verifier.verify_once with solver+TF mode 'hybridz' (HybridzTF + HZSolver)"),
     Capability("verify.bab", "available", "act.back_end.bab.bab.verify_bab_batched + TorchLPSolver (as act/config/pipeline_cli.py)"),
     Capability("fuzz.actfuzzer", "available", "act.pipeline.fuzzing.ACTFuzzer on ACTToTorch(net); progress via the instance's _print_progress seam; mutated-input frames via a wrapper on the instance's mutation_engine.mutate"),
+    Capability("fuzz.control", "available", "act.pipeline.gui.fuzzing options, observation records and FuzzControl at ACTFuzzer batch boundaries"),
     Capability("inspect.layer_bounds.interval", "available", "act.back_end.analyze.analyze after-facts"),
     Capability("observe.propagation", "available", "act.pipeline.gui.observe records during verify_once (ACT-06)"),
     Capability("source.vnnlib", "available", "act.front_end.vnnlib_loader.create_specs.create_specs_from_paths + TorchToACT"),

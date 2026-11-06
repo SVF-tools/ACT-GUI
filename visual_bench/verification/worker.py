@@ -1,10 +1,12 @@
 """Run worker: executes one ACT run in an isolated process (VER-02, VER-06).
 
 Invoked by the workbench as:
-    python -m visual_bench.verification.worker <request.json> <output.json> <progress_fd>
+    python -m visual_bench.verification.worker <request.json> <output.json> <progress_fd> [<control_fd>]
 ACT writes diagnostics to stdout/stderr, so results go to <output.json>, never stdout.
 Fuzzing progress goes as JSON lines to the inherited pipe <progress_fd>: {"progress": FuzzProgress}
 or {"frame": FuzzFrame} (the latest mutated input, shown live and not recorded as an event).
+Fuzz workers read {"action": "pause"|"resume"|"stop"|"update", "changes": {...}} on control_fd
+and emit {"control": FuzzControlChange} / {"control_state": {"paused": bool}} on progress_fd.
 Observer-capable verification sends {"propagation": index_entry}; complete tensors and history
 are stored in the run directory before a throttled notification is sent.
 SIGTERM is a stop request: a fuzz run ends after its current iteration and reports what it found;
@@ -25,7 +27,8 @@ from pathlib import Path
 from typing import IO, Any
 
 
-def _run(req: dict[str, Any], progress: IO[str], stop: threading.Event) -> dict[str, Any]:
+def _run(req: dict[str, Any], progress: IO[str], stop: threading.Event,
+         control: Any = None, control_fd: int | None = None) -> dict[str, Any]:
     from engine_bridge.events import bab_summary
     from engine_bridge.execution import run_verification
 
@@ -33,11 +36,15 @@ def _run(req: dict[str, Any], progress: IO[str], stop: threading.Event) -> dict[
     if req["method"] == "fuzz":
         from visual_bench.fuzzing import runner
 
-        def send(kind: str, item: Any) -> None:
-            progress.write(json.dumps({kind: dataclasses.asdict(item)}) + "\n")
-            progress.flush()
+        send_lock = threading.Lock()
 
-        return runner.run(model, req, send, stop)
+        def send(kind: str, item: Any) -> None:
+            value = dataclasses.asdict(item) if dataclasses.is_dataclass(item) else item
+            with send_lock:
+                progress.write(json.dumps({kind: value}) + "\n")
+                progress.flush()
+
+        return runner.run(model, req, send, stop, control, control_fd)
     from engine_bridge.contracts import DualOptions
 
     domain = req.get("domain") or "interval"
@@ -76,9 +83,16 @@ def _run(req: dict[str, Any], progress: IO[str], stop: threading.Event) -> dict[
     return out
 
 
-def main(request_path: str, output_path: str, progress_fd: int) -> int:
+def main(request_path: str, output_path: str, progress_fd: int, control_fd: int | None = None) -> int:
     stop = threading.Event()  # installed first, so a stop during ACT imports is still graceful
-    signal.signal(signal.SIGTERM, lambda *_: stop.set())
+    control = None
+
+    def request_stop(*_: Any) -> None:
+        stop.set()
+        if control is not None:
+            control.request_stop()  # also wakes ACT while paused
+
+    signal.signal(signal.SIGTERM, request_stop)
     from visual_bench.verification.diagnostics import Capture, default_roots, scrubber
 
     req = json.loads(Path(request_path).read_text())
@@ -89,7 +103,13 @@ def main(request_path: str, output_path: str, progress_fd: int) -> int:
         from engine_bridge.inspection import interval_layer_states
 
         try:
-            out = _run(req, progress, stop)
+            if req["method"] == "fuzz":
+                from engine_bridge.execution import FuzzRunControl
+
+                control = FuzzRunControl()
+                if stop.is_set():
+                    control.request_stop()
+            out = _run(req, progress, stop, control, control_fd)
             if "layer_states" in out or "layer_states_error" in out:
                 pass  # Observed bounds belong to the run's own domain; never rerun interval analysis.
             elif not req.get("record_layers", True):
@@ -119,4 +139,4 @@ def main(request_path: str, output_path: str, progress_fd: int) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1], sys.argv[2], int(sys.argv[3])))
+    sys.exit(main(sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4]) if len(sys.argv) > 4 else None))

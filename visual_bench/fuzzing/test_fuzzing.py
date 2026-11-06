@@ -95,6 +95,16 @@ def test_fuzz_defaults_match_the_pinned_act_pipeline_yaml(client: TestClient):
     act = fuzzing_defaults()
     assert act and {k: served[k] for k in act} == act
 
+
+def test_fuzz_options_schema_describes_legacy_defaults(client: TestClient):
+    from engine_bridge.execution import fuzzing_defaults
+
+    schema = client.get("/api/fuzz/options")
+    assert schema.status_code == 200
+    options = schema.json()["options"]
+    assert {o["name"]: o["default"] for o in options} == fuzzing_defaults()
+    assert not schema.json()["live_control"] and not any(o["live"] for o in options)
+
 def test_fuzz_hyperparameters_reach_act_and_invalid_ones_are_rejected(client: TestClient):
     zero = {k: 0 for k in ("gradient", "pgd", "activation", "boundary", "random")}
     bad = client.post("/api/runs", json={"model_id": "unsafe_linear", "method": "fuzz",
