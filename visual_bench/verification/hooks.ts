@@ -24,7 +24,7 @@ export function useStartRun() {
 export function useSaveRunCounterexample() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: api.saveCounterexample,
+    mutationFn: ({ id, row }: { id: string; row: number | null }) => api.saveCounterexample(id, row),
     onSuccess: (run) => client.setQueryData(keys.run(run.run_id), run),
   });
 }

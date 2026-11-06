@@ -52,7 +52,9 @@ _BATCH_PRECEDENCE: tuple[Verdict, ...] = ("falsified", "error", "timeout", "unkn
 def _batch_outcome(results: list[Any], elapsed: float, domain: Domain) -> RunOutcome:
     import torch
 
-    rows = tuple(LaneOutcome(row=i, verdict=_STATUS_MAP.get(r.status.name) or "error", act_status=r.status.name)
+    rows = tuple(LaneOutcome(row=i, verdict=_STATUS_MAP.get(r.status.name) or "error", act_status=r.status.name,
+                             counterexample=None if r.counterexample is None
+                             else tuple(float(x) for x in r.counterexample.reshape(-1).tolist()))
                  for i, r in enumerate(results))  # verify_once returns one result per lane, in row order
     verdict: Verdict = next(v for v in _BATCH_PRECEDENCE if any(r.verdict == v for r in rows))
     ce_row = next((r.row for r in rows if r.verdict == "falsified" and results[r.row].counterexample is not None), None)
@@ -66,24 +68,28 @@ def _batch_outcome(results: list[Any], elapsed: float, domain: Domain) -> RunOut
     )
 
 
-def _with_output(outcome: RunOutcome, net: Any, x: Any) -> RunOutcome:
-    """Add the network output at ACT's counterexample, from ACT's own rebuilt model (ACTToTorch, the converter
-    ACT's BaB uses for concrete counterexample checks), so the counterexample exports as a VNN-COMP witness.
+def _with_output(outcome: RunOutcome, net: Any, ces: dict[int, Any]) -> RunOutcome:
+    """Add the network output at each of ACT's counterexamples ({row: x}), from ACT's own rebuilt model (ACTToTorch,
+    the converter ACT's BaB uses for concrete counterexample checks), so every counterexample exports as a VNN-COMP
+    witness: on its row (batched nets) and, for the summary counterexample_row, on the outcome itself.
 
-    The rebuilt model maps one lane per INPUT row, so x goes into its row of the full batch. A failure is
-    reported on the outcome; it only disables the export, never the verdict or ACT's counterexample.
+    The rebuilt model maps one lane per INPUT row, so each x goes into its row of the full batch and one forward pass
+    evaluates them all. A failure is reported on the outcome; it only disables the export, never the verdict or
+    ACT's counterexample.
     """
-    if x is None:
+    if not ces:
         return outcome
     import torch
     from act.front_end.verifiable_model import InputLayer, VerifiableModel
     from act.pipeline.verification.act2torch import ACTToTorch
 
-    row = outcome.counterexample_row or 0
+    ys: dict[int, tuple[float, ...]] = {}
+    err: str | None = None
     try:
         model = ACTToTorch(net).run()
         full = next(c for c in model.children() if isinstance(c, InputLayer)).input_tensor.clone()
-        full[row] = x.reshape(full[row].shape).to(device=full.device, dtype=full.dtype)
+        for row, x in ces.items():
+            full[row] = x.reshape(full[row].shape).to(device=full.device, dtype=full.dtype)
         strict = VerifiableModel.get_strict_mode()
         VerifiableModel.set_strict_mode(False)  # the property is violated here by construction
         try:
@@ -91,10 +97,19 @@ def _with_output(outcome: RunOutcome, net: Any, x: Any) -> RunOutcome:
                 out = model(full)
         finally:
             VerifiableModel.set_strict_mode(strict)
-        y = (out["output"] if isinstance(out, dict) else out)[row]
+        y = out["output"] if isinstance(out, dict) else out
+        ys = {row: tuple(float(v) for v in y[row].reshape(-1).tolist()) for row in ces}
     except Exception as exc:  # noqa: BLE001 - reported on the outcome, see docstring
-        return dataclasses.replace(outcome, counterexample_output_error=f"{type(exc).__name__}: {exc}")
-    return dataclasses.replace(outcome, counterexample_output=tuple(float(v) for v in y.reshape(-1).tolist()))
+        err = f"{type(exc).__name__}: {exc}"
+    rows = tuple(dataclasses.replace(r, counterexample_output=ys.get(r.row),
+                                     counterexample_output_error=err if r.row in ces else None) for r in outcome.rows)
+    top = outcome.counterexample_row or 0
+    return dataclasses.replace(outcome, rows=rows, counterexample_output=ys.get(top), counterexample_output_error=err)
+
+
+def _ces(results: list[Any]) -> dict[int, Any]:
+    """ACT's counterexample per lane, for lanes that have one."""
+    return {i: r.counterexample for i, r in enumerate(results) if r.counterexample is not None}
 
 
 def select_domain(domain: Domain) -> None:
@@ -154,10 +169,8 @@ def run_verification(model_path: Path, method: Method, time_budget_s: float, dom
             if not results:
                 raise BridgeError("unsupported_batch", "ACT returned no input lane")
             if len(results) == 1:
-                return _with_output(_outcome("interval", results[0], elapsed, domain), net, results[0].counterexample)
-            out = _batch_outcome(results, elapsed, domain)
-            return _with_output(out, net, None if out.counterexample_row is None
-                                else results[out.counterexample_row].counterexample)
+                return _with_output(_outcome("interval", results[0], elapsed, domain), net, _ces(results))
+            return _with_output(_batch_outcome(results, elapsed, domain), net, _ces(results))
         select_domain("interval")  # BaB keeps its own bounding path; reset any earlier selection
         from act.back_end.bab.bab import verify_bab_batched
         from act.back_end.solver.solver_torchlp import TorchLPSolver
@@ -170,4 +183,4 @@ def run_verification(model_path: Path, method: Method, time_budget_s: float, dom
             max_batch_size=BackendConfig.from_yaml().bab_max_batch_size,
             time_budget_s=float(time_budget_s), dual_config=pc.dual,
         )
-        return _with_output(_outcome("bab", result, time.perf_counter() - t), net, result.counterexample)
+        return _with_output(_outcome("bab", result, time.perf_counter() - t), net, _ces([result]))

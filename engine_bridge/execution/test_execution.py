@@ -91,6 +91,8 @@ def test_batched_net_reports_native_verdict_per_row_and_their_conjunction(tmp_pa
     statuses = {r.verdict for r in out.rows}
     assert out.verdict == next(v for v in ("falsified", "error", "timeout", "unknown", "certified") if v in statuses)
     assert out.metadata["batch"] == 3 and (out.counterexample_row is None) == (out.counterexample is None)
+    assert all((r.counterexample is None) == (r.counterexample_output is None and r.counterexample_output_error is None)
+               for r in out.rows)  # every row ACT falsified carries its own counterexample and output
 
 def test_fuzzing_reports_act_counterexample_inside_the_input_box():
     progress, live = [], []

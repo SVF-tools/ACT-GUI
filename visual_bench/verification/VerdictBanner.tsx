@@ -2,7 +2,7 @@
 // The verdict is ACT's (RunResultOut.verdict / act_status); this view only labels it.
 import { fmt, indexRanges } from "../shared/wire";
 import { runDomainLabel } from "./labels";
-import type { ModelDescriptionOut, RowVerdictOut, RunOut } from "../generated/wire";
+import type { ModelDescriptionOut, RowVerdictOut, RunOut, RunResultOut } from "../generated/wire";
 import { useBatchRows } from "../model_spec/hooks";
 import { useState } from "react";
 import { downloadBlob, imagePng, Pixels, specImageShape, type Shape } from "../shared/ui/pixels";
@@ -23,6 +23,7 @@ export function VerdictBanner({ runId, model }: {
 }) {
   const q = useRun(runId);
   const stopRun = useStopRun();
+  const [pick, setPick] = useState<{ run: string; row: number | null } | null>(null);
   if (!runId || q.status !== "success") return null;
   const run = q.data;
   if (run.status === "queued" || run.status === "running") {
@@ -43,6 +44,10 @@ export function VerdictBanner({ runId, model }: {
   const r = run.result;
   const v = VERDICT[r.verdict] ?? VERDICT.unknown!;
   const rows = r.rows ?? [];
+  const ces = counterexamples(r);
+  const want = pick?.run === run.run_id ? pick.row : r.counterexample_row ?? null;
+  const ce = ces.find((c) => c.row === want) ?? ces[0];
+  const choose = (row: number | null) => setPick({ run: run.run_id, row });
   return (
     <div className={`banner verdict ${v.cls}`}>
       <div className="verdicthead">
@@ -54,8 +59,9 @@ export function VerdictBanner({ runId, model }: {
         {run.matches_native === false && <span className="chip warn" title={`native: ${run.native_reference?.status}`}>≠ native</span>}
       </div>
       <div>{rows.length > 0 ? <BatchNote n={rows.length} modelId={run.model_id} /> : ""}{v.text}</div>
-      {rows.length > 0 && <RowVerdicts rows={rows} modelId={run.model_id} />}
-      {r.verdict === "falsified" && r.counterexample && <Counterexample xs={r.counterexample} run={run} model={model} />}
+      {rows.length > 0 && <RowVerdicts rows={rows} modelId={run.model_id} selected={ce?.row ?? null}
+        pickable={new Set(ces.map((c) => c.row))} onPick={choose} />}
+      {r.verdict === "falsified" && ce && <Counterexample ce={ce} all={ces} onPick={choose} run={run} model={model} />}
     </div>
   );
 }
@@ -66,8 +72,24 @@ function BatchNote({ n, modelId }: { n: number; modelId: string }) {
   return <>Batch of {n} {plural}: the verdict holds for the whole batch only when it holds for every {noun}. </>;
 }
 
+// ACT's counterexample of one batch row (row null: a single-row net), with the output for its VNN-COMP export.
+type RowCe = { row: number | null; xs: number[]; output: number[] | null; outputError: string | null };
+
+// Every counterexample ACT reported: one per falsified batch row; runs recorded before per-row counterexamples (and
+// single-row nets) only carry the summary one.
+function counterexamples(r: RunResultOut): RowCe[] {
+  const perRow = (r.rows ?? []).flatMap((x) => x.counterexample ? [{ row: x.row, xs: x.counterexample,
+    output: x.counterexample_output ?? null, outputError: x.counterexample_output_error ?? null }] : []);
+  if (perRow.length > 0) return perRow;
+  return r.counterexample ? [{ row: r.counterexample_row ?? null, xs: r.counterexample,
+    output: r.counterexample_output ?? null, outputError: r.counterexample_output_error ?? null }] : [];
+}
+
 // ACT's verdict per batch row: counts per verdict (image indices compressed to ranges), rows listed on demand.
-function RowVerdicts({ rows, modelId }: { rows: RowVerdictOut[]; modelId: string }) {
+// Rows with a counterexample are clickable and select the counterexample shown (and saved/exported) below.
+function RowVerdicts({ rows, modelId, selected, pickable, onPick }: {
+  rows: RowVerdictOut[]; modelId: string; selected: number | null; pickable: Set<number | null>; onPick: (row: number) => void;
+}) {
   const batch = useBatchRows(modelId);
   const label = (row: number) => batch?.labels[row] ?? `row ${row + 1}`;
   const groups = Object.keys(VERDICT).map((k) => ({ k, rs: rows.filter((x) => x.verdict === k).map((x) => x.row) }))
@@ -81,60 +103,79 @@ function RowVerdicts({ rows, modelId }: { rows: RowVerdictOut[]; modelId: string
           {VERDICT[g.k]!.title.toLowerCase()} {g.rs.length}</span>)}
       </summary>
       <div className="chips" aria-label="verdict per batch row">
-        {rows.map((x) => <span key={x.row} className={`chip ${VERDICT[x.verdict]?.cls ?? ""}`} title={`row ${x.row + 1}: ${x.act_status}`}>
-          {label(x.row)} {x.act_status}</span>)}
+        {rows.map((x) => pickable.has(x.row)
+          ? <button key={x.row} type="button" className={`chip ${VERDICT[x.verdict]?.cls ?? ""}${x.row === selected ? " active" : ""}`}
+              title={`row ${x.row + 1}: ${x.act_status} · show this row's counterexample`} onClick={() => onPick(x.row)}>
+              {label(x.row)} {x.act_status}</button>
+          : <span key={x.row} className={`chip ${VERDICT[x.verdict]?.cls ?? ""}`} title={`row ${x.row + 1}: ${x.act_status}`}>
+              {label(x.row)} {x.act_status}</span>)}
       </div>
     </details>
   );
 }
 
-function Counterexample({ xs, run, model }: { xs: number[]; run: RunOut; model: ModelDescriptionOut }) {
+function Counterexample({ ce, all, onPick, run, model }: {
+  ce: RowCe; all: RowCe[]; onPick: (row: number | null) => void; run: RunOut; model: ModelDescriptionOut;
+}) {
   const batch = useBatchRows(run.model_id);
-  const row = run.result?.counterexample_row ?? null;
+  const xs = ce.xs, row = ce.row;
   const spec = model.model_id === run.model_id ? model.input_specs[0] : undefined;
   const s = spec ? specImageShape(spec.shape, spec.dataset) : null;
   const shape = s && s.c * s.h * s.w === xs.length ? s : null;
   const lo = Math.min(...xs), hi = Math.max(...xs);
   const unit = lo >= 0 && hi <= 1;
+  const name = (r: number) => `${batch?.noun === "image" ? "test image " : ""}${batch?.labels[r] ?? `row ${r + 1}`}`;
   return (
     <div className="verdictce">
-      {shape && <Pixels xs={xs} shape={shape} lo={unit ? 0 : lo} hi={unit ? 1 : hi} label={row === null ? "counterexample input" : `counterexample · ${batch?.noun === "image" ? "test image " : ""}${batch?.labels[row] ?? `row ${row + 1}`}`} size="big" />}
+      {all.length > 1 && (
+        <label className="ceselect" title="ACT found a counterexample on each of these batch rows">
+          counterexample of{" "}
+          <select value={row ?? ""} onChange={(e) => onPick(Number(e.target.value))}>
+            {all.map((c) => <option key={c.row} value={c.row ?? ""}>{name(c.row!)}</option>)}
+          </select>
+          <small className="muted"> ({all.length} falsified)</small>
+        </label>
+      )}
+      {shape && <Pixels key={row} xs={xs} shape={shape} lo={unit ? 0 : lo} hi={unit ? 1 : hi} label={row === null ? "counterexample input" : `counterexample · ${name(row)}`} size="big" />}
       <span className="mono muted">
         x = [{xs.slice(0, 8).map((v) => fmt(v, 3)).join(", ")}{xs.length > 8 ? `, … (${xs.length})` : ""}]
       </span>
-      <SaveExport run={run} xs={xs} shape={shape} lo={unit ? 0 : lo} hi={unit ? 1 : hi} />
+      <SaveExport run={run} ce={ce} shape={shape} lo={unit ? 0 : lo} hi={unit ? 1 : hi} />
     </div>
   );
 }
 
-// Save ACT's counterexample on the run record, then export it as a VNN-COMP witness and, for images, a PNG.
-function SaveExport({ run, xs, shape, lo, hi }: { run: RunOut; xs: number[]; shape: Shape | null; lo: number; hi: number }) {
+// Save ACT's counterexample (of the selected batch row) on the run record, then export it as a VNN-COMP witness and,
+// for images, a PNG.
+function SaveExport({ run, ce, shape, lo, hi }: { run: RunOut; ce: RowCe; shape: Shape | null; lo: number; hi: number }) {
   const save = useSaveRunCounterexample();
   const [err, setErr] = useState<string | null>(null);
-  const noOutput = run.result?.counterexample_output == null;
+  const { row, xs } = ce;
+  const tag = row === null ? "" : `-row${row}`;
+  const saved = (run.saved_counterexample_rows ?? []).includes(row ?? 0);
   async function png() {
     setErr(null);
     try {
-      downloadBlob(await imagePng(xs, shape!, lo, hi), `${run.run_id}-ce.png`);
+      downloadBlob(await imagePng(xs, shape!, lo, hi), `${run.run_id}${tag}-ce.png`);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     }
   }
-  if (!run.counterexample_saved_at) {
+  if (!saved) {
     return (
       <span className="ceactions">
-        <button className="secondary small" disabled={save.isPending} onClick={() => save.mutate(run.run_id)}>
-          {save.isPending ? "Saving…" : "Save counterexample"}</button>
+        <button className="secondary small" disabled={save.isPending} onClick={() => save.mutate({ id: run.run_id, row })}>
+          {save.isPending ? "Saving…" : row === null ? "Save counterexample" : `Save counterexample (row ${row + 1})`}</button>
         {save.error && <span className="state bad">{save.error.message}</span>}
       </span>
     );
   }
   return (
     <span className="ceactions">
-      <span className="chip good" title={`saved on this run's record ${new Date(run.counterexample_saved_at).toLocaleString()}`}>saved</span>
-      {noOutput
-        ? <span className="chip warn" title={run.result?.counterexample_output_error ?? undefined}>no VNN-LIB export: output not computed</span>
-        : <a className="button secondary small" href={savedCounterexampleUrl(run.run_id)} download
+      <span className="chip good" title="saved on this run's record">saved</span>
+      {ce.output == null
+        ? <span className="chip warn" title={ce.outputError ?? undefined}>no VNN-LIB export: output not computed</span>
+        : <a className="button secondary small" href={savedCounterexampleUrl(run.run_id, row)} download
             title="VNN-COMP result: sat + VNN-LIB 2.0 command-line assignment of X (input) and Y (output), float64">Export counterexample (VNN-LIB 2.0)</a>}
       {shape && <button className="secondary small" onClick={() => void png()}
         title={`${shape.w}×${shape.h} PNG of the counterexample input at native resolution`}>Export image (.png)</button>}

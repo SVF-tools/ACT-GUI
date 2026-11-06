@@ -35,14 +35,16 @@ def router(runs: RunService) -> APIRouter:
         return runs.stop(run_id)
 
     @r.post("/runs/{run_id}/saved-counterexample", response_model=S.RunOut, status_code=201)
-    def save_counterexample(run_id: str) -> JSONResponse:
-        run, created = runs.save_counterexample(run_id)
+    def save_counterexample(run_id: str, row: int | None = None) -> JSONResponse:
+        """Save ACT's counterexample of batch row `row` (default: the run's summary counterexample)."""
+        run, created = runs.save_counterexample(run_id, row)
         return JSONResponse(run.model_dump(), status_code=201 if created else 200)
 
     @r.get("/runs/{run_id}/saved-counterexample/vnnlib")
-    def saved_counterexample_file(run_id: str) -> Response:
-        return Response(runs.saved_counterexample_file(run_id), media_type="text/plain; charset=utf-8",
-                        headers={"Content-Disposition": f'attachment; filename="{run_id}-ce.counterexample"'})
+    def saved_counterexample_file(run_id: str, row: int | None = None) -> Response:
+        name = f"{run_id}-ce.counterexample" if row is None else f"{run_id}-row{row}-ce.counterexample"
+        return Response(runs.saved_counterexample_file(run_id, row), media_type="text/plain; charset=utf-8",
+                        headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
     @r.get("/runs/{run_id}/snapshot")
     def snapshot(run_id: str) -> Response:

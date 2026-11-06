@@ -193,10 +193,13 @@ class LayerStates:
 
 @dataclass(frozen=True)
 class LaneOutcome:
-    """ACT's verdict for one INPUT row of a batched net."""
+    """ACT's verdict for one INPUT row of a batched net, with that row's counterexample when ACT reported one."""
     row: int
     verdict: Verdict
     act_status: str
+    counterexample: tuple[float, ...] | None = None
+    counterexample_output: tuple[float, ...] | None = None  # as RunOutcome.counterexample_output, for this row
+    counterexample_output_error: str | None = None
 
 
 @dataclass(frozen=True)

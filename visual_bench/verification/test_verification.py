@@ -138,6 +138,37 @@ def test_torch_batch_verification_records_a_verdict_per_image(client: TestClient
     layers = client.get(f"/api/runs/{run_id}/layers").json()
     assert layers["availability"] != "available"  # layer inspection reads one input lane
 
+def test_batched_run_saves_and_exports_the_counterexample_of_each_falsified_row(client: TestClient):
+    s = sources_or_skip(client)
+    cora = next(b for b in s["vnnlib"] if b["benchmark"] == "cora_2024")
+    props = [i["vnnlib"] for i in cora["instances"] if i["onnx"] == "onnx/mnist-point.onnx"][:6]
+    m = client.post("/api/models", json={"source": {"kind": "vnnlib", "benchmark": "cora_2024", "onnx": "onnx/mnist-point.onnx",
+                                                    "vnnlib": props[0], "vnnlibs": props}}).json()
+    run_id = client.post("/api/runs", json={"model_id": m["model_id"], "method": "interval", "domain": "dual"}).json()["run_id"]
+    follow_to_end(client, run_id)
+    run = client.get(f"/api/runs/{run_id}").json()
+    if run["status"] == "failed":  # ACT branches without batched 1-D INPUT support reject this net in verify_once
+        pytest.skip(f"this ACT cannot verify a batched VNN-LIB net: {run['error']['message']}")
+    result = run["result"]
+    falsified = [r for r in result["rows"] if r["verdict"] == "falsified"]
+    assert len(falsified) >= 2 and all(r["counterexample"] and r["counterexample_output"] for r in falsified)
+    assert (result["counterexample_row"], result["counterexample"]) == (falsified[0]["row"], falsified[0]["counterexample"])
+
+    url = f"/api/runs/{run_id}/saved-counterexample"
+    picked = falsified[-2:]  # not only the summary row
+    for r in picked:
+        assert client.get(f"{url}/vnnlib?row={r['row']}").json()["error"]["code"] == "counterexample_not_saved"
+        assert [client.post(f"{url}?row={r['row']}").status_code for _ in range(2)] == [201, 200]
+        resp = client.get(f"{url}/vnnlib?row={r['row']}")
+        assert f"{run_id}-row{r['row']}-ce.counterexample" in resp.headers["content-disposition"]
+        lines, x, y = resp.text.splitlines(), r["counterexample"], r["counterexample_output"]
+        assert lines[0] == "sat" and [float(v) for v in lines[2:2 + len(x)]] == x
+        assert [float(v) for v in lines[3 + len(x):]] == y
+    assert client.get(f"/api/runs/{run_id}").json()["saved_counterexample_rows"] == [r["row"] for r in picked]
+    unfalsified = next((r["row"] for r in result["rows"] if r["verdict"] != "falsified"), None)
+    if unfalsified is not None:
+        assert client.post(f"{url}?row={unfalsified}").json()["error"]["code"] == "counterexample_not_found"
+
 def test_idempotent_start_and_conflict(client: TestClient):
     body = {"model_id": "range_check", "method": "interval", "client_request_id": "req-1"}
     first = client.post("/api/runs", json=body)

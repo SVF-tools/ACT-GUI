@@ -335,6 +335,7 @@ class RunService:
             matches = result.act_status == native.status
         diag = self.records.diagnostics(run_id)
         diagnostics = S.RunDiagnosticsOut.model_validate(diag["summary"]) if diag and "summary" in diag else None
+        saved = [] if req.method == "fuzz" else self.records.annotation(run_id, SAVED) or []
         return S.RunOut(run_id=run_id, model_id=req.model_id, method=req.method, domain=domain, diagnostics=diagnostics,
                         dual=req.dual, hybridz=req.hybridz,
                         time_budget_s=req.time_budget_s,
@@ -342,34 +343,54 @@ class RunService:
                         started_at=started, finished_at=last["at"] if status in ("completed", "failed") and last else None,
                         model_sha256=m["model"]["sha256"], act_commit=m["act"]["commit"], result=result, error=error,
                         native_reference=native, matches_native=matches, last_seq=last["seq"] if last else 0,
-                        counterexample_saved_at=None if req.method == "fuzz" else
-                        next((e["saved_at"] for e in self.records.annotation(run_id, SAVED) or []), None))
+                        counterexample_saved_at=next((e["saved_at"] for e in saved), None),
+                        saved_counterexample_rows=[e["counterexample"]["row"] for e in saved])
 
-    # -- saved counterexample (user annotation on a verification run; ACT decided the violation) ------------
-    def save_counterexample(self, run_id: str) -> tuple[S.RunOut, bool]:
-        """Save ACT's counterexample of a verify_once/BaB run on its record; saving it again is a no-op."""
+    # -- saved counterexamples (user annotations on a verification run; ACT decided the violation) ----------
+    @staticmethod
+    def _row_counterexample(r: S.RunResultOut | None, row: int | None) -> tuple[int, list[float], list[float] | None, str | None] | None:
+        """(row, input, output, output error) of ACT's counterexample on a batch row; None (no row) means the run's
+        summary counterexample. Single-row nets and runs recorded before per-row counterexamples use the summary."""
+        if r is None:
+            return None
+        summary = r.counterexample_row or 0
+        if r.counterexample is not None and (row is None or row == summary):
+            return summary, r.counterexample, r.counterexample_output, r.counterexample_output_error
+        lane = next((x for x in r.rows if x.row == row and x.counterexample is not None), None)
+        return None if lane is None else (lane.row, lane.counterexample, lane.counterexample_output,
+                                          lane.counterexample_output_error)
+
+    def save_counterexample(self, run_id: str, row: int | None = None) -> tuple[S.RunOut, bool]:
+        """Save ACT's counterexample of a verify_once/BaB run (of batch row `row`; default: the summary one) on its
+        record; saving the same row again is a no-op."""
         run = self.get(run_id)
         if run.method == "fuzz":
             raise AppError(422, "unsupported_method", "Fuzz runs save counterexamples by index (saved-counterexamples).")
-        r = run.result
-        if r is None or r.counterexample is None:
-            raise AppError(404, "counterexample_not_found", f"ACT reported no counterexample for {run_id}")
+        ce = self._row_counterexample(run.result, row)
+        if ce is None:
+            where = "" if row is None else f" on row {row}"
+            raise AppError(404, "counterexample_not_found", f"ACT reported no counterexample{where} for {run_id}")
         with self._lock:
-            created = not self.records.annotation(run_id, SAVED)
+            saved = self.records.annotation(run_id, SAVED) or []
+            created = all(e["counterexample"]["row"] != ce[0] for e in saved)
             if created:
-                self.records.write_annotation(run_id, SAVED, [{"saved_at": now_iso(), "counterexample": {
-                    "row": r.counterexample_row or 0, "input": r.counterexample, "output": r.counterexample_output}}])
+                self.records.write_annotation(run_id, SAVED, [*saved, {"saved_at": now_iso(), "counterexample": {
+                    "row": ce[0], "input": ce[1], "output": ce[2]}}])
         return self.get(run_id), created
 
-    def saved_counterexample_file(self, run_id: str) -> str:
-        """The saved counterexample as a VNN-COMP witness (see vnncomp_sat); X takes one input row's shape."""
+    def saved_counterexample_file(self, run_id: str, row: int | None = None) -> str:
+        """A saved counterexample (of batch row `row`; default: the first saved) as a VNN-COMP witness (see
+        vnncomp_sat); X takes one input row's shape."""
         run = self.get(run_id)
         saved = self.records.annotation(run_id, SAVED) if run.method != "fuzz" else None
-        if not saved:
-            raise AppError(404, "counterexample_not_saved", f"No counterexample is saved on {run_id}")
-        ce = saved[0]["counterexample"]
+        entry = next((e for e in saved or [] if row is None or e["counterexample"]["row"] == row), None)
+        if entry is None:
+            where = "" if row is None else f" for row {row}"
+            raise AppError(404, "counterexample_not_saved", f"No counterexample{where} is saved on {run_id}")
+        ce = entry["counterexample"]
         if ce["output"] is None:
-            reason = run.result.counterexample_output_error if run.result else None
+            found = self._row_counterexample(run.result, ce["row"])
+            reason = found[3] if found else None
             raise AppError(422, "output_unavailable", "The network output at this counterexample could not be computed, "
                            f"so it has no VNN-COMP witness: {reason or 'not recorded'}")
         specs = self.models.describe(run.model_id).input_specs

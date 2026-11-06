@@ -63,6 +63,10 @@ class RowVerdictOut(Wire):
     row: int  # INPUT row of a batched net (one test image)
     verdict: Verdict
     act_status: str
+    # This row's counterexample and the output for its VNN-COMP export (as RunResultOut); None for runs recorded before.
+    counterexample: list[float] | None = None
+    counterexample_output: list[float] | None = None
+    counterexample_output_error: str | None = None
 
 class RunResultOut(Wire):
     verdict: Verdict  # batched nets: the conjunction of the row verdicts below
@@ -108,6 +112,7 @@ class RunOut(Wire):
     matches_native: bool | None
     last_seq: int
     counterexample_saved_at: str | None = None  # when the user saved ACT's counterexample (verification runs)
+    saved_counterexample_rows: list[int] = []  # batch rows whose counterexample the user saved (verification runs)
     diagnostics: RunDiagnosticsOut | None = None  # None for runs recorded before diagnostics were captured
 
 class RunList(Wire):

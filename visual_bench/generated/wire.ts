@@ -294,6 +294,9 @@ export type Name4 = string
 export type Note = string
 export type Providers = ProviderOut[]
 export type ActStatus1 = string
+export type Counterexample = (number[] | null)
+export type CounterexampleOutput = (number[] | null)
+export type CounterexampleOutputError = (string | null)
 export type Row1 = number
 export type Verdict = ("certified" | "falsified" | "unknown" | "timeout" | "error")
 export type Errors = number
@@ -324,15 +327,16 @@ export type ActStatus2 = string
 export type BabSummary = ({
 [k: string]: string | number | boolean | null
 } | null)
-export type Counterexample = (number[] | null)
-export type CounterexampleOutput = (number[] | null)
-export type CounterexampleOutputError = (string | null)
+export type Counterexample1 = (number[] | null)
+export type CounterexampleOutput1 = (number[] | null)
+export type CounterexampleOutputError1 = (string | null)
 export type CounterexampleRow = (number | null)
 export type Device1 = (string | null)
 export type ElapsedS5 = number
 export type Rows1 = RowVerdictOut[]
 export type Verdict1 = ("certified" | "falsified" | "unknown" | "timeout" | "error")
 export type RunId8 = string
+export type SavedCounterexampleRows = number[]
 export type StartedAt = (string | null)
 export type Status4 = ("queued" | "running" | "completed" | "failed")
 export type TimeBudgetS = number
@@ -1156,6 +1160,9 @@ note: Note
  */
 export interface RowVerdictOut {
 act_status: ActStatus1
+counterexample?: Counterexample
+counterexample_output?: CounterexampleOutput
+counterexample_output_error?: CounterexampleOutputError
 row: Row1
 verdict: Verdict
 }
@@ -1214,6 +1221,7 @@ model_sha256: ModelSha256
 native_reference: (NativeResult | null)
 result: (RunResultOut | null)
 run_id: RunId8
+saved_counterexample_rows?: SavedCounterexampleRows
 started_at: StartedAt
 status: Status4
 time_budget_s: TimeBudgetS
@@ -1225,9 +1233,9 @@ time_budget_s: TimeBudgetS
 export interface RunResultOut {
 act_status: ActStatus2
 bab_summary: BabSummary
-counterexample: Counterexample
-counterexample_output?: CounterexampleOutput
-counterexample_output_error?: CounterexampleOutputError
+counterexample: Counterexample1
+counterexample_output?: CounterexampleOutput1
+counterexample_output_error?: CounterexampleOutputError1
 counterexample_row?: CounterexampleRow
 device?: Device1
 elapsed_s: ElapsedS5
