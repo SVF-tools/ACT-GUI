@@ -1,4 +1,4 @@
-"""Native ACT fuzz control tests; optional on the pinned baseline without act.pipeline.gui.fuzzing."""
+"""Native ACT fuzz control tests; optional on the pinned baseline without act.pipeline.gui.fuzzer_gui."""
 from __future__ import annotations
 
 import threading
@@ -21,7 +21,7 @@ def native_net():
 
 
 def test_options_match_native_metadata_and_defaults(native_net):
-    from act.pipeline.gui.fuzzing import fuzzing_options as native_options
+    from act.pipeline.gui.fuzzer_gui import fuzzing_options as native_options
 
     options = fuzzing_options()
     assert [o.name for o in options] == [o.option.name for o in native_options()]

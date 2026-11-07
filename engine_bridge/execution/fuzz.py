@@ -94,7 +94,7 @@ def fuzzing_options() -> tuple[FuzzOptionSpec, ...]:
     """Active ACT option metadata, or the legacy tunables with live control disabled."""
     if _control_available():
         with act_imports():
-            from act.pipeline.gui.fuzzing import fuzzing_options as native_options
+            from act.pipeline.gui.fuzzer_gui import fuzzing_options as native_options
 
             return tuple(FuzzOptionSpec(**dataclasses.asdict(item.option), default=item.default)
                          for item in native_options())
@@ -121,7 +121,7 @@ class FuzzRunControl:
         self._native: Any = None
         if _control_available():
             with act_imports():
-                from act.pipeline.gui.fuzzing import FuzzControl
+                from act.pipeline.gui.fuzzer_gui import FuzzControl
 
                 self._native = FuzzControl()
 
@@ -343,8 +343,8 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
                     on_progress(p)
 
     if native:
-        from act.pipeline.gui.fuzzing import FuzzConfigChange, FuzzEnd, FuzzStart, FuzzStep
-        from act.pipeline.gui.observe import observe as register
+        from act.pipeline.gui.fuzzer_gui import FuzzConfigChange, FuzzEnd, FuzzStart, FuzzStep
+        from act.pipeline.gui.verifier_gui import observe as register
 
         def sink(record: Any) -> None:
             nonlocal stop_reason

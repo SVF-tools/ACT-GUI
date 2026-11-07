@@ -186,7 +186,7 @@ class PropagationSink:
                                      lb.values(), ub.values(), rec.output_shape, layer.preds if layer else ()))
         return LayerStates(method=domain, availability="available" if states else "not_recorded",
                            layers=tuple(states), provenance={
-                               "act_call": "act.back_end.verifier.verify_once under act.pipeline.gui.observe.observe",
+                               "act_call": "act.back_end.verifier.verify_once under act.pipeline.gui.verifier_gui.observe",
                                "domain": domain, "pass": "forward",
                                "bounds": "forward pre-activation bounds" if domain == "dual" else "committed layer output bounds",
                            })
@@ -199,7 +199,7 @@ def run_observed_verification(model_path: Path, time_budget_s: float, domain: Do
     model = describe_model(model_path)
     sink = PropagationSink(callback, model, start_ns)
     with act_imports():
-        from act.pipeline.gui.observe import observe
+        from act.pipeline.gui.verifier_gui import observe
 
         with observe(sink):
             outcome = run_verification(model_path, "interval", time_budget_s, domain, dual, hybridz_tolerance)

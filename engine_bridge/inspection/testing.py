@@ -14,9 +14,9 @@ def observation_api():
     """Use the real observer registry when present, otherwise a schema-only stub."""
     with act_imports():
         try:
-            return importlib.import_module("act.pipeline.gui.observe")
+            return importlib.import_module("act.pipeline.gui.verifier_gui")
         except ModuleNotFoundError as exc:
-            if exc.name not in ("act.pipeline.gui", "act.pipeline.gui.observe"):
+            if exc.name not in ("act.pipeline.gui", "act.pipeline.gui.verifier_gui"):
                 raise
 
     @dataclass
