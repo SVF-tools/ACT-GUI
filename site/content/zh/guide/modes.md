@@ -1,72 +1,102 @@
-# 工作模式
+# 验证与测试
 
-在中间栏选择模式，设置选项，然后在网络视图下方启动运行。所有模式使用相同的运行生命周期，因此每次运行都有相同的工作进程隔离、实时事件、记录和导出机制。
+ACT 可以证明性质、搜索反例，也可以检查验证器本身。每项任务都有自己的命令，所有命令都接受 `--device {cpu,cuda,gpu,mps}` 和 `--dtype {float32,float64}`。
 
-| 模式 | ACT 入口 | 可能的结论 |
+| 任务 | 命令 | 可能的结果 |
 | --- | --- | --- |
-| [模糊测试](#fuzzing) | ACTFuzzer | `falsified` 或 `unknown` |
-| [验证](#verification) | 使用区间、对偶或 HybridZ 的 `verify_once` | ACT 的结论 |
-| [BaB](#bab) | `verify_bab_batched` | ACT 的结论 |
-
----
-
-## 模糊测试 {#fuzzing}
-
-模糊测试搜索违反规约的输入，但无法证明不存在违反输入。
-
-- **选项。** 每个 ACTFuzzer 设置都会显示 ACT 的默认值，并且都可以编辑。扰动模式包括 **isotropic**、**anisotropic** 和 **fixed**。
-- **批次。** 对共享模型设置批量大小，可以在一次运行中模糊测试多个输入行，也可以选择特定输入。
-- **实时视图。** 对图像模型，模糊测试运行期间会实时更新原始图像、变异图像和差分图像，同时显示进度和覆盖率。
-- **运行控制。** 当前引擎支持时，可以暂停、恢复或停止正在运行的模糊测试，也可以修改设置。ACT 会报告每次修改是已应用还是被拒绝，运行记录会保存每个决定。
-- **反例。** ACT 接受的每个违反样例都会随运行保存，并导出为 VNN-LIB 赋值或 PNG 图像。
+| [验证](#verification) | `python -m act.back_end --verify` | certified、falsified、unknown、timeout |
+| [分支定界](#branch-and-bound) | `python -m act.back_end --verify --bab` | certified、falsified、unknown、timeout |
+| [模糊测试](#fuzzing) | `python -m act.pipeline --fuzz` | 找到反例，或没有找到 |
+| [基准运行](#benchmark-runs) | `python -m act.pipeline --verify vnnlib` | 每个实例一个结果 |
+| [验证器校验](#verifier-validation) | `python -m act.pipeline --verify ... --validate-soundness` | 每项检查为通过、失败或无法判定 |
 
 ---
 
 ## 验证 {#verification}
 
-使用你选择的抽象域运行 ACT 的单遍验证：**interval**、**dual** 或 **HybridZ**。
+单次验证只传播一次上下界，并据此判定性质。
 
-- **结论。** 横幅显示 ACT 自己的结果。
-- **反例。** `falsified` 运行会保存 ACT 的反例，并可将其导出为 VNN-COMP 见证文件或图像。
-- **诊断。** 每个到达工作进程的运行都会记录警告、ACT 打印的错误以及异常链，并定位到最内层的 ACT 堆栈帧。运行历史会显示这些信息，并提供复现快照，其中包含请求、ACT 网络、引擎信息和 `reproduce.py` 的 zip 文件。
+```bash
+# 一个示例 ACT Net（--list-examples 会列出生成的网络名）
+python -m act.back_end --verify --network act/back_end/examples/nets/mlp_plain_3x8_64x64_3962224133.json --device cpu
 
----
+# ONNX 网络加 VNN-LIB 性质；--save-net 保存实际验证的 Net
+python -m act.back_end --verify --onnx model.onnx --vnnlib property.vnnlib \
+  --solver torchlp --save-net verified.json --device cpu --dtype float64
+```
 
-## BaB {#bab}
-
-运行 ACT 的批量分支定界，与 ACT 的流水线命令行使用同一入口。
-
-- **最终摘要。** BaB 标签页显示 ACT 的最终摘要，以及运行拥有哪类观察数据。
-- **尚未提供。** 搜索树、节点历史和节点控制需要 ACT 提供已提交的节点事件，而固定引擎尚不提供这些事件。工作台不会自行重建树。
-
----
-
-## 层分析
-
-运行结束后，逐步查看 ACT 在每一层记录的区间上下界。
-
-- 比较某层变换前后的上下界，并选择单个值。
-- 将结果投影为二维区间盒。
-- 视图只显示已记录数据，不会在浏览器中重新计算上下界。
+- **`--solver`** 选择后端：`torchlp`（PyTorch LP）、`dual`、`hybridz`、`gurobi`（MILP/LP，需要许可证）或 `auto`。
+- **`--tf-mode`** 选择前向传递函数，`interval` 或 `hybridz`。
+- **`--timeout`** 设置以秒为单位的时间预算。
+- 含多个析取分支的 VNN-LIB 文件会作为多个 Net 验证：`verified.d0.json`、`verified.d1.json`，依此类推。
 
 ---
 
-## 助手
+## 分支定界 {#branch-and-bound}
 
-可以询问当前选中的模型、运行、层或值。助手会冻结上下文，通过视图使用的相同服务收集带类型的证据，并以可点击的引用回答，让你跳转到引用对象。
+分支定界用于细化单次验证判定不了的性质。它把问题拆分开，批量地为每个子问题定界，直到每个分支都得到判定、找到反例或预算用完为止。
 
-当前提供方是确定性的占位实现，尚未连接真实语言模型。
+```bash
+python -m act.back_end --verify --network act/back_end/examples/nets/mlp_plain_3x8_64x64_3962224133.json --bab --device cpu
+```
+
+| 选项 | 取值 |
+| --- | --- |
+| `--bab-solver-tier` | `lp`、`dual`、`dual_alpha`、`dual_alpha_eta` |
+| `--bab-branching` | 如何选择下一次拆分，例如 `babsr`、`fsb`、`gain`、`width` 或 `random` |
+| `--bab-bounding` | 先展开哪些子问题，例如 `greedy` 或 `depth_bound_blend` |
+| `--bab-max-depth`、`--bab-max-subproblems` | 搜索的上限 |
+
+命名的 BaB 配置（预设）位于 `act/config/backend.yaml`，见[配置](./configuration#configuration-files)。
 
 ---
 
-## 记录与导出
+## 模糊测试 {#fuzzing}
 
-每次运行都会保留：
+ACTFuzzer 搜索违反性质的输入。它在 GPU 上批量运行具体模型，在输入规约内对输入做变异，并用输出性质检查每个候选。
 
-- 包含请求和引擎快照的不可变**清单**；
-- 浏览器重连时会重放的仅追加**事件日志**；
-- 每次读取都会根据 sha256 哈希检查的**封存工件**。
+```bash
+python -m act.pipeline --fuzz --category acasxu_2023 --iterations 5000
+python -m act.pipeline --fuzz --creator torchvision --dataset MNIST
+```
 
-**Records** 标签页显示来源信息和哈希。**Export** 会将完整记录下载为不含服务器绝对路径的 zip 文件。
+- **变异。** 五种策略，由 `--mutation-weights` 控制比例：`gradient`（一步 FGSM 风格扰动）、`pgd`（迭代并投影的 PGD 步）、`activation`（DeepXplore 风格，针对低激活神经元）、`boundary`（在输入规约边界附近采样）和 `random`（高斯噪声）。
+- **扰动大小。** `--perturb-mode adaptive_scalar`（一个自适应尺度）、`adaptive_perdim`（每个输入维度一个尺度）或 `fixed`，配合 `--perturb-scale`。
+- **覆盖率。** 激活新神经元的输入会被保留为种子（`--coverage-strategy`、`--activation-threshold`）。
+- **预算。** `--iterations`、`--timeout` 和 `--stop-on-first-violation`。
+- **输出。** 反例和摘要保存在输出目录下（`--output`；用 `--no-save` 跳过保存）。
+
+模糊测试无法证明性质：什么也没找到时，性质仍然是 unknown。
+
+---
+
+## 基准运行 {#benchmark-runs}
+
+在已下载的基准上端到端地运行验证器：
+
+```bash
+python -m act.pipeline --download acasxu_2023
+python -m act.pipeline --verify vnnlib --category acasxu_2023 --max-instances 10
+python -m act.pipeline --verify torchvision --dataset MNIST
+```
+
+`--tf-modes` 和 `--solvers` 选择抽象域和求解器；一次运行使用各自的第一个值。
+
+---
+
+## 验证器校验 {#verifier-validation}
+
+校验在 ACT 生成的示例网络或某个基准上，检查验证器是否可靠、数值是否正确。
+
+```bash
+python -m act.pipeline --verify netfactory --validate-soundness --device cpu --dtype float64
+python -m act.pipeline --verify netfactory --validate-soundness --tf-modes interval --solvers torchlp
+python -m act.pipeline --verify vnnlib --category acasxu_2023 --validate-soundness
+```
+
+1. **第一层：可靠性。** 用具体反例交叉检查每个求解器的结论。存在真实反例却得到 `CERTIFIED`，就是可靠性错误。
+2. **第二层：数值精度。** 采样输入在具体模型上运行，每一层的抽象上下界都必须包含具体激活值。
+
+`--verify torch2act` 和 `--verify act2torch` 检查 PyTorch 模型与 ACT Net 之间的转换。
 
 下一步：[配置](./configuration)。

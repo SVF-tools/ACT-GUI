@@ -1,50 +1,62 @@
 # Fonctionnement
 
-ACT-GUI est un produit unique organisé en deux zones selon leurs responsabilités. Un moteur ACT distinct se trouve en dessous.
+ACT comporte trois niveaux. Le front-end transforme modèles, données et propriétés en tâches de vérification. Le back-end les vérifie. Le pipeline relie les deux et les teste.
 
 ```mermaid
 flowchart TB
-  B["Navigateur<br/>vues React"] -->|"Requêtes et commandes HTTP"| VB["visual_bench<br/>service de l'atelier"]
-  VB -->|"Événements en direct (SSE)"| B
-  VB -->|"Un processus worker par exécution"| EB["engine_bridge<br/>adaptation ACT"]
-  EB -->|"Invoque une capacité existante"| ACT["ACT<br/>calcul scientifique"]
-  ACT -->|"Résultats et preuves"| EB
-  EB -->|"Contrats neutres"| VB
-  VB -->|"Enregistrements scellés"| R["Enregistrements d'exécution"]
+  In["PyTorch, ONNX, VNN-LIB,<br/>TorchVision, BERT"] -->|"créateurs de spécifications"| FE["Front-end<br/>spécifications et modèles enveloppés"]
+  FE -->|"torch2act"| Net["ACT Net<br/>avec couches INPUT_SPEC et ASSERT"]
+  Net --> BE["Back-end<br/>fonctions de transfert, solveurs, BaB"]
+  BE -->|"verdict et bornes"| Out["CERTIFIED, FALSIFIED,<br/>UNKNOWN, TIMEOUT"]
+  FE -->|"modèle concret"| FZ["Pipeline<br/>ACTFuzzer, validation"]
+  FZ -->|"contre-exemples vérifiés"| Out
 ```
 
-| Couche | Responsabilité | Ne fait jamais |
+| Niveau | Responsabilités | Ligne de commande |
 | --- | --- | --- |
-| **visual_bench** | Vues du navigateur, services applicatifs, workers d'exécution, enregistrements et assistant | Importer ACT |
-| **engine_bridge** | Vérification de la version et des capacités d'ACT, appels à ACT, conversion des résultats en données neutres | Servir HTTP, conserver l'état de l'interface, planifier les exécutions |
-| **ACT** | Algorithmes, bornes et verdicts | Connaître l'interface graphique |
+| **Front-end** (`act/front_end`) | Créateurs de spécifications pour VNN-LIB, TorchVision et BERT ; spécifications d'entrée et de sortie ; enveloppes de modèles vérifiables ; synthèse de modèles | `python -m act.front_end` |
+| **Back-end** (`act/back_end`) | L'ACT Net ; fonctions de transfert par intervalles, HybridZ et duales ; solveurs ; vérification en une passe et séparation-évaluation | `python -m act.back_end` |
+| **Pipeline** (`act/pipeline`) | Conversion PyTorch ↔ ACT, ACTFuzzer, validation des vérificateurs, gestion des benchmarks | `python -m act.pipeline` |
 
 ---
 
-## Cycle de vie d'une exécution
+## Du modèle à l'ACT Net {#from-a-model-to-an-act-net}
 
-1. **Requête.** Le navigateur envoie une requête avec le modèle, la méthode et ses options. Une requête répétée avec le même identifiant client renvoie l'exécution existante au lieu d'en démarrer une autre.
-2. **Worker.** Le service démarre un processus worker séparé. Celui-ci appelle ACT par l'intermédiaire d'engine_bridge, afin qu'un crash ou un délai d'expiration ne fasse pas tomber le service.
-3. **Événements en direct.** La progression, comme les images de fuzzing et les changements de cycle de vie, est inscrite dans un journal d'événements ordonné et envoyée au navigateur par Server-Sent Events. Un navigateur qui se reconnecte rejoue les événements manqués.
-4. **Enregistrement scellé.** À la fin de l'exécution, le résultat et les preuves sont écrits comme artefacts, chacun scellé par un hash sha256 à côté d'un manifeste immuable. Les lectures ultérieures vérifient les hash.
+1. **Spécification.** Un créateur de spécifications lit un benchmark ou un jeu de données et produit une spécification d'entrée (une boîte, une boule L∞ ou un polytope linéaire) et une propriété de sortie (robustesse top-1, robustesse avec marge, contraintes linéaires, intervalle de sortie ou région linéaire dangereuse).
+2. **Modèle enveloppé.** La spécification entoure le réseau sous forme de couches PyTorch : une couche d'entrée, une couche de spécification d'entrée et une couche de spécification de sortie.
+3. **Conversion.** `torch2act` convertit le modèle enveloppé en ACT Net. La spécification devient les couches `INPUT_SPEC` et `ASSERT` du Net : la vérification n'a donc besoin d'aucun fichier de spécification séparé. `act2torch` effectue la conversion inverse, et les tests du pipeline vérifient que les deux sens concordent.
 
----
-
-## Contrôle des capacités
-
-ACT varie selon les branches et les forks. L'atelier ne suppose pas qu'un checkout ACT possède l'API requise par une fonction : engine_bridge vérifie les symboles ACT appelés par chaque adaptateur. Une fonction absente du moteur actif est désactivée et sa raison est affichée, plutôt que d'échouer au milieu d'une exécution.
+Plusieurs propriétés peuvent partager un même réseau. La synthèse de modèles les fusionne en un seul Net en lots, avec une ligne par propriété, qu'ACT vérifie ensemble.
 
 ---
 
-## Modules
+## Vérifier un ACT Net {#verifying-an-act-net}
 
-L'atelier est organisé en quatorze modules, chacun avec son propre guide.
+**Bornes.** Une fonction de transfert propage des bornes à travers chaque couche du Net :
 
-| Zone | Modules |
+| Domaine | Précision et coût |
 | --- | --- |
-| visual_bench | [workspace](/visual_bench/workspace/README), [model_spec](/visual_bench/model_spec/README), [verification](/visual_bench/verification/README), [fuzzing](/visual_bench/fuzzing/README), [engine](/visual_bench/engine/README), [analysis](/visual_bench/analysis/README), [bab](/visual_bench/bab/README), [assistant](/visual_bench/assistant/README), [records](/visual_bench/records/README) |
-| engine_bridge | [engine_session](/engine_bridge/engine_session/README), [model_spec](/engine_bridge/model_spec/README), [execution](/engine_bridge/execution/README), [inspection](/engine_bridge/inspection/README), [events](/engine_bridge/events/README) |
+| `interval` | Le plus rapide ; une borne inférieure et une borne supérieure par neurone. |
+| `hybridz` | Zonotopes ; des bornes plus serrées pour un coût plus élevé. |
+| `dual` | Bornes duales issues d'une relaxation linéaire, avec en option des relaxations ReLU optimisées (alpha). |
 
-Pour les décisions de conception et les invariants, consultez l'[architecture](/docs/design).
+**Décision.** Un solveur confronte la propriété de sortie aux bornes. Si elles prouvent la propriété pour toute entrée, le résultat est `CERTIFIED`. Si la propriété reste ouverte, ACT évalue des entrées candidates sur le modèle concret ; une candidate qui viole la propriété donne `FALSIFIED` avec ce contre-exemple.
 
-Suite : [Modes de travail](./modes).
+**Raffinement.** Si aucun des deux n'aboutit, la séparation-évaluation découpe le problème en sous-problèmes, en fixant la phase d'une ReLU instable ou en scindant une dimension d'entrée, puis borne chaque sous-problème à nouveau jusqu'à ce que chaque branche soit décidée ou que le budget soit épuisé.
+
+---
+
+## Chercher des contre-exemples {#searching-for-counterexamples}
+
+ACTFuzzer exécute le modèle concret, pas une abstraction. Il fait muter des entrées graines à l'intérieur de la spécification d'entrée par des pas guidés par le gradient (de type FGSM/PGD) et des perturbations aléatoires, conserve les entrées qui atteignent une nouvelle couverture de neurones et confronte chaque candidate à la propriété de sortie. Une candidate qui la viole est signalée comme contre-exemple ; le fuzzing ne certifie jamais une propriété.
+
+---
+
+## Contrôler le vérificateur {#checking-the-verifier}
+
+Les résultats de vérification ne sont utiles que si le vérificateur est correct. La validation du pipeline comporte deux niveaux :
+
+1. **Correction.** Un vérificateur ne doit jamais répondre `CERTIFIED` lorsqu'un contre-exemple concret existe.
+2. **Précision numérique.** Les bornes abstraites de chaque couche doivent contenir les activations concrètes des entrées échantillonnées.
+
+Suite : [Vérification et tests](./modes).

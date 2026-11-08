@@ -6,6 +6,7 @@ import { withMermaid } from "vitepress-plugin-mermaid";
 // Hand-written user pages live in content/. sync-docs.mjs copies the repository's developer Markdown
 // into content/ at the same relative paths, so those pages keep their own URLs and relative links.
 const REPO = "https://github.com/guanqin-123/ACT-GUI";
+const ACT_REPO = "https://github.com/SVF-tools/ACT";
 const WORKBENCH = "https://app.act-online.au";
 
 // Relative links to source files (not Markdown pages) point to the file on GitHub.
@@ -39,7 +40,7 @@ type DeveloperLabels = {
 };
 
 const ENGLISH_DEVELOPER: DeveloperLabels = {
-  docs: "Developer docs (English)",
+  docs: "ACT-GUI developer docs",
   task: "Choose a development task",
   rules: "Contributor rules",
   docsGuide: "Documentation guide",
@@ -124,14 +125,14 @@ function locale(prefix: string, l: Labels, d = ENGLISH_DEVELOPER): DefaultTheme.
 
 export default withMermaid(
   defineConfig({
-    title: "ACT-GUI",
-    description: "The visual workbench for ACT neural network verification.",
+    title: "ACT",
+    description: "ACT: a testing and verification framework for neural networks.",
     srcDir: "content",
     cleanUrls: true,
     appearance: "dark",
     markdown: { config: sourceLinksToGitHub },
     themeConfig: {
-      socialLinks: [{ icon: "github", link: REPO }],
+      socialLinks: [{ icon: "github", link: ACT_REPO }],
       search: { provider: "local" },
       outline: "deep",
     },
@@ -140,11 +141,11 @@ export default withMermaid(
         label: "English",
         lang: "en-US",
         themeConfig: locale("", {
-          guide: "Guide",
-          whatIs: "What is ACT-GUI?",
+          guide: "User Guide",
+          whatIs: "What is ACT?",
           installation: "Installation",
           howItWorks: "How it works",
-          modes: "Working modes",
+          modes: "Verification and testing",
           configuration: "Configuration",
           developers: "Developers",
           openWorkbench: "Open Workbench",
@@ -153,18 +154,18 @@ export default withMermaid(
       zh: {
         label: "简体中文",
         lang: "zh-CN",
-        description: "ACT 神经网络验证的可视化工作台。",
+        description: "ACT：神经网络的测试与验证框架。",
         themeConfig: locale("/zh", {
-          guide: "指南",
-          whatIs: "ACT-GUI 是什么？",
+          guide: "用户指南",
+          whatIs: "ACT 是什么？",
           installation: "安装",
           howItWorks: "工作原理",
-          modes: "工作模式",
+          modes: "验证与测试",
           configuration: "配置",
           developers: "开发者",
           openWorkbench: "打开工作台",
         }, {
-          docs: "开发者文档（英文）",
+          docs: "ACT-GUI 开发者文档（英文）",
           task: "选择开发任务",
           rules: "贡献者规则",
           docsGuide: "文档指南",
@@ -177,13 +178,13 @@ export default withMermaid(
       fr: {
         label: "Français",
         lang: "fr-FR",
-        description: "L'atelier visuel de vérification de réseaux de neurones ACT.",
+        description: "ACT : un cadre de test et de vérification pour les réseaux de neurones.",
         themeConfig: locale("/fr", {
-          guide: "Guide",
-          whatIs: "Qu'est-ce qu'ACT-GUI ?",
+          guide: "Guide utilisateur",
+          whatIs: "Qu'est-ce qu'ACT ?",
           installation: "Installation",
           howItWorks: "Fonctionnement",
-          modes: "Modes de travail",
+          modes: "Vérification et tests",
           configuration: "Configuration",
           developers: "Développeurs",
           openWorkbench: "Ouvrir l'atelier",

@@ -2,37 +2,37 @@
 layout: home
 
 hero:
-  name: ACT-GUI
-  text: Voir l'intérieur de la vérification des réseaux neuronaux
-  tagline: Un atelier dans le navigateur pour le vérificateur ACT. Chargez un réseau, testez-le par fuzzing, vérifiez-le et inspectez chaque borne calculée par ACT. ACT décide, l'atelier montre pourquoi.
+  name: ACT
+  text: Abstract Constraint Transformation
+  tagline: Un cadre de test et de vérification pour les réseaux de neurones. Chargez un modèle et une spécification, cherchez des contre-exemples et prouvez des propriétés par interprétation abstraite correcte et séparation-évaluation.
   actions:
     - theme: brand
-      text: Ouvrir l'atelier
-      link: https://app.act-online.au
-    - theme: alt
-      text: Démarrer
+      text: Commencer
       link: /fr/guide/
     - theme: alt
+      text: Essayer en ligne
+      link: https://app.act-online.au
+    - theme: alt
       text: GitHub
-      link: https://github.com/guanqin-123/ACT-GUI
+      link: https://github.com/SVF-tools/ACT
 
 features:
-  - title: Fuzzing en direct
-    details: Lancez le fuzzer d'ACT et observez la mise à jour des images originales, modifiées et différentielles pendant la recherche. Mettez l'exécution en pause, reprenez-la, arrêtez-la ou réglez ses paramètres pendant qu'elle s'exécute.
-  - title: Vérification et BaB
-    details: Lancez la vérification en un passage d'ACT avec le domaine intervalle, dual ou HybridZ, ou sa séparation et évaluation par lots. Le verdict appartient toujours à ACT.
-  - title: Bornes couche par couche
-    details: Parcourez les bornes enregistrées par ACT à chaque couche, comparez-les avant et après, puis projetez une boîte d'intervalle à deux coordonnées.
-  - title: Des contre-exemples exploitables
-    details: Chaque violation acceptée par ACT est enregistrée avec l'exécution et exportée comme témoin VNN-COMP ou comme image.
-  - title: Enregistrements reproductibles
-    details: Chaque exécution conserve un manifeste, un journal d'événements en ajout seul et des artefacts scellés par sha256. Exportez l'enregistrement complet sous forme de fichier zip.
-  - title: N'importe quelle branche ACT
-    details: Basculez le moteur vers la base épinglée ou vers une branche de n'importe quel fork d'ACT. Les fonctions non prises en charge par le moteur actif sont désactivées, avec leur raison.
+  - title: Une seule représentation pour tous les modèles
+    details: Les modèles PyTorch, les réseaux ONNX et les propriétés VNN-LIB deviennent un même ACT Net, dans lequel les spécifications d'entrée et de sortie sont des couches ; chaque moteur vérifie donc le même problème.
+  - title: Trois domaines abstraits
+    details: Propagez des bornes par intervalles, par zonotopes HybridZ ou par bornes duales issues d'une relaxation linéaire, à travers des couches MLP, CNN, RNN et Transformer.
+  - title: Séparation-évaluation
+    details: Raffinez les propriétés non décidées en scindant des neurones ou des entrées, avec des sous-problèmes en lots, plusieurs heuristiques de branchement et des bornes LP, duales ou MILP.
+  - title: Fuzzing en boîte blanche
+    details: ACTFuzzer cherche des violations sur GPU avec des mutations guidées par le gradient, une mise à l'échelle adaptative des perturbations et la couverture des neurones.
+  - title: Contre-exemples vérifiés
+    details: Chaque contre-exemple, issu du fuzzing ou de la vérification, est contrôlé sur le modèle concret avec les mêmes spécifications d'entrée et de sortie avant d'être signalé.
+  - title: Validation des vérificateurs
+    details: Confrontez les verdicts à des contre-exemples concrets et vérifiez, couche par couche, que les bornes abstraites contiennent chaque activation concrète.
 ---
 
 <div class="home-demo">
 
-![Démonstration du fuzzing ACT-GUI](../fuzzingGuide.gif)
+![Fuzzing ACT dans l'atelier en ligne](../fuzzingGuide.gif)
 
 </div>

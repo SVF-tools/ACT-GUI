@@ -1,56 +1,79 @@
-# Qu'est-ce qu'ACT-GUI ?
+# Qu'est-ce qu'ACT ?
 
-ACT-GUI est l'atelier de visualisation et d'interaction du vérificateur de réseaux neuronaux [ACT](https://github.com/SVF-tools/ACT). ACT effectue le travail scientifique : il propage les bornes, recherche des contre-exemples et décide des verdicts. ACT-GUI permet d'observer ce travail. Il charge les modèles et les spécifications, exécute ACT, affiche les preuves produites par ACT et conserve l'enregistrement de chaque exécution.
+ACT (Abstract Constraint Transformation) est un cadre de test et de vérification pour les réseaux de neurones. À partir d'un modèle et d'une spécification des entrées qu'il peut recevoir et des sorties qu'il doit produire, ACT trouve un contre-exemple, c'est-à-dire une entrée qui viole la spécification, ou prouve qu'il n'en existe aucun.
 
-Un navigateur suffit. L'atelier s'exécute sur un serveur où ACT est installé, et tous les calculs y sont réalisés.
-
----
-
-## Démarrage rapide
-
-### Ouvrir l'atelier
-
-L'atelier hébergé est disponible à **[app.act-online.au](https://app.act-online.au)**. Pour exécuter votre propre copie, consultez l'[installation](./installation).
-
-### Votre première exécution
-
-1. **Choisissez un modèle.** Sélectionnez un modèle du catalogue dans la barre latérale, ou utilisez **Load model** pour en construire un à partir d'une instance de référence VNN-COMP (ONNX + VNN-LIB) ou d'un classifieur d'images ONNX avec une image de test et un epsilon.
-2. **Choisissez un mode.** Les modes disponibles sont **Fuzzing**, **Verification** et **BaB**.
-3. **Démarrez l'exécution.** Les contrôles se trouvent sous la vue du réseau. Le fuzzing diffuse sa progression et les images modifiées en direct. Verification et BaB affichent le verdict d'ACT à la fin.
-4. **Inspectez les preuves.** Ouvrez les bornes des couches, les contre-exemples ou l'historique des exécutions. L'onglet **Records** affiche la provenance de chaque exécution et permet d'exporter l'exécution dans un fichier zip.
-
-La commande **Guide** de la barre supérieure relance la visite introductive à tout moment.
+ACT est natif PyTorch et fonctionne sur CPU ou GPU. Il lit des modèles PyTorch, des réseaux ONNX et des propriétés VNN-LIB, les convertit en une représentation intermédiaire unique (l'ACT Net) et vérifie cette représentation avec plusieurs domaines abstraits et solveurs.
 
 ---
 
-## Le principe : ACT décide
+## Démarrage rapide {#quick-start}
 
-L'atelier ne calcule ni ne remplace jamais un verdict.
+### Essayer en ligne {#try-it-online}
 
-- **Les verdicts viennent d'ACT.** L'interface affiche seulement ce qu'ACT rapporte.
-- **Le fuzzing ne certifie rien.** Une exécution de fuzzing est `falsified` uniquement lorsque le vérificateur de propriétés d'ACT accepte un contre-exemple. Toutes les autres se terminent par `unknown`.
-- **L'assistant explique, il ne décide pas.** Ses réponses citent les preuves enregistrées et ne remplacent jamais le résultat d'ACT.
-- **Les données absentes restent absentes.** Une valeur non enregistrée par ACT est affichée comme non enregistrée, jamais complétée ni estimée.
+L'**[atelier en ligne d'ACT](https://app.act-online.au)** exécute ACT sur un serveur : un navigateur suffit. Choisissez un modèle, puis **Fuzzing**, **Vérification** ou **BaB**, et observez les résultats d'ACT, les bornes par couche et les contre-exemples.
+
+### Exécuter en local {#run-it-locally}
+
+```bash
+git clone --recursive https://github.com/SVF-tools/ACT.git
+cd ACT
+conda env create -f environment.yml
+conda activate act-py312
+
+python -m act.back_end --generate --device cpu --dtype float64              # génère les réseaux d'exemple
+python -m act.back_end --verify --network act/back_end/examples/nets/mlp_plain_3x8_64x64_3962224133.json --device cpu   # en vérifie un
+```
+
+Voir [Installation](./installation) pour Gurobi et le téléchargement des benchmarks.
+
+### Vérifier votre propre modèle {#verify-your-own-model}
+
+```bash
+python -m act.back_end --verify --onnx model.onnx --vnnlib property.vnnlib --solver torchlp --device cpu
+```
 
 ---
 
-## Fonctionnalités disponibles aujourd'hui
+## Résultats d'ACT {#what-act-reports}
 
-| Disponible | Pas encore disponible |
+| Résultat | Signification |
 | --- | --- |
-| Chargement de modèles depuis le catalogue, les instances VNN-LIB et les classifieurs ONNX | Historique et contrôles BaB au niveau des nœuds |
-| Vérification avec le domaine intervalle, dual ou HybridZ, et résumés finaux de BaB | Géométrie au-delà des boîtes d'intervalles |
-| Fuzzing en direct avec contrôles d'exécution et contre-exemples enregistrés | Un vrai fournisseur d'IA (l'assistant utilise un fournisseur déterministe factice) |
-| Bornes d'intervalles enregistrées couche par couche | |
-| Enregistrements d'exécution, diagnostics et export zip | |
-| Changement de branche ACT et gestion des licences Gurobi | |
+| `CERTIFIED` | La propriété est vraie pour toute entrée de la spécification. |
+| `FALSIFIED` | ACT a trouvé un contre-exemple et l'a vérifié sur le modèle concret. |
+| `UNKNOWN` | L'abstraction était trop grossière pour décider, et aucun contre-exemple n'a été trouvé. |
+| `TIMEOUT` | Le budget de temps a été épuisé avant. |
+
+Le fuzzing ne peut que réfuter : une exécution de fuzzing sans contre-exemple se termine en unknown, jamais en certified.
 
 ---
 
-## Suite du parcours
+## Ce que prend en charge ACT {#what-act-supports}
 
-- **[Installation](./installation)** : utilisez l'atelier hébergé, exécutez-le avec Docker ou préparez un checkout de développement.
-- **[Fonctionnement](./how-it-works)** : découvrez comment le navigateur, le service de l'atelier et ACT se répartissent le travail.
-- **[Modes de travail](./modes)** : fuzzing, vérification, BaB, analyse des couches, assistant et enregistrements.
-- **[Configuration](./configuration)** : variables d'environnement, changement de moteur et Gurobi.
-- **[Documentation développeur](/README)** : trouvez le module responsable du comportement à modifier.
+| Domaine | Pris en charge |
+| --- | --- |
+| Entrées | modules PyTorch, réseaux ONNX, propriétés VNN-LIB, paires jeu de données et modèle TorchVision, modèles de texte BERT compacts |
+| Spécifications d'entrée | boîte, boule L∞, polytope linéaire |
+| Propriétés de sortie | robustesse top-1, robustesse avec marge, contraintes linéaires, intervalles de sortie, régions linéaires dangereuses |
+| Couches | couches MLP, CNN, RNN et Transformer |
+| Domaines abstraits | intervalles, HybridZ (zonotopes), dual (relaxation linéaire) |
+| Solveurs | TorchLP, dual, HybridZ, Gurobi MILP/LP (licence requise) |
+| Tests | fuzzing en boîte blanche, validation de la correction des vérificateurs, contrôles de conversion PyTorch ↔ ACT |
+
+---
+
+## Publications {#publications}
+
+- Kaijie Liu and Yulei Sui. [Detecting Unsoundness in Neural Network Verifiers via Concrete–Abstract Consistency](https://openreview.net/forum?id=6vjnMGdx5i). AIware 2026.
+- Guanqin Zhang and Yulei Sui. [Tensor-Based Batch Fuzzing with Adaptive Perturbation Scaling for Deep Neural Networks](https://arxiv.org/abs/2606.25239). ASE 2026.
+
+ACT est distribué sous la licence GNU Affero General Public License v3.0 (AGPL-3.0).
+
+---
+
+## Pour continuer {#whats-next}
+
+- **[Installation](./installation)** : installer ACT, Gurobi et les benchmarks.
+- **[Fonctionnement](./how-it-works)** : les niveaux front-end, back-end et pipeline.
+- **[Vérification et tests](./modes)** : vérification, séparation-évaluation, fuzzing et validation.
+- **[Configuration](./configuration)** : périphériques, fichiers de configuration et options de débogage.
+- **[Documentation développeur](/README)** : le code source de l'atelier en ligne (en anglais).

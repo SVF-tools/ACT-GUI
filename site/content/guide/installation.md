@@ -1,62 +1,75 @@
 # Installation
 
-There are three ways to use ACT-GUI.
+There are two ways to use ACT.
 
 | You want | Use | You need |
 | --- | --- | --- |
-| To try it now | [The hosted workbench](#hosted-workbench) | A browser |
-| Your own server | [Docker](#run-with-docker) | Docker with Compose v2.24+ (and the NVIDIA Container Toolkit for GPU) |
-| To change the code | [Development setup](#development-setup) | Linux, ACT and its conda environment, Node 22+, uv |
+| To try it now | [The online workbench](#online-workbench) | A browser |
+| To run ACT yourself | [A local install](#local-install) | Linux, Miniconda, git (a CUDA GPU is optional) |
 
 ---
 
-## Hosted workbench
+## Online workbench
 
-Open **[app.act-online.au](https://app.act-online.au)**. You do not need to install anything on your machine.
-
----
-
-## Run with Docker
-
-One image contains everything the workbench serves: the browser app, the API, live updates, and a pinned ACT checkout.
-
-```bash
-cp .env.example .env                      # optional settings (port, image tag, Gurobi, AI key)
-scripts/docker_build.sh                   # stage the pinned ACT commit, then docker compose build
-docker compose up -d                      # CPU; open http://127.0.0.1:8080
-docker compose -f compose.yaml -f compose.gpu.yaml up -d      # NVIDIA GPU
-```
-
-- **Port.** The workbench listens on `127.0.0.1:${ACT_GUI_PORT:-8080}` only. If 8080 is taken, set `ACT_GUI_PORT`. To reach it from other machines, put it behind HTTPS and an authentication proxy.
-- **ACT source.** `scripts/docker_build.sh` reads the ACT commit pinned in `fixtures/catalog.json` and fetches it from `$ACT_SOURCE`, which is a local checkout by default or a git URL.
-- **Benchmarks and datasets.** **Load model** builds models from ACT's `data/` and `literature/` directories, and the image does not include them. Mount them read-only with `-f compose.actdata.yaml`. Without them, the catalog still works.
-- **Persistence.** Records, built models and uploaded licenses are kept in the `act-gui-data` volume.
-- **Gurobi (optional).** Upload a `gurobi.lic` in the **Engine** tab, or mount one with `GUROBI_LICENSE_FILE` and `-f compose.gurobi.yaml`. See [Configuration](./configuration#gurobi).
+Open **[app.act-online.au](https://app.act-online.au)**. The workbench runs ACT on its server; you do not need to install anything.
 
 ---
 
-## Development setup
+## Local install
+
+### 1. Create the environment
+
+Install [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install), then clone ACT with its submodules and create the `act-py312` environment (Python 3.12 and PyTorch):
 
 ```bash
-# once
-uv venv --python "$(conda run -n act-py312 which python)" --system-site-packages .venv
-VIRTUAL_ENV=.venv uv pip install -r requirements-dev.txt
-npm install
-
-# run (ACT_ROOT defaults to /data1/guanqin/ACT)
-./scripts/dev.sh
-# then open http://127.0.0.1:5173
+git clone --recursive https://github.com/SVF-tools/ACT.git
+cd ACT
+conda env create -f environment.yml
+conda activate act-py312
 ```
 
-`dev.sh` starts the API service on `127.0.0.1:18765` and the Vite dev server on `127.0.0.1:5173`, which forwards `/api` to the service. Both listen on loopback only. On a remote machine, forward the port with `ssh -L 5173:127.0.0.1:5173 <host>`.
+Run every ACT command from the repository root.
 
-### Checks
+### 2. Gurobi (optional)
+
+Gurobi is only needed for the `gurobi` solver (MILP/LP). Get a [Gurobi license](https://www.gurobi.com/academia/academic-program-and-licenses/) and place it here:
 
 ```bash
-.venv/bin/python -m pytest      # bridge parity against real ACT + service tests
-npm test                        # browser tests (vitest)
-npm run typecheck               # TypeScript
-npm run check:types             # generated wire types match the Python schemas
+cp /path/to/gurobi.lic ./modules/gurobi/gurobi.lic
 ```
+
+Without a license, ACT prints a warning and uses its other solvers.
+
+### 3. Check the install
+
+```bash
+python -m act.back_end --generate --device cpu --dtype float64     # build the example networks
+python -m act.back_end --list-examples                              # list them
+python -m act.back_end --verify --network act/back_end/examples/nets/mlp_plain_3x8_64x64_3962224133.json --device cpu
+```
+
+Each tier has its own command line; `--help` lists every option:
+
+```bash
+python -m act.front_end --help    # datasets, benchmarks and specifications
+python -m act.back_end --help     # verification and example networks
+python -m act.pipeline --help     # fuzzing, validation and conversion tests
+```
+
+### 4. Benchmarks and datasets
+
+ACT downloads benchmarks into its `data/` directory on request.
+
+```bash
+python -m act.front_end --list                  # TorchVision datasets and VNN-LIB categories
+python -m act.front_end --search acas           # search by name
+python -m act.front_end --download acasxu_2023  # ONNX models and VNN-LIB properties
+python -m act.front_end --download MNIST        # dataset and its recommended models
+python -m act.front_end --list-downloads        # what is already downloaded
+```
+
+### 5. Notebooks
+
+The `ipynb/` directory has small demos, including a [fuzzer example](https://github.com/SVF-tools/ACT/blob/main/ipynb/vnnlib_fuzzer.ipynb) and a [verifier example](https://github.com/SVF-tools/ACT/blob/main/ipynb/vnnlib_verifier.ipynb).
 
 Next: [How it works](./how-it-works).

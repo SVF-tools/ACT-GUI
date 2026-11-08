@@ -2,37 +2,37 @@
 layout: home
 
 hero:
-  name: ACT-GUI
-  text: See inside neural network verification
-  tagline: A browser workbench for the ACT verifier. Load a network, fuzz it, verify it, and inspect every bound ACT computes. ACT decides; the workbench shows you why.
+  name: ACT
+  text: Abstract Constraint Transformation
+  tagline: A testing and verification framework for neural networks. Load a model and a specification, search for counterexamples, and prove properties with sound abstract interpretation and branch-and-bound.
   actions:
     - theme: brand
-      text: Open Workbench
-      link: https://app.act-online.au
-    - theme: alt
       text: Get Started
       link: /guide/
     - theme: alt
+      text: Try it online
+      link: https://app.act-online.au
+    - theme: alt
       text: GitHub
-      link: https://github.com/guanqin-123/ACT-GUI
+      link: https://github.com/SVF-tools/ACT
 
 features:
-  - title: Live fuzzing
-    details: Run ACT's fuzzer and watch the original, mutated and difference images update as it searches. Pause, resume, stop or retune the run while it is still running.
-  - title: Verification and BaB
-    details: Run ACT's single-pass verification with the interval, dual or HybridZ domain, or its batched branch-and-bound. The verdict is always ACT's own.
-  - title: Layer-by-layer bounds
-    details: Step through the bounds ACT recorded at each layer, compare them before and after, and project a two-coordinate interval box.
-  - title: Counterexamples you can use
-    details: Every violation ACT accepts is saved with the run and exports as a VNN-COMP witness or an image.
-  - title: Reproducible records
-    details: Each run keeps a manifest, an append-only event log and sha256-sealed artifacts. Export the whole record as a zip.
-  - title: Any ACT branch
-    details: Switch the engine to the pinned baseline or a branch of any ACT fork. Features the active engine cannot support are disabled, with the reason shown.
+  - title: One IR for every model
+    details: PyTorch models, ONNX networks and VNN-LIB properties become one ACT Net, with the input and output specification embedded as layers, so every backend verifies the same thing.
+  - title: Three abstract domains
+    details: Propagate bounds with interval, HybridZ zonotopes or linear-relaxation dual bounds, through MLP, CNN, RNN and Transformer layers.
+  - title: Branch-and-bound
+    details: Refine undecided properties by splitting neurons or inputs, with batched subproblems, several branching heuristics and LP, dual or MILP bounding.
+  - title: Whitebox fuzzing
+    details: ACTFuzzer searches for violations on the GPU with gradient-guided mutations, adaptive perturbation scaling and neuron coverage.
+  - title: Checked counterexamples
+    details: Every counterexample, from fuzzing or verification, is checked on the concrete model against the same input and output specification before it is reported.
+  - title: Verifier validation
+    details: Cross-check verdicts against concrete counterexamples and check that abstract bounds contain every concrete activation, layer by layer.
 ---
 
 <div class="home-demo">
 
-![ACT-GUI fuzzing walkthrough](./fuzzingGuide.gif)
+![ACT fuzzing in the online workbench](./fuzzingGuide.gif)
 
 </div>

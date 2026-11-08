@@ -1,72 +1,102 @@
-# Modes de travail
+# Vérification et tests
 
-Choisissez un mode dans la colonne centrale, définissez ses options et démarrez l'exécution sous la vue du réseau. Tous les modes utilisent le même cycle de vie. Chaque exécution bénéficie donc de la même isolation du worker, des événements en direct, des enregistrements et de l'export.
+ACT peut prouver une propriété, chercher un contre-exemple ou contrôler un autre vérificateur. Chaque tâche a sa propre commande ; toutes acceptent `--device {cpu,cuda,gpu,mps}` et `--dtype {float32,float64}`.
 
-| Mode | Entrée ACT | Verdicts possibles |
+| Tâche | Commande | Résultats possibles |
 | --- | --- | --- |
-| [Fuzzing](#fuzzing) | ACTFuzzer | `falsified` ou `unknown` |
-| [Verification](#verification) | `verify_once` avec intervalle, dual ou HybridZ | Verdict d'ACT |
-| [BaB](#bab) | `verify_bab_batched` | Verdict d'ACT |
+| [Vérification](#verification) | `python -m act.back_end --verify` | certified, falsified, unknown, timeout |
+| [Séparation-évaluation](#branch-and-bound) | `python -m act.back_end --verify --bab` | certified, falsified, unknown, timeout |
+| [Fuzzing](#fuzzing) | `python -m act.pipeline --fuzz` | contre-exemples trouvés, ou aucun |
+| [Exécutions sur benchmark](#benchmark-runs) | `python -m act.pipeline --verify vnnlib` | un résultat par instance |
+| [Validation des vérificateurs](#verifier-validation) | `python -m act.pipeline --verify ... --validate-soundness` | réussite, échec ou non concluant pour chaque contrôle |
+
+---
+
+## Vérification {#verification}
+
+La vérification en une passe propage les bornes une seule fois et décide la propriété à partir d'elles.
+
+```bash
+# un ACT Net d'exemple (--list-examples affiche les noms générés)
+python -m act.back_end --verify --network act/back_end/examples/nets/mlp_plain_3x8_64x64_3962224133.json --device cpu
+
+# un réseau ONNX avec une propriété VNN-LIB ; --save-net conserve le Net vérifié
+python -m act.back_end --verify --onnx model.onnx --vnnlib property.vnnlib \
+  --solver torchlp --save-net verified.json --device cpu --dtype float64
+```
+
+- **`--solver`** choisit le moteur : `torchlp` (LP en PyTorch), `dual`, `hybridz`, `gurobi` (MILP/LP, licence requise) ou `auto`.
+- **`--tf-mode`** choisit la fonction de transfert avant, `interval` ou `hybridz`.
+- **`--timeout`** fixe le budget de temps en secondes.
+- Un fichier VNN-LIB à plusieurs disjonctions est vérifié comme plusieurs Nets : `verified.d0.json`, `verified.d1.json`, etc.
+
+---
+
+## Séparation-évaluation {#branch-and-bound}
+
+La séparation-évaluation (branch-and-bound) raffine une propriété que la vérification en une passe laisse indécise. Elle découpe le problème, borne chaque sous-problème par lots et s'arrête lorsque chaque branche est décidée, qu'un contre-exemple est trouvé ou que le budget est épuisé.
+
+```bash
+python -m act.back_end --verify --network act/back_end/examples/nets/mlp_plain_3x8_64x64_3962224133.json --bab --device cpu
+```
+
+| Option | Valeurs |
+| --- | --- |
+| `--bab-solver-tier` | `lp`, `dual`, `dual_alpha`, `dual_alpha_eta` |
+| `--bab-branching` | le choix de la prochaine découpe, par exemple `babsr`, `fsb`, `gain`, `width` ou `random` |
+| `--bab-bounding` | les sous-problèmes développés en premier, par exemple `greedy` ou `depth_bound_blend` |
+| `--bab-max-depth`, `--bab-max-subproblems` | limites de la recherche |
+
+Les configurations BaB nommées (préréglages) se trouvent dans `act/config/backend.yaml` ; voir [Configuration](./configuration#configuration-files).
 
 ---
 
 ## Fuzzing {#fuzzing}
 
-Le fuzzing recherche des entrées qui violent la spécification. Il ne peut pas prouver qu'il n'en existe aucune.
+ACTFuzzer cherche des entrées qui violent la propriété. Il exécute le modèle concret sur GPU par lots, fait muter les entrées à l'intérieur de la spécification d'entrée et confronte chaque candidate à la propriété de sortie.
 
-- **Options.** Chaque paramètre d'ACTFuzzer apparaît avec la valeur par défaut d'ACT et peut être modifié. Le mode de perturbation est **isotropic**, **anisotropic** ou **fixed**.
-- **Lots.** Pour un modèle partagé, définissez une taille de lot afin de tester plusieurs lignes d'entrée dans une même exécution, ou sélectionnez des entrées précises.
-- **Vue en direct.** Pour les modèles d'images, les images originale, modifiée et différentielle se mettent à jour pendant le fuzzing, avec la progression et la couverture.
-- **Contrôle de l'exécution.** Lorsque le moteur actif le permet, vous pouvez mettre en pause, reprendre ou arrêter un fuzzing en cours, ou modifier ses paramètres. ACT indique si chaque changement a été appliqué ou refusé, et l'enregistrement conserve chaque décision.
-- **Contre-exemples.** Chaque violation acceptée par ACT est enregistrée avec l'exécution. Elle est exportable comme affectation VNN-LIB ou image PNG.
+```bash
+python -m act.pipeline --fuzz --category acasxu_2023 --iterations 5000
+python -m act.pipeline --fuzz --creator torchvision --dataset MNIST
+```
 
----
+- **Mutations.** Cinq stratégies, dosées par `--mutation-weights` : `gradient` (un pas de type FGSM), `pgd` (pas PGD itératifs et projetés), `activation` (à la DeepXplore, cible les neurones peu activés), `boundary` (échantillonne près du bord de la spécification d'entrée) et `random` (bruit gaussien).
+- **Taille des perturbations.** `--perturb-mode adaptive_scalar` (une échelle adaptative), `adaptive_perdim` (une échelle par dimension d'entrée) ou `fixed`, avec `--perturb-scale`.
+- **Couverture.** Les entrées qui activent de nouveaux neurones sont conservées comme graines (`--coverage-strategy`, `--activation-threshold`).
+- **Budget.** `--iterations`, `--timeout` et `--stop-on-first-violation`.
+- **Sortie.** Les contre-exemples et un résumé sont enregistrés dans le répertoire de sortie (`--output` ; `--no-save` pour ne rien enregistrer).
 
-## Verification {#verification}
-
-Lance la vérification en un passage d'ACT avec le domaine abstrait choisi : **interval**, **dual** ou **HybridZ**.
-
-- **Verdict.** La bannière affiche le résultat d'ACT.
-- **Contre-exemple.** Une exécution `falsified` conserve le contre-exemple d'ACT, que vous pouvez exporter comme témoin VNN-COMP ou comme image.
-- **Diagnostics.** Toute exécution qui atteint un worker enregistre les avertissements, les erreurs imprimées par ACT et la chaîne d'exceptions, située à la frame ACT la plus interne. L'historique affiche ces informations et propose un instantané de reproduction : un zip contenant la requête, le réseau ACT, les informations du moteur et `reproduce.py`.
+Le fuzzing ne peut pas prouver une propriété : s'il ne trouve rien, la propriété reste unknown.
 
 ---
 
-## BaB {#bab}
+## Exécutions sur benchmark {#benchmark-runs}
 
-Lance la séparation et évaluation par lots d'ACT, avec le même point d'entrée que la ligne de commande du pipeline ACT.
+Exécutez le vérificateur de bout en bout sur un benchmark téléchargé :
 
-- **Résumé final.** L'onglet BaB affiche le résumé final d'ACT et les données d'observation disponibles pour l'exécution.
-- **Pas encore disponible.** L'arbre de recherche, l'historique des nœuds et leurs contrôles nécessitent des événements de nœuds validés par ACT, que le moteur épinglé ne fournit pas encore. L'atelier ne reconstruit pas l'arbre lui-même.
+```bash
+python -m act.pipeline --download acasxu_2023
+python -m act.pipeline --verify vnnlib --category acasxu_2023 --max-instances 10
+python -m act.pipeline --verify torchvision --dataset MNIST
+```
 
----
-
-## Analyse des couches
-
-Après une exécution, parcourez les bornes d'intervalle enregistrées par ACT pour chaque couche.
-
-- Comparez les bornes d'une couche avant et après son traitement et sélectionnez des valeurs individuelles.
-- Projetez une boîte d'intervalle à deux coordonnées.
-- La vue affiche uniquement les données enregistrées. Elle ne recalcule jamais les bornes dans le navigateur.
+`--tf-modes` et `--solvers` choisissent le domaine et le solveur ; une exécution utilise la première valeur de chacun.
 
 ---
 
-## Assistant
+## Validation des vérificateurs {#verifier-validation}
 
-Posez une question sur la sélection actuelle, par exemple un modèle, une exécution, une couche ou une valeur. L'assistant fige ce contexte, recueille des preuves typées par l'intermédiaire des mêmes services que les vues et répond avec des citations cliquables pour accéder à l'objet cité.
+La validation contrôle qu'un vérificateur est correct et numériquement juste, sur les réseaux d'exemple générés par ACT ou sur un benchmark.
 
-Le fournisseur actuel est un espace réservé déterministe. Aucun véritable modèle de langage n'est encore connecté.
+```bash
+python -m act.pipeline --verify netfactory --validate-soundness --device cpu --dtype float64
+python -m act.pipeline --verify netfactory --validate-soundness --tf-modes interval --solvers torchlp
+python -m act.pipeline --verify vnnlib --category acasxu_2023 --validate-soundness
+```
 
----
+1. **Niveau 1 : correction.** Des contre-exemples concrets sont confrontés au verdict de chaque solveur. Un résultat `CERTIFIED` en présence d'un vrai contre-exemple est un défaut de correction.
+2. **Niveau 2 : précision numérique.** Des entrées échantillonnées traversent le modèle concret, et les bornes abstraites de chaque couche doivent contenir les activations concrètes.
 
-## Enregistrements et export
-
-Chaque exécution conserve :
-
-- un **manifeste** immuable avec la requête et l'instantané du moteur ;
-- un **journal d'événements** en ajout seul, rejoué lors de la reconnexion du navigateur ;
-- des **artefacts scellés**, chacun vérifié par son hash sha256 à chaque lecture.
-
-L'onglet **Records** affiche la provenance et les hash. **Export** télécharge l'enregistrement complet dans un fichier zip sans chemins absolus du serveur.
+`--verify torch2act` et `--verify act2torch` contrôlent les conversions entre modèles PyTorch et ACT Nets.
 
 Suite : [Configuration](./configuration).

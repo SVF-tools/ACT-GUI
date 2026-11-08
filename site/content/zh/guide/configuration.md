@@ -1,57 +1,69 @@
 # 配置
 
-所有设置都是可选的。Docker Compose 从 `.env` 读取这些设置。开发时，请在运行 `scripts/dev.sh` 前导出它们。
+每项设置都有默认值。只影响一次运行时在命令行修改；影响所有运行时在配置文件中修改。
 
-## 环境变量
+**优先级：** 命令行参数 > 环境变量 > BaB 预设 > 配置文件 > 代码默认值。
 
-### 服务
+## 设备与精度 {#device-and-precision}
 
-| 变量 | 默认值 | 含义 |
+三个命令行都接受同样的两个选项。
+
+| 选项 | 取值 | 默认值 |
 | --- | --- | --- |
-| `ACT_GUI_PORT` | `8080` | 容器的主机端口，仅绑定到 `127.0.0.1`。 |
-| `ACT_GUI_IMAGE` | `act-gui:0.1.0` | 要构建或运行的镜像名称和标签。 |
-| `ACT_GUI_DEVICE` | `cpu` | 运行使用的 Torch 设备。`compose.gpu.yaml` 设置为 `cuda`。运行结果会记录 ACT 实际使用的设备。 |
-| `ACT_GUI_RECORDS` | `var/records`（Docker 中为 `/data/records`） | 运行记录的根目录。 |
-| `ACT_GUI_MODELS` | 与记录根目录相邻 | 构建模型的内容寻址存储。 |
-| `ACT_GUI_ENGINES` | 与记录根目录相邻 | 导入的 ACT 分支代码库和当前引擎选择。 |
-| `ACT_GUI_SECRETS` | Docker 中为 `/data/secrets` | 服务器端存储上传的许可证。 |
+| `--device` | `cpu`、`cuda`（或 `gpu`）、`mps` | 有 CUDA GPU 时使用 GPU，否则 `cpu` |
+| `--dtype` | `float32`、`float64` | `float32` |
 
-### ACT 引擎
-
-| 变量 | 默认值 | 含义 |
-| --- | --- | --- |
-| `ACT_ROOT` | `/data1/guanqin/ACT`（Docker 中为 `/opt/act`） | 基线 ACT 代码库。目录网络、`data/` 和 `literature/` 从这里读取。 |
-| `ACT_GUI_ACT_REMOTES` | GitHub 上的 SVF-tools 和 guanqin-123 | 预配置的 ACT 仓库，格式为 `name=url,...`，用于切换分支。 |
-| `ACT_GUI_ALLOW_CUSTOM_REMOTES` | `1` | 设置为 `0` 可禁止用户输入其他仓库 URL。 |
-
-### 构建
-
-| 变量 | 默认值 | 含义 |
-| --- | --- | --- |
-| `ACT_SOURCE` | 本地 ACT 代码库 | `scripts/docker_build.sh` 获取固定提交的位置，可以是路径或 git URL。 |
-| `ACT_NETS_FROM` | `$ACT_ROOT` | 构建复制目录网络的位置，每个网络都必须匹配固定的 sha256。 |
-| `ACT_DATA_FROM` | `$ACT_ROOT` | `compose.actdata.yaml` 使用的 `data/` 和 `literature/` 主机源目录。 |
-| `GUROBIPY_VERSION` | `13.0.0` | 镜像中安装的 gurobipy 版本，应与许可证主版本匹配。 |
-| `GUROBI_LICENSE_FILE` | 空 | 与 `compose.gurobi.yaml` 一起使用的 `gurobi.lic` 主机路径。 |
+需要严格的数值一致性时（例如验证器校验）请使用 `float64`。环境变量 `ACT_DEVICE`、`ACT_DTYPE` 和 `ACT_SOLVER` 为所有后端运行设置相同的值。
 
 ---
 
-## 切换 ACT 引擎
+## 配置文件 {#configuration-files}
 
-**Engine** 标签页用于选择工作台导入的 ACT 代码，可以是固定基线，也可以是任意 ACT 派生仓库的分支头。选择预配置仓库，或输入 `https` URL。
+默认值位于 `act/config/`。
 
-- 切换会重启服务，因为 ACT 无法在运行中的进程里重新导入。
-- 工作台会根据所选引擎提供的 API 检查每项功能。不支持的功能会被禁用，并显示原因。
-- 新引擎无法加载的构建模型会标记为 **needs rebuild**，并可根据已记录的设置重新构建。
-- 输入 URL 会在服务器上运行该仓库的代码。公开部署需要访问控制，或将 `ACT_GUI_ALLOW_CUSTOM_REMOTES` 设置为 `0`。
+| 文件 | 配置内容 |
+| --- | --- |
+| `backend.yaml` | 验证：求解器级联，TorchLP、Gurobi、HybridZ 和对偶设置，分支定界，以及命名的 BaB 预设（`bab_presets`，用 `backend.bab_preset` 选择） |
+| `pipeline.yaml` | 模糊测试（迭代次数、时间预算、变异权重、扰动模式、覆盖率）、基准验证和校验 |
+| `frontend.yaml` | 规约创建：epsilon、间隔、输入和输出类型，以及文本验证 |
+| `gen_act_net.yaml` | 生成的示例网络的结构 |
+
+例如 `pipeline.yaml` 中的模糊测试默认值：
+
+```yaml
+fuzzing:
+  max_iterations: 10000
+  timeout_seconds: 3600.0
+  perturb_mode: "adaptive_scalar"
+  perturb_scale: 0.1
+```
 
 ---
 
 ## Gurobi {#gurobi}
 
-gurobipy 安装在镜像中，但镜像中从不包含许可证。
+`gurobi` 求解器需要位于 `modules/gurobi/gurobi.lic` 的许可证。ACT 会自动在这里查找；没有许可证时，ACT 会打印警告，其他求解器照常可用。学术许可证可以从 [Gurobi](https://www.gurobi.com/academia/academic-program-and-licenses/) 免费申请。
 
-- **上传。** 在 **Engine** 标签页上传 `gurobi.lic`。文件会以仅所有者可读的权限存储在服务器端，并传给每个运行工作进程。API 不会返回其内容。
-- **挂载。** 设置 `GUROBI_LICENSE_FILE` 并添加 `-f compose.gurobi.yaml`。上传的许可证优先于挂载的许可证。
-- Engine 标签页显示 Gurobi 自己的许可证检查结果。WLS 和令牌服务器许可证可以在容器中使用。绑定主机的许可证（命名用户或学术许可证）通常无法使用。
-- 当前的 interval 和 BaB 方法不会调用 Gurobi，因此许可证不会改变当前结论。
+---
+
+## 路径与日志 {#paths-and-logs}
+
+| 路径 | 内容 |
+| --- | --- |
+| `data/` | 下载的基准、数据集和模型 |
+| `act/back_end/examples/nets/` | 生成的示例 ACT Net |
+| `act/pipeline/log/` | 运行日志、模糊测试结果和传递函数调试日志 |
+
+---
+
+## 调试选项 {#debugging-options}
+
+`PerformanceOptions`（`act/util/options.py`）保存全局调试开关，供从 Python 调用 ACT 的脚本使用。
+
+| 开关 | 默认值 | 作用 |
+| --- | --- | --- |
+| `debug_tf` | `True` | 把每一层的上下界和约束记录到 `act/pipeline/log/act_debug_tf.log` |
+| `debug_tf_max_constraints` | `50` | 每层记录的约束数 |
+| `validate_constraints` | `True` | 检查每个传递函数生成的约束 |
+
+调试日志在每次运行时追加写入，不会轮转。长时间或大规模运行时请关闭 `debug_tf`，否则日志可能写满磁盘。

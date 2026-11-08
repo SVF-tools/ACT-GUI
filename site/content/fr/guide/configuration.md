@@ -1,57 +1,69 @@
 # Configuration
 
-Tous les paramètres sont facultatifs. Docker Compose les lit depuis `.env`. En développement, exportez-les avant d'exécuter `scripts/dev.sh`.
+Chaque réglage a une valeur par défaut. Modifiez-le en ligne de commande pour une seule exécution, ou dans un fichier de configuration pour toutes.
 
-## Variables d'environnement
+**Priorité :** option de ligne de commande > variable d'environnement > préréglage BaB > fichier de configuration > valeur par défaut du code.
 
-### Service
+## Périphérique et précision {#device-and-precision}
 
-| Variable | Valeur par défaut | Signification |
+Les trois lignes de commande acceptent les deux mêmes options.
+
+| Option | Valeurs | Par défaut |
 | --- | --- | --- |
-| `ACT_GUI_PORT` | `8080` | Port hôte du conteneur, lié uniquement à `127.0.0.1`. |
-| `ACT_GUI_IMAGE` | `act-gui:0.1.0` | Nom et tag de l'image à construire ou à exécuter. |
-| `ACT_GUI_DEVICE` | `cpu` | Appareil Torch utilisé pour les exécutions. `compose.gpu.yaml` définit `cuda`. Le résultat enregistre l'appareil réellement utilisé par ACT. |
-| `ACT_GUI_RECORDS` | `var/records` (`/data/records` dans Docker) | Répertoire racine des enregistrements. |
-| `ACT_GUI_MODELS` | À côté de la racine des enregistrements | Stockage adressé par contenu des modèles construits. |
-| `ACT_GUI_ENGINES` | À côté de la racine des enregistrements | Checkouts des branches ACT importées et sélection du moteur actif. |
-| `ACT_GUI_SECRETS` | `/data/secrets` dans Docker | Stockage côté serveur des licences importées. |
+| `--device` | `cpu`, `cuda` (ou `gpu`), `mps` | un GPU CUDA s'il y en a un, sinon `cpu` |
+| `--dtype` | `float32`, `float64` | `float32` |
 
-### Moteur ACT
-
-| Variable | Valeur par défaut | Signification |
-| --- | --- | --- |
-| `ACT_ROOT` | `/data1/guanqin/ACT` (`/opt/act` dans Docker) | Checkout ACT de référence. Les réseaux du catalogue, `data/` et `literature/` sont lus ici. |
-| `ACT_GUI_ACT_REMOTES` | SVF-tools et guanqin-123 sur GitHub | Dépôts ACT préconfigurés pour changer de branche, au format `name=url,...`. |
-| `ACT_GUI_ALLOW_CUSTOM_REMOTES` | `1` | Définissez `0` pour empêcher la saisie d'autres URL de dépôts. |
-
-### Construction
-
-| Variable | Valeur par défaut | Signification |
-| --- | --- | --- |
-| `ACT_SOURCE` | Le checkout ACT local | Emplacement depuis lequel `scripts/docker_build.sh` récupère le commit épinglé, sous forme de chemin ou d'URL git. |
-| `ACT_NETS_FROM` | `$ACT_ROOT` | Source depuis laquelle la construction copie les réseaux du catalogue, chacun devant correspondre à son sha256 épinglé. |
-| `ACT_DATA_FROM` | `$ACT_ROOT` | Source hôte de `data/` et `literature/` pour `compose.actdata.yaml`. |
-| `GUROBIPY_VERSION` | `13.0.0` | Version de gurobipy installée dans l'image, à faire correspondre à la version majeure de la licence. |
-| `GUROBI_LICENSE_FILE` | Vide | Chemin hôte de `gurobi.lic`, utilisé avec `compose.gurobi.yaml`. |
+Utilisez `float64` lorsque vous avez besoin d'un accord numérique serré, par exemple pour la validation des vérificateurs. Les variables d'environnement `ACT_DEVICE`, `ACT_DTYPE` et `ACT_SOLVER` fixent les mêmes valeurs pour toutes les exécutions du back-end.
 
 ---
 
-## Changer de moteur ACT
+## Fichiers de configuration {#configuration-files}
 
-L'onglet **Engine** choisit le code ACT importé par l'atelier : la base épinglée ou la tête d'une branche de n'importe quel fork d'ACT. Choisissez un dépôt préconfiguré ou saisissez une URL `https`.
+Les valeurs par défaut se trouvent dans `act/config/`.
 
-- Un changement redémarre le service, car ACT ne peut pas être réimporté dans un processus en cours.
-- L'atelier vérifie chaque fonction par rapport aux API fournies par le moteur sélectionné. Les fonctions non prises en charge sont désactivées et leur raison est affichée.
-- Un modèle construit que le nouveau moteur ne peut pas charger est marqué **needs rebuild** et peut être reconstruit à partir de ses paramètres enregistrés.
-- La saisie d'une URL exécute le code de ce dépôt sur le serveur. Un déploiement public nécessite un contrôle d'accès, ou `ACT_GUI_ALLOW_CUSTOM_REMOTES=0`.
+| Fichier | Configure |
+| --- | --- |
+| `backend.yaml` | La vérification : la cascade de solveurs, les réglages TorchLP, Gurobi, HybridZ et dual, la séparation-évaluation et les préréglages BaB nommés (`bab_presets`, choisis par `backend.bab_preset`) |
+| `pipeline.yaml` | Le fuzzing (itérations, budget de temps, poids des mutations, mode de perturbation, couverture), la vérification sur benchmark et la validation |
+| `frontend.yaml` | La création de spécifications : epsilons, marges, types d'entrée et de sortie, et vérification de texte |
+| `gen_act_net.yaml` | Les architectures des réseaux d'exemple générés |
+
+Par exemple, les valeurs par défaut du fuzzing dans `pipeline.yaml` :
+
+```yaml
+fuzzing:
+  max_iterations: 10000
+  timeout_seconds: 3600.0
+  perturb_mode: "adaptive_scalar"
+  perturb_scale: 0.1
+```
 
 ---
 
 ## Gurobi {#gurobi}
 
-gurobipy est installé dans l'image, mais une licence n'y est jamais incluse.
+Le solveur `gurobi` a besoin d'une licence dans `modules/gurobi/gurobi.lic`. ACT l'y trouve automatiquement ; sans elle, ACT affiche un avertissement et les autres solveurs fonctionnent toujours. Les licences académiques sont gratuites chez [Gurobi](https://www.gurobi.com/academia/academic-program-and-licenses/).
 
-- **Importer.** Importez `gurobi.lic` dans l'onglet **Engine**. Il est stocké côté serveur avec des permissions réservées au propriétaire et transmis à chaque worker d'exécution. L'API ne renvoie jamais son contenu.
-- **Monter.** Définissez `GUROBI_LICENSE_FILE` et ajoutez `-f compose.gurobi.yaml`. Une licence importée est prioritaire sur une licence montée.
-- L'onglet Engine affiche le contrôle de licence propre à Gurobi. Les licences WLS et de serveur de jetons fonctionnent dans les conteneurs. Les licences liées à l'hôte, telles que les licences utilisateur nommé ou académiques, échouent généralement.
-- Les méthodes intervalle et BaB actuelles n'appellent pas Gurobi. Une licence ne change donc aucun verdict actuel.
+---
+
+## Chemins et journaux {#paths-and-logs}
+
+| Chemin | Contenu |
+| --- | --- |
+| `data/` | Benchmarks, jeux de données et modèles téléchargés |
+| `act/back_end/examples/nets/` | ACT Nets d'exemple générés |
+| `act/pipeline/log/` | Journaux d'exécution, résultats de fuzzing et journal de débogage des fonctions de transfert |
+
+---
+
+## Options de débogage {#debugging-options}
+
+`PerformanceOptions` (`act/util/options.py`) regroupe les indicateurs globaux de débogage pour les scripts qui appellent ACT depuis Python.
+
+| Indicateur | Par défaut | Effet |
+| --- | --- | --- |
+| `debug_tf` | `True` | Journalise les bornes et contraintes de chaque couche dans `act/pipeline/log/act_debug_tf.log` |
+| `debug_tf_max_constraints` | `50` | Nombre de contraintes journalisées par couche |
+| `validate_constraints` | `True` | Contrôle les contraintes produites par chaque fonction de transfert |
+
+Le journal de débogage est complété à chaque exécution et n'est jamais tourné. Désactivez `debug_tf` pour les exécutions longues ou volumineuses, sinon le journal peut remplir le disque.

@@ -1,62 +1,75 @@
 # Installation
 
-ACT-GUI peut être utilisé de trois façons.
+Il y a deux façons d'utiliser ACT.
 
-| Objectif | Utiliser | Pré-requis |
+| Vous voulez | Utilisez | Il vous faut |
 | --- | --- | --- |
-| L'essayer maintenant | [Atelier hébergé](#hosted-workbench) | Un navigateur |
-| Votre propre serveur | [Docker](#run-with-docker) | Docker avec Compose v2.24+ (et le NVIDIA Container Toolkit pour le GPU) |
-| Modifier le code | [Configuration de développement](#development-setup) | Linux, ACT et son environnement conda, Node 22+, uv |
+| Essayer tout de suite | [L'atelier en ligne](#online-workbench) | Un navigateur |
+| Exécuter ACT vous-même | [Une installation locale](#local-install) | Linux, Miniconda, git (GPU CUDA facultatif) |
 
 ---
 
-## Atelier hébergé {#hosted-workbench}
+## Atelier en ligne {#online-workbench}
 
-Ouvrez **[app.act-online.au](https://app.act-online.au)**. Rien n'a besoin d'être installé sur votre machine.
-
----
-
-## Exécuter avec Docker {#run-with-docker}
-
-Une image contient tout ce que l'atelier sert : l'application du navigateur, l'API, les mises à jour en direct et un checkout ACT épinglé.
-
-```bash
-cp .env.example .env                      # optional settings (port, image tag, Gurobi, AI key)
-scripts/docker_build.sh                   # stage the pinned ACT commit, then docker compose build
-docker compose up -d                      # CPU; open http://127.0.0.1:8080
-docker compose -f compose.yaml -f compose.gpu.yaml up -d      # NVIDIA GPU
-```
-
-- **Port.** L'atelier écoute uniquement sur `127.0.0.1:${ACT_GUI_PORT:-8080}`. Si le port 8080 est déjà utilisé, définissez `ACT_GUI_PORT`. Pour y accéder depuis d'autres machines, placez-le derrière HTTPS et un proxy d'authentification.
-- **Source ACT.** `scripts/docker_build.sh` lit le commit ACT épinglé dans `fixtures/catalog.json` et le récupère depuis `$ACT_SOURCE`, qui est par défaut un checkout local ou peut être une URL git.
-- **Benchmarks et jeux de données.** **Load model** construit les modèles depuis les répertoires `data/` et `literature/` d'ACT, qui ne sont pas inclus dans l'image. Montez-les en lecture seule avec `-f compose.actdata.yaml`. Sans eux, le catalogue reste fonctionnel.
-- **Persistance.** Les enregistrements, les modèles construits et les licences importées sont conservés dans le volume `act-gui-data`.
-- **Gurobi (facultatif).** Importez `gurobi.lic` dans l'onglet **Engine**, ou montez-le avec `GUROBI_LICENSE_FILE` et `-f compose.gurobi.yaml`. Consultez la [configuration](./configuration#gurobi).
+Ouvrez **[app.act-online.au](https://app.act-online.au)**. L'atelier exécute ACT sur son serveur ; vous n'avez rien à installer.
 
 ---
 
-## Configuration de développement {#development-setup}
+## Installation locale {#local-install}
+
+### 1. Créer l'environnement {#_1-create-the-environment}
+
+Installez [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install), puis clonez ACT avec ses sous-modules et créez l'environnement `act-py312` (Python 3.12 et PyTorch) :
 
 ```bash
-# once
-uv venv --python "$(conda run -n act-py312 which python)" --system-site-packages .venv
-VIRTUAL_ENV=.venv uv pip install -r requirements-dev.txt
-npm install
-
-# run (ACT_ROOT defaults to /data1/guanqin/ACT)
-./scripts/dev.sh
-# then open http://127.0.0.1:5173
+git clone --recursive https://github.com/SVF-tools/ACT.git
+cd ACT
+conda env create -f environment.yml
+conda activate act-py312
 ```
 
-`dev.sh` démarre le service API sur `127.0.0.1:18765` et le serveur de développement Vite sur `127.0.0.1:5173`, qui transmet `/api` au service. Les deux n'écoutent que sur l'interface locale. Sur une machine distante, transférez le port avec `ssh -L 5173:127.0.0.1:5173 <host>`.
+Lancez toutes les commandes ACT depuis la racine du dépôt.
 
-### Vérifications
+### 2. Gurobi (facultatif) {#_2-gurobi-optional}
+
+Gurobi n'est nécessaire que pour le solveur `gurobi` (MILP/LP). Obtenez une [licence Gurobi](https://www.gurobi.com/academia/academic-program-and-licenses/) et placez-la ici :
 
 ```bash
-.venv/bin/python -m pytest      # bridge parity against real ACT + service tests
-npm test                        # browser tests (vitest)
-npm run typecheck               # TypeScript
-npm run check:types             # generated wire types match the Python schemas
+cp /path/to/gurobi.lic ./modules/gurobi/gurobi.lic
 ```
+
+Sans licence, ACT affiche un avertissement et utilise ses autres solveurs.
+
+### 3. Vérifier l'installation {#_3-check-the-install}
+
+```bash
+python -m act.back_end --generate --device cpu --dtype float64     # génère les réseaux d'exemple
+python -m act.back_end --list-examples                              # les liste
+python -m act.back_end --verify --network act/back_end/examples/nets/mlp_plain_3x8_64x64_3962224133.json --device cpu
+```
+
+Chaque niveau a sa propre ligne de commande ; `--help` liste toutes les options :
+
+```bash
+python -m act.front_end --help    # jeux de données, benchmarks et spécifications
+python -m act.back_end --help     # vérification et réseaux d'exemple
+python -m act.pipeline --help     # fuzzing, validation et tests de conversion
+```
+
+### 4. Benchmarks et jeux de données {#_4-benchmarks-and-datasets}
+
+ACT télécharge les benchmarks dans son répertoire `data/` à la demande.
+
+```bash
+python -m act.front_end --list                  # jeux de données TorchVision et catégories VNN-LIB
+python -m act.front_end --search acas           # recherche par nom
+python -m act.front_end --download acasxu_2023  # modèles ONNX et propriétés VNN-LIB
+python -m act.front_end --download MNIST        # jeu de données et ses modèles recommandés
+python -m act.front_end --list-downloads        # ce qui est déjà téléchargé
+```
+
+### 5. Notebooks {#_5-notebooks}
+
+Le répertoire `ipynb/` contient de petites démonstrations, dont un [exemple de fuzzer](https://github.com/SVF-tools/ACT/blob/main/ipynb/vnnlib_fuzzer.ipynb) et un [exemple de vérificateur](https://github.com/SVF-tools/ACT/blob/main/ipynb/vnnlib_verifier.ipynb).
 
 Suite : [Fonctionnement](./how-it-works).

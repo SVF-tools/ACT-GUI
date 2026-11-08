@@ -1,62 +1,75 @@
 # 安装
 
-ACT-GUI 有三种使用方式。
+使用 ACT 有两种方式。
 
-| 你的目标 | 使用方式 | 所需条件 |
+| 你想要 | 使用 | 你需要 |
 | --- | --- | --- |
-| 立即试用 | [托管工作台](#hosted-workbench) | 浏览器 |
-| 使用自己的服务器 | [Docker](#run-with-docker) | Docker 与 Compose v2.24+（GPU 还需要 NVIDIA Container Toolkit） |
-| 修改代码 | [开发环境](#development-setup) | Linux、ACT 及其 conda 环境、Node 22+、uv |
+| 立即试用 | [在线工作台](#online-workbench) | 浏览器 |
+| 自己运行 ACT | [本地安装](#local-install) | Linux、Miniconda、git（CUDA GPU 可选） |
 
 ---
 
-## 托管工作台 {#hosted-workbench}
+## 在线工作台 {#online-workbench}
 
-打开 **[app.act-online.au](https://app.act-online.au)**。无需在本机安装任何软件。
-
----
-
-## 使用 Docker 运行 {#run-with-docker}
-
-一个镜像包含工作台提供的全部内容：浏览器应用、API、实时更新和固定版本的 ACT 代码库。
-
-```bash
-cp .env.example .env                      # optional settings (port, image tag, Gurobi, AI key)
-scripts/docker_build.sh                   # stage the pinned ACT commit, then docker compose build
-docker compose up -d                      # CPU; open http://127.0.0.1:8080
-docker compose -f compose.yaml -f compose.gpu.yaml up -d      # NVIDIA GPU
-```
-
-- **端口。** 工作台只监听 `127.0.0.1:${ACT_GUI_PORT:-8080}`。如果 8080 已被占用，请设置 `ACT_GUI_PORT`。如需从其他机器访问，请将其置于 HTTPS 和身份验证代理之后。
-- **ACT 源码。** `scripts/docker_build.sh` 读取 `fixtures/catalog.json` 中固定的 ACT 提交，并从 `$ACT_SOURCE` 获取。默认值是本地代码库，也可以是 git URL。
-- **基准和数据集。** **Load model** 从 ACT 的 `data/` 和 `literature/` 目录构建模型，镜像不包含这些目录。使用 `-f compose.actdata.yaml` 以只读方式挂载。没有这些目录时，目录模型仍可使用。
-- **持久化。** 记录、构建的模型和上传的许可证保存在 `act-gui-data` 卷中。
-- **Gurobi（可选）。** 在 **Engine** 标签页上传 `gurobi.lic`，或设置 `GUROBI_LICENSE_FILE` 并添加 `-f compose.gurobi.yaml`。参阅[配置](./configuration#gurobi)。
+打开 **[app.act-online.au](https://app.act-online.au)**。工作台在服务器上运行 ACT，你不需要安装任何东西。
 
 ---
 
-## 开发环境 {#development-setup}
+## 本地安装 {#local-install}
+
+### 1. 创建环境
+
+安装 [Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install)，然后连同子模块一起克隆 ACT，并创建 `act-py312` 环境（Python 3.12 和 PyTorch）：
 
 ```bash
-# once
-uv venv --python "$(conda run -n act-py312 which python)" --system-site-packages .venv
-VIRTUAL_ENV=.venv uv pip install -r requirements-dev.txt
-npm install
-
-# run (ACT_ROOT defaults to /data1/guanqin/ACT)
-./scripts/dev.sh
-# then open http://127.0.0.1:5173
+git clone --recursive https://github.com/SVF-tools/ACT.git
+cd ACT
+conda env create -f environment.yml
+conda activate act-py312
 ```
 
-`dev.sh` 在 `127.0.0.1:18765` 启动 API 服务，在 `127.0.0.1:5173` 启动 Vite 开发服务器，并将 `/api` 转发到服务。两者都只监听回环地址。在远程机器上，可使用 `ssh -L 5173:127.0.0.1:5173 <host>` 转发端口。
+所有 ACT 命令都在仓库根目录运行。
 
-### 检查
+### 2. Gurobi（可选）
+
+只有 `gurobi` 求解器（MILP/LP）需要 Gurobi。申请 [Gurobi 许可证](https://www.gurobi.com/academia/academic-program-and-licenses/)，然后放到这里：
 
 ```bash
-.venv/bin/python -m pytest      # bridge parity against real ACT + service tests
-npm test                        # browser tests (vitest)
-npm run typecheck               # TypeScript
-npm run check:types             # generated wire types match the Python schemas
+cp /path/to/gurobi.lic ./modules/gurobi/gurobi.lic
 ```
+
+没有许可证时，ACT 会打印警告，并使用其他求解器。
+
+### 3. 检查安装
+
+```bash
+python -m act.back_end --generate --device cpu --dtype float64     # 生成示例网络
+python -m act.back_end --list-examples                              # 列出示例网络
+python -m act.back_end --verify --network act/back_end/examples/nets/mlp_plain_3x8_64x64_3962224133.json --device cpu
+```
+
+每一层都有自己的命令行，`--help` 会列出全部选项：
+
+```bash
+python -m act.front_end --help    # 数据集、基准和规约
+python -m act.back_end --help     # 验证和示例网络
+python -m act.pipeline --help     # 模糊测试、校验和转换测试
+```
+
+### 4. 基准和数据集
+
+ACT 按需把基准下载到 `data/` 目录。
+
+```bash
+python -m act.front_end --list                  # TorchVision 数据集和 VNN-LIB 类别
+python -m act.front_end --search acas           # 按名称搜索
+python -m act.front_end --download acasxu_2023  # ONNX 模型和 VNN-LIB 性质
+python -m act.front_end --download MNIST        # 数据集及其推荐模型
+python -m act.front_end --list-downloads        # 已下载的内容
+```
+
+### 5. Notebook 示例
+
+`ipynb/` 目录有一些小型演示，包括一个[模糊测试示例](https://github.com/SVF-tools/ACT/blob/main/ipynb/vnnlib_fuzzer.ipynb)和一个[验证器示例](https://github.com/SVF-tools/ACT/blob/main/ipynb/vnnlib_verifier.ipynb)。
 
 下一步：[工作原理](./how-it-works)。

@@ -98,6 +98,8 @@ The **Load model** panel builds models from ACT's git-ignored `data/` (VNN-LIB b
 
 Gurobi is optional; the image contains gurobipy (`GUROBIPY_VERSION`) but never a license. Either upload your `gurobi.lic` in the **Engine** tab, or mount it with `GUROBI_LICENSE_FILE=/path/to/gurobi.lic` in `.env` and `-f compose.gurobi.yaml`. The Engine tab shows Gurobi's own license check. WLS and token-server licenses work in containers; host-bound (named-user/academic) licenses usually do not. The current interval and BaB methods do not call Gurobi.
 
+Other settings (all optional, read from `.env` by Compose or from the environment by `dev.sh`): `ACT_GUI_IMAGE` (image tag, default `act-gui:0.1.0`), `ACT_GUI_ENGINES` (imported ACT branch checkouts and the active engine selection, next to the records root by default), `ACT_GUI_SECRETS` (uploaded licenses, `/data/secrets` in Docker), `ACT_GUI_ACT_REMOTES` (preconfigured ACT repositories for branch switching, `name=url,...`), and `ACT_GUI_ALLOW_CUSTOM_REMOTES` (`0` stops users from entering other repository URLs; entering a URL runs that repository's code on the server, so a public deployment needs access control or `0`). Engine switching is described in [visual_bench/engine](visual_bench/engine/README.md).
+
 Checks:
 
 ```bash

@@ -2,13 +2,13 @@
 
 [Project task chooser](../README.md#choose-a-development-task) → **website**.
 
-This directory builds the public ACT-GUI website (product overview, user guide and developer docs) with [VitePress](https://vitepress.dev). It is static, has its own `package.json`, and shares no code or dependencies with the workbench. The hosted site is served at `act-online.au`, and the workbench is served at `app.act-online.au`.
+This directory builds the public ACT website with [VitePress](https://vitepress.dev): the home page and the user guide introduce ACT itself (installation, architecture, verification, fuzzing, validation and configuration, based on ACT's own README and CLIs), and the developer docs are this repository's ACT-GUI documentation. It is static, has its own `package.json`, and shares no code or dependencies with the workbench. The hosted site is served at `act-online.au`, and the workbench is served at `app.act-online.au`.
 
 ## Change Guide
 
 | Goal | Edit |
 | --- | --- |
-| Change the home page or a user guide page | `content/index.md`, `content/guide/*.md`, and the same page under `content/zh/` and `content/fr/` |
+| Change the home page or a user guide page | `content/index.md`, `content/guide/*.md`, and the same page under `content/zh/` and `content/fr/`; check ACT commands against the ACT CLI (`--help`) on upstream `main` |
 | Change navigation, sidebar, languages or the workbench link | [.vitepress/config.mts](.vitepress/config.mts) |
 | Change a developer page | The original file in the repository (for example `docs/design.md`). The site copies it at build time. |
 | Publish another repository Markdown file | `SOURCES` in [sync-docs.mjs](sync-docs.mjs) and the developer sidebar in the config |

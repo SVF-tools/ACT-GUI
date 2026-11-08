@@ -1,50 +1,62 @@
 # How it works
 
-ACT-GUI is one product split into two areas by responsibility. A separate ACT engine sits beneath them.
+ACT has three tiers. The front-end turns models, data and properties into verification tasks. The back-end verifies them. The pipeline connects the two and tests them.
 
 ```mermaid
 flowchart TB
-  B["Browser<br/>React views"] -->|"HTTP queries and commands"| VB["visual_bench<br/>workbench service"]
-  VB -->|"Live events (SSE)"| B
-  VB -->|"One worker process per run"| EB["engine_bridge<br/>ACT adaptation"]
-  EB -->|"Invokes existing capability"| ACT["ACT<br/>scientific computation"]
-  ACT -->|"Results and evidence"| EB
-  EB -->|"Neutral contracts"| VB
-  VB -->|"Sealed records"| R["Run records"]
+  In["PyTorch, ONNX, VNN-LIB,<br/>TorchVision, BERT"] -->|"spec creators"| FE["Front-end<br/>specs and wrapped models"]
+  FE -->|"torch2act"| Net["ACT Net<br/>with INPUT_SPEC and ASSERT layers"]
+  Net --> BE["Back-end<br/>transfer functions, solvers, BaB"]
+  BE -->|"verdict and bounds"| Out["CERTIFIED, FALSIFIED,<br/>UNKNOWN, TIMEOUT"]
+  FE -->|"concrete model"| FZ["Pipeline<br/>ACTFuzzer, validation"]
+  FZ -->|"checked counterexamples"| Out
 ```
 
-| Layer | Owns | Never does |
+| Tier | Owns | Command line |
 | --- | --- | --- |
-| **visual_bench** | Browser views, application services, run workers, records, the assistant | Import ACT |
-| **engine_bridge** | ACT version and capability checks, ACT calls, converting results to neutral data | Serve HTTP, hold UI state, schedule runs |
-| **ACT** | Algorithms, bounds, verdicts | Know about the GUI |
+| **Front-end** (`act/front_end`) | Spec creators for VNN-LIB, TorchVision and BERT; input and output specifications; verifiable model wrappers; model synthesis | `python -m act.front_end` |
+| **Back-end** (`act/back_end`) | The ACT Net; interval, HybridZ and dual transfer functions; solvers; single-pass verification and branch-and-bound | `python -m act.back_end` |
+| **Pipeline** (`act/pipeline`) | PyTorch ↔ ACT conversion, ACTFuzzer, verifier validation, benchmark management | `python -m act.pipeline` |
 
 ---
 
-## The life of a run
+## From a model to an ACT Net
 
-1. **Request.** The browser sends a run request with the model, the method and its options. A repeated request with the same client request ID returns the existing run instead of starting another.
-2. **Worker.** The service starts a separate worker process for the run. The worker calls ACT through engine_bridge, so a crash or timeout cannot take down the service.
-3. **Live events.** Progress, such as fuzzing frames and lifecycle changes, is committed to an ordered event log and streamed to the browser over Server-Sent Events. A reconnecting browser replays the events it missed.
-4. **Sealed record.** When the run ends, its result and evidence are written as artifacts, each sealed with a sha256 hash, next to an immutable manifest. Later reads check the hashes.
+1. **Specification.** A spec creator reads a benchmark or dataset and produces an input specification (a box, an L∞ ball or a linear polytope) and an output property (top-1 robustness, margin robustness, linear constraints, an output range or an unsafe linear region).
+2. **Wrapped model.** The specification is wrapped around the network as PyTorch layers: an input layer, an input-spec layer and an output-spec layer.
+3. **Conversion.** `torch2act` converts the wrapped model into an ACT Net. The specification becomes the Net's `INPUT_SPEC` and `ASSERT` layers, so verification needs no separate specification file. `act2torch` converts back, and the pipeline tests check that both directions agree.
 
----
-
-## Capability gating
-
-ACT changes between branches and forks. The workbench does not assume that an ACT checkout has the API a feature needs: engine_bridge checks for the ACT symbols each adapter calls. A feature the active engine lacks is disabled, and the reason is shown, instead of failing halfway through a run.
+Several properties can share one network. Model synthesis merges them into one batched Net with a row per property, and ACT verifies the rows together.
 
 ---
 
-## Modules
+## Verifying an ACT Net
 
-The workbench is organized into fourteen modules, each with its own guide.
+**Bounds.** A transfer function propagates bounds through every layer of the Net:
 
-| Area | Modules |
+| Domain | Precision and cost |
 | --- | --- |
-| visual_bench | [workspace](/visual_bench/workspace/README), [model_spec](/visual_bench/model_spec/README), [verification](/visual_bench/verification/README), [fuzzing](/visual_bench/fuzzing/README), [engine](/visual_bench/engine/README), [analysis](/visual_bench/analysis/README), [bab](/visual_bench/bab/README), [assistant](/visual_bench/assistant/README), [records](/visual_bench/records/README) |
-| engine_bridge | [engine_session](/engine_bridge/engine_session/README), [model_spec](/engine_bridge/model_spec/README), [execution](/engine_bridge/execution/README), [inspection](/engine_bridge/inspection/README), [events](/engine_bridge/events/README) |
+| `interval` | Fastest; one lower and upper bound per neuron. |
+| `hybridz` | Zonotopes; tighter bounds at higher cost. |
+| `dual` | Linear-relaxation dual bounds, optionally with optimized ReLU relaxations (alpha). |
 
-For design decisions and invariants, see [Architecture](/docs/design).
+**Decision.** A solver checks the output property against the bounds. If they prove it for every input, the result is `CERTIFIED`. If the property is still open, ACT evaluates candidate inputs on the concrete model; one that violates the property gives `FALSIFIED` with that counterexample.
 
-Next: [Working modes](./modes).
+**Refinement.** When neither happens, branch-and-bound splits the problem into subproblems, by fixing the phase of an unstable ReLU or by splitting an input dimension, and bounds each subproblem again until every branch is decided or the budget runs out.
+
+---
+
+## Searching for counterexamples
+
+ACTFuzzer runs the concrete model, not an abstraction. It mutates seed inputs inside the input specification with gradient-guided steps (FGSM/PGD style) and random perturbations, keeps inputs that reach new neuron coverage, and checks every candidate against the output property. A candidate that violates it is reported as a counterexample; fuzzing never certifies a property.
+
+---
+
+## Checking the verifier
+
+Verification results are only useful if the verifier is sound. The pipeline's validation checks two levels:
+
+1. **Soundness.** A verifier must never report `CERTIFIED` when a concrete counterexample exists.
+2. **Numerical precision.** The abstract bounds of every layer must contain the concrete activations of sampled inputs.
+
+Next: [Verification and testing](./modes).

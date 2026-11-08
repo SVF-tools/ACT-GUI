@@ -1,56 +1,79 @@
-# What is ACT-GUI?
+# What is ACT?
 
-ACT-GUI is the visualization and interaction workbench for [ACT](https://github.com/SVF-tools/ACT), a neural network verifier. ACT does the scientific work: it propagates bounds, searches for counterexamples, and decides verdicts. ACT-GUI lets you see that work. It loads models and specifications, runs ACT, shows the evidence ACT produces, and keeps a record of every run.
+ACT (Abstract Constraint Transformation) is a testing and verification framework for neural networks. Given a model and a specification of the inputs it may receive and the outputs it must produce, ACT either finds a counterexample, an input that violates the specification, or proves that none exists.
 
-You need nothing but a browser. The workbench runs on a server with ACT installed, and every computation happens there.
+ACT is PyTorch-native and runs on CPU or GPU. It reads PyTorch models, ONNX networks and VNN-LIB properties, converts them into one intermediate representation (the ACT Net), and verifies that representation with several abstract domains and solvers.
 
 ---
 
 ## Quick Start
 
-### Open the workbench
+### Try it online
 
-The hosted workbench is at **[app.act-online.au](https://app.act-online.au)**. To run your own copy, see [Installation](./installation).
+The **[ACT online workbench](https://app.act-online.au)** runs ACT on a server, so you only need a browser. Pick a model, choose **Fuzzing**, **Verification** or **BaB**, and watch ACT's results, layer bounds and counterexamples.
 
-### Your first run
+### Run it locally
 
-1. **Pick a model.** Select a catalog model in the sidebar, or use **Load model** to build one from a VNN-COMP benchmark instance (ONNX + VNN-LIB) or an ONNX image classifier with a test image and an epsilon.
-2. **Choose a mode.** The modes are **Fuzzing**, **Verification** and **BaB**.
-3. **Start the run.** The controls sit below the network view. Fuzzing streams its progress and mutated images live. Verification and BaB report ACT's verdict when they finish.
-4. **Inspect the evidence.** Open the layer bounds, the counterexamples, or the run history. The **Records** tab shows each run's provenance, and you can export the run as a zip.
+```bash
+git clone --recursive https://github.com/SVF-tools/ACT.git
+cd ACT
+conda env create -f environment.yml
+conda activate act-py312
 
-**Guide** in the top bar replays the introductory tour at any time.
+python -m act.back_end --generate --device cpu --dtype float64              # build the example networks
+python -m act.back_end --verify --network act/back_end/examples/nets/mlp_plain_3x8_64x64_3962224133.json --device cpu   # verify one of them
+```
+
+See [Installation](./installation) for Gurobi and benchmark downloads.
+
+### Verify your own model
+
+```bash
+python -m act.back_end --verify --onnx model.onnx --vnnlib property.vnnlib --solver torchlp --device cpu
+```
 
 ---
 
-## The principle: ACT decides
+## What ACT reports
 
-The workbench never computes or overrides a verdict.
-
-- **Verdicts come from ACT.** The GUI only displays what ACT reports.
-- **Fuzzing never certifies.** A fuzz run is `falsified` only when ACT's property checker accepts a counterexample. Every other fuzz run ends as `unknown`.
-- **The assistant explains; it does not decide.** Its answers cite recorded evidence and never replace ACT's result.
-- **Missing data stays missing.** A value ACT did not record is shown as not recorded, never filled in or estimated.
-
----
-
-## What is available today
-
-| Available | Not yet available |
+| Result | Meaning |
 | --- | --- |
-| Model loading from the catalog, VNN-LIB instances and ONNX classifiers | Node-level BaB history and controls |
-| Verification with the interval, dual or HybridZ domain, and BaB final summaries | Geometry beyond interval boxes |
-| Live fuzzing with run controls and saved counterexamples | A real AI provider (the assistant uses a deterministic placeholder) |
-| Recorded layer-by-layer interval bounds | |
-| Run records, diagnostics and zip export | |
-| ACT branch switching and Gurobi license management | |
+| `CERTIFIED` | The property holds for every input in the specification. |
+| `FALSIFIED` | ACT found a counterexample and checked it on the concrete model. |
+| `UNKNOWN` | The abstraction was too coarse to decide, and no counterexample was found. |
+| `TIMEOUT` | The time budget ran out first. |
+
+Fuzzing can only falsify: a fuzz run without a counterexample ends as unknown, never certified.
+
+---
+
+## What ACT supports
+
+| Area | Supported |
+| --- | --- |
+| Inputs | PyTorch modules, ONNX networks, VNN-LIB properties, TorchVision dataset and model pairs, compact BERT text models |
+| Input specifications | box, L∞ ball, linear polytope |
+| Output properties | top-1 robustness, margin robustness, linear constraints, output ranges, unsafe linear regions |
+| Layers | MLP, CNN, RNN and Transformer layers |
+| Abstract domains | interval, HybridZ (zonotopes), dual (linear relaxation) |
+| Solvers | TorchLP, dual, HybridZ, Gurobi MILP/LP (license required) |
+| Testing | whitebox fuzzing, verifier soundness validation, PyTorch ↔ ACT conversion checks |
+
+---
+
+## Publications
+
+- Kaijie Liu and Yulei Sui. [Detecting Unsoundness in Neural Network Verifiers via Concrete–Abstract Consistency](https://openreview.net/forum?id=6vjnMGdx5i). AIware 2026.
+- Guanqin Zhang and Yulei Sui. [Tensor-Based Batch Fuzzing with Adaptive Perturbation Scaling for Deep Neural Networks](https://arxiv.org/abs/2606.25239). ASE 2026.
+
+ACT is licensed under the GNU Affero General Public License v3.0.
 
 ---
 
 ## What's next
 
-- **[Installation](./installation)**: use the hosted workbench, run it with Docker, or set up a development checkout.
-- **[How it works](./how-it-works)**: how the browser, the workbench service and ACT divide the work.
-- **[Working modes](./modes)**: fuzzing, verification, BaB, layer analysis, the assistant and records.
-- **[Configuration](./configuration)**: environment variables, engine switching and Gurobi.
-- **[Developer docs](/README)**: find the module that owns the behavior you want to change.
+- **[Installation](./installation)**: set up ACT, Gurobi and the benchmarks.
+- **[How it works](./how-it-works)**: the front-end, back-end and pipeline tiers.
+- **[Verification and testing](./modes)**: verification, branch-and-bound, fuzzing and validation.
+- **[Configuration](./configuration)**: devices, configuration files and debugging options.
+- **[Developer docs](/README)**: the source of the online workbench.
