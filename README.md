@@ -1,12 +1,12 @@
 # ACT-GUI
 
 <p align="center">
-  <img src="fuzzingGuide.gif" alt="ACT-GUI fuzzing walkthrough" width="900">
+  <img src="./fuzzingGuide.gif" alt="ACT-GUI fuzzing walkthrough" width="900">
 </p>
 
 ACT-GUI is the visualization and interaction workbench for [ACT](https://github.com/SVF-tools/ACT). ACT computes verification results; this repository loads inputs, runs experiments, displays evidence, and saves records.
 
-**Online (v0.1):** ACT-GUI now supports online use at [https://act-online.au](https://act-online.au).
+**Online (v0.1):** the website and user guide are at [act-online.au](https://act-online.au); the hosted workbench is at [app.act-online.au](https://app.act-online.au).
 
 **Available:** real model loading, verification, BaB final summaries, live fuzzing, recorded interval-layer views, and record export. **Not available:** node-level BaB history/controls, geometry beyond interval boxes, and a real AI provider. The assistant currently uses a deterministic fake provider.
 
@@ -27,6 +27,7 @@ Start with the row matching your intended behavior. Follow its module guide for 
 | Persistence, integrity, replay, or export | [records](visual_bench/records/README.md#change-guide) | A feature needs a new artifact or annotation; keep its meaning in the producing module. |
 | Engine diagnostics or Gurobi licensing | [engine](visual_bench/engine/README.md#change-guide) | The actual engine/license probe changes: [engine_session](engine_bridge/engine_session/README.md#change-guide). |
 | ACT compatibility or scientific result adaptation | [Engine Bridge](engine_bridge/README.md#change-guide) | ACT itself lacks the required algorithm or public capability. |
+| The public website or user guide | [site](site/README.md#change-guide) | A guide page describes new behavior: change the owning module first, then the guide and its translations. |
 | Architecture or implementation planning | [Documentation](docs/README.md#change-guide) | A decision spans modules; local feature evidence stays in its module README. |
 
 ## Flow Diagram

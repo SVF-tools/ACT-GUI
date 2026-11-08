@@ -10,3 +10,5 @@ node_modules
 **/node_modules
 **/__pycache__
 **/*.pyc
+site/.vitepress/dist
+site/.vitepress/cache

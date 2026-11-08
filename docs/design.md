@@ -108,6 +108,8 @@ Maintainers deploy the computation service. Distinguish uploading a client file 
 - Gurobi is optional and user-licensed. gurobipy is installed (version is a build argument) but no license is ever built into the image. A user supplies one either by mounting a license file (`compose.gurobi.yaml`, `GRB_LICENSE_FILE`) or by uploading it through the workbench, which stores it server-side with owner-only permissions next to the records and passes it to each run worker. An uploaded license takes precedence over a mounted one; the content is never returned by the API. The service reports Gurobi's own license check result; host-bound licenses generally fail inside containers, while WLS and token-server licenses work. The current interval and BaB paths use ACT's TorchLPSolver, so a license changes no current verdict.
 - Loopback by default. Compose publishes the port on `127.0.0.1` only. Remote access still requires the HTTPS and authentication front end described above (DIST-01).
 
+**Public website (2026-11-08).** The product overview, user guide (English, Chinese, French) and developer docs are a separate static VitePress site in `site/`, served by its own container (`compose.site.yaml`) at `act-online.au`; the workbench is served at `app.act-online.au`. The site copies the repository's Markdown at build time instead of keeping a second copy, so module READMEs remain the single source for developer documentation. It shares no code, dependencies or process with the workbench.
+
 ## 7. Technology Decisions and Open Items
 
 FastAPI/Pydantic and React/TypeScript are the baseline. Evaluate and introduce layout, network/BaB rendering, and plotting dependencies when their features start.
