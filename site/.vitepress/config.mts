@@ -27,41 +27,66 @@ function sourceLinksToGitHub(md: any) {
   });
 }
 
-const developerSidebar: DefaultTheme.SidebarItem[] = [
-  {
-    text: "Developer docs (English)",
-    collapsed: true,
-    items: [
-      { text: "Choose a development task", link: "/README" },
-      { text: "Contributor rules", link: "/AGENTS" },
-      { text: "Documentation guide", link: "/docs/README" },
-      { text: "Architecture", link: "/docs/design" },
-      { text: "Development plan", link: "/docs/plan" },
-      { text: "Website", link: "/site/README" },
-    ],
-  },
-  {
-    text: "visual_bench",
-    collapsed: true,
-    items: [
-      { text: "Overview", link: "/visual_bench/README" },
-      ...["workspace", "model_spec", "verification", "fuzzing", "engine", "analysis", "bab", "assistant", "records"].map(
-        (m) => ({ text: m, link: `/visual_bench/${m}/README` }),
-      ),
-    ],
-  },
-  {
-    text: "engine_bridge",
-    collapsed: true,
-    items: [
-      { text: "Overview", link: "/engine_bridge/README" },
-      ...["engine_session", "model_spec", "execution", "inspection", "events"].map((m) => ({
-        text: m,
-        link: `/engine_bridge/${m}/README`,
-      })),
-    ],
-  },
-];
+type DeveloperLabels = {
+  docs: string;
+  task: string;
+  rules: string;
+  docsGuide: string;
+  architecture: string;
+  plan: string;
+  website: string;
+  overview: string;
+};
+
+const ENGLISH_DEVELOPER: DeveloperLabels = {
+  docs: "Developer docs (English)",
+  task: "Choose a development task",
+  rules: "Contributor rules",
+  docsGuide: "Documentation guide",
+  architecture: "Architecture",
+  plan: "Development plan",
+  website: "Website",
+  overview: "Overview",
+};
+
+// Developer docs are the repository's English Markdown in every locale; only the sidebar labels are translated.
+function developerSidebar(l: DeveloperLabels): DefaultTheme.SidebarItem[] {
+  return [
+    {
+      text: l.docs,
+      collapsed: true,
+      items: [
+        { text: l.task, link: "/README" },
+        { text: l.rules, link: "/AGENTS" },
+        { text: l.docsGuide, link: "/docs/README" },
+        { text: l.architecture, link: "/docs/design" },
+        { text: l.plan, link: "/docs/plan" },
+        { text: l.website, link: "/site/README" },
+      ],
+    },
+    {
+      text: "visual_bench",
+      collapsed: true,
+      items: [
+        { text: l.overview, link: "/visual_bench/README" },
+        ...["workspace", "model_spec", "verification", "fuzzing", "engine", "analysis", "bab", "assistant", "records"].map(
+          (m) => ({ text: m, link: `/visual_bench/${m}/README` }),
+        ),
+      ],
+    },
+    {
+      text: "engine_bridge",
+      collapsed: true,
+      items: [
+        { text: l.overview, link: "/engine_bridge/README" },
+        ...["engine_session", "model_spec", "execution", "inspection", "events"].map((m) => ({
+          text: m,
+          link: `/engine_bridge/${m}/README`,
+        })),
+      ],
+    },
+  ];
+}
 
 type Labels = {
   guide: string;
@@ -74,7 +99,7 @@ type Labels = {
   openWorkbench: string;
 };
 
-function locale(prefix: string, l: Labels): DefaultTheme.Config {
+function locale(prefix: string, l: Labels, d = ENGLISH_DEVELOPER): DefaultTheme.Config {
   return {
     nav: [
       { text: l.guide, link: `${prefix}/guide/` },
@@ -92,7 +117,7 @@ function locale(prefix: string, l: Labels): DefaultTheme.Config {
           { text: l.configuration, link: `${prefix}/guide/configuration` },
         ],
       },
-      ...developerSidebar,
+      ...developerSidebar(d),
     ],
   };
 }
@@ -138,6 +163,15 @@ export default withMermaid(
           configuration: "配置",
           developers: "开发者",
           openWorkbench: "打开工作台",
+        }, {
+          docs: "开发者文档（英文）",
+          task: "选择开发任务",
+          rules: "贡献者规则",
+          docsGuide: "文档指南",
+          architecture: "架构",
+          plan: "开发计划",
+          website: "网站",
+          overview: "概览",
         }),
       },
       fr: {

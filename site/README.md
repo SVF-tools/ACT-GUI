@@ -14,7 +14,7 @@ This directory builds the public ACT-GUI website (product overview, user guide a
 | Publish another repository Markdown file | `SOURCES` in [sync-docs.mjs](sync-docs.mjs) and the developer sidebar in the config |
 | Change how the site is served | [Dockerfile](Dockerfile), [nginx.conf](nginx.conf), [compose.site.yaml](../compose.site.yaml) |
 
-English is the default language. Chinese (`/zh/`) and French (`/fr/`) translate the home page and the user guide; developer docs are English only. When an English guide page changes, update both translations in the same change.
+English is the default language. Chinese (`/zh/`) and French (`/fr/`) translate the home page and the user guide; developer docs are English only and live next to the code they describe (each module's README), so every locale's sidebar links to the same English pages, and [nginx.conf](nginx.conf) redirects `/zh/` and `/fr/` developer paths (reached through the language switcher) to them. When an English guide page changes, update both translations in the same change.
 
 ## Flow Diagram
 
