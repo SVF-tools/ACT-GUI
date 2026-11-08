@@ -36,7 +36,8 @@ def test_probe_missing_act_is_a_deterministic_error(tmp_path):
 def test_probe_version_mismatch_is_a_warning():
     info = probe("0" * 40)
     assert info.usable
-    assert [d.code for d in info.diagnostics] == ["version_mismatch"]
+    assert "version_mismatch" in [d.code for d in info.diagnostics]
+    assert {d.severity for d in info.diagnostics} == {"warning"}
 
 def test_branch_checkout_is_staged_reused_and_linked_to_baseline_assets(tmp_path):
     url, commits = fake_act_remote(tmp_path / "remote")
