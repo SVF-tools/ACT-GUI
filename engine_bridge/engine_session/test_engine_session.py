@@ -79,8 +79,9 @@ def test_pinned_baseline_passes_every_api_check():
     assert required and [c for c in required if not c.ok] == []
     observation = [c for c in info.api_checks if c.capability == "observe.propagation"]
     assert {c.symbol for c in observation if not c.ok} == {
-        f"act.pipeline.gui.verifier_gui:{name}" for name in
-        ("observe", "emit", "RecordKey", "LayerBounds", "Relaxation", "DualBackward", "SpecBound")}
+        *(f"act.pipeline.gui.common_gui:{name}" for name in ("observe", "emit")),
+        *(f"act.pipeline.gui.verifier_gui:{name}" for name in
+          ("RecordKey", "LayerBounds", "Relaxation", "DualBackward", "SpecBound"))}
     assert next(c for c in info.capabilities if c.name == "observe.propagation").availability == "unsupported"
     assert next(c for c in info.capabilities if c.name == "verify.dual.options").availability == "unsupported"
     assert next(c for c in info.capabilities if c.name == "fuzz.control").availability == "unsupported"

@@ -27,15 +27,15 @@ def test_sink_copies_full_tensors_identity_relaxations_and_final_versions():
     lb = torch.tensor([[-2., 0., 1.]], dtype=torch.float64)
     ub = torch.tensor([[3., 0., 2.]], dtype=torch.float64)
     with obs.observe(sink):
-        obs.emit(obs.PhaseEvent("verify_once", "start", start))
-        obs.emit(obs.LayerBounds(key, "RELU", lb, ub, start + 1_000_000))
+        obs.emit(obs.PhaseEvent("verify_once", "start", t_ns=start))
+        obs.emit(obs.LayerBounds(key, "RELU", lb, ub, t_ns=start + 1_000_000))
         obs.emit(obs.Relaxation(key, torch.tensor([[-1, 0, 1]], dtype=torch.int8), "linear",
                                 lower_slope=torch.zeros_like(lb), upper_slope=torch.ones_like(lb),
                                 extra={"generators": torch.ones_like(lb), "note": "synthetic"}))
         obs.emit(obs.DualBackward(replace(key, pass_="backward"), lb[:, None, :], False, nu=ub))
         obs.emit(obs.SpecBound(replace(key, layer_id=9, pass_="backward"), lb, ub, 0, "n_iters"))
         obs.emit(object())
-        obs.emit(obs.LayerBounds(replace(key, version=1), "RELU", ub, ub, start))
+        obs.emit(obs.LayerBounds(replace(key, version=1), "RELU", ub, ub, t_ns=start))
     lb.fill_(99)
     assert sink.wants_relaxation and sink.ignored_records == 1
     bound = records[1]
@@ -55,8 +55,8 @@ def test_sink_isolates_malformed_records_and_callback_failures():
         raise OSError("synthetic storage failure")
     sink = PropagationSink(fail)
     with obs.observe(sink):
-        obs.emit(obs.LayerBounds(obs.RecordKey("interval", "forward", 1), "LINEAR", None, None, 0))
-        obs.emit(obs.PhaseEvent("verify_once", "start", time.perf_counter_ns()))
+        obs.emit(obs.LayerBounds(obs.RecordKey("interval", "forward", 1), "LINEAR", None, None, t_ns=0))
+        obs.emit(obs.PhaseEvent("verify_once", "start"))
     assert sink.ignored_records == 1
     assert isinstance(sink.callback_error, OSError)
 
@@ -71,7 +71,7 @@ def test_output_shape_preserves_convolution_axes_without_batch():
     sink = PropagationSink(records.append, model)
     with obs.observe(sink):
         obs.emit(obs.LayerBounds(obs.RecordKey("interval", "forward", 3), "CONV2D", torch.zeros(2, 60),
-                                torch.ones(2, 60), time.perf_counter_ns()))
+                                torch.ones(2, 60)))
         obs.emit(obs.SpecBound(obs.RecordKey("dual", "backward", 9), torch.ones(2, 3), torch.ones(2), 0, "n_iters"))
     assert records[0].output_shape == (3, 4, 5)
     assert records[0].tensors["lb"].shape == (2, 60)

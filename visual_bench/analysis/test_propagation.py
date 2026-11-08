@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import io
 import json
-import time
 import zipfile
 from dataclasses import replace
 from types import SimpleNamespace
@@ -45,11 +44,10 @@ def recorded(tmp_path, monkeypatch):
     obs = observation_api()
     key = obs.RecordKey("dual", "forward", 3, stage="pre")
     with obs.observe(sink):
-        obs.emit(obs.PhaseEvent("verify_once", "start", time.perf_counter_ns()))
+        obs.emit(obs.PhaseEvent("verify_once", "start"))
         for version in range(100):
             obs.emit(obs.LayerBounds(replace(key, version=version), "RELU",
-                                    torch.tensor([[-1., 0., 2.]]), torch.tensor([[3., 0., float("inf")]]),
-                                    time.perf_counter_ns()))
+                                    torch.tensor([[-1., 0., 2.]]), torch.tensor([[3., 0., float("inf")]])))
         key = replace(key, version=99)
         obs.emit(obs.Relaxation(key, torch.tensor([[-1, 0, 1]]), "linear",
                                 lower_slope=torch.zeros(1, 3), upper_slope=torch.ones(1, 3)))
@@ -120,7 +118,7 @@ def test_value_limit_rejects_without_truncation(recorded):
     sink = PropagationSink(writer)
     with obs.observe(sink):
         obs.emit(obs.LayerBounds(obs.RecordKey("dual", "forward", 100), "LINEAR", torch.zeros(1, 65537),
-                                torch.ones(1, 65537), time.perf_counter_ns()))
+                                torch.ones(1, 65537)))
     writer.finish(0)
     response = client.get(f"/api/runs/{RUN}/propagation/layers/100")
     assert response.status_code == 413 and response.json()["error"]["code"] == "too_large"
