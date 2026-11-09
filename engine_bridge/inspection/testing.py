@@ -17,10 +17,10 @@ def observation_api():
     """Use ACT's shared channel and verifier records when present, otherwise a schema-only stub."""
     with act_imports():
         try:
-            common = importlib.import_module("act.pipeline.gui.common_gui")
+            common = importlib.import_module("act.pipeline.gui.act_gui")
             verifier = importlib.import_module("act.pipeline.gui.verifier_gui")
         except ModuleNotFoundError as exc:
-            if exc.name not in ("act.pipeline.gui", "act.pipeline.gui.common_gui", "act.pipeline.gui.verifier_gui"):
+            if exc.name not in ("act.pipeline.gui", "act.pipeline.gui.act_gui", "act.pipeline.gui.verifier_gui"):
                 raise
         else:
             return SimpleNamespace(**{name: getattr(verifier, name) for name in _RECORDS},

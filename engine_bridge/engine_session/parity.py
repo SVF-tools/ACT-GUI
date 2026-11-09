@@ -76,8 +76,8 @@ def requirements() -> dict[str, tuple[Requirement, ...]]:
         ),
         "observe.propagation": (
             *_VERIFY_ONCE,
-            Requirement("act.pipeline.gui.common_gui:observe", positional=1),
-            Requirement("act.pipeline.gui.common_gui:emit", positional=1),
+            Requirement("act.pipeline.gui.act_gui:observe", positional=1),
+            Requirement("act.pipeline.gui.act_gui:emit", positional=1),
             *(Requirement(f"act.pipeline.gui.verifier_gui:{name}") for name in
               ("RecordKey", "LayerBounds", "Relaxation", "DualBackward", "SpecBound")),
         ),
@@ -91,14 +91,14 @@ def requirements() -> dict[str, tuple[Requirement, ...]]:
         "verify.bab": bab,
         "events.bab_summary": bab,
         "fuzz.control": (
-            Requirement("act.pipeline.gui.common_gui:observe", positional=1),
+            Requirement("act.pipeline.gui.act_gui:observe", positional=1),
             *(Requirement(f"act.pipeline.gui.fuzzer_gui:{name}") for name in
               ("FuzzControl", "fuzzing_options", "FuzzStep", "FuzzStart", "FuzzConfigChange", "FuzzEnd")),
             Requirement("act.pipeline.gui.fuzzer_gui:FuzzControl.pause", positional=1),
             Requirement("act.pipeline.gui.fuzzer_gui:FuzzControl.resume", positional=1),
             Requirement("act.pipeline.gui.fuzzer_gui:FuzzControl.request_stop", positional=1),
             Requirement("act.pipeline.gui.fuzzer_gui:FuzzControl.update", positional=1),
-            Requirement("act.pipeline.gui.common_gui:validate_changes", positional=2),
+            Requirement("act.pipeline.gui.act_gui:validate_changes", positional=2),
             Requirement("act.pipeline.fuzzing.actfuzzer:ACTFuzzer",
                         ("wrapped_model", "initial_seeds", "config", "control")),
         ),

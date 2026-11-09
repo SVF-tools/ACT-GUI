@@ -344,7 +344,7 @@ def _fuzz(fuzzer: Any, cfg: Any, rng_seed: int, rows: Any,
 
     if native:
         from act.pipeline.gui.fuzzer_gui import FuzzConfigChange, FuzzEnd, FuzzStart, FuzzStep
-        from act.pipeline.gui.common_gui import observe as register
+        from act.pipeline.gui.act_gui import observe as register
 
         def sink(record: Any) -> None:
             nonlocal stop_reason

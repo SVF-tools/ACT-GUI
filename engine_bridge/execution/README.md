@@ -114,7 +114,7 @@ Edit [fuzz.py](fuzz.py):
 * Display-only input vectors (frame input and seed input, seed rows, a counterexample's seed input) are None above `contracts.DISPLAY_VALUES` values; a counterexample keeps its full `input` for save and export, and recorded frames drop a large counterexample already listed in `counterexamples`.
 * Progress and frames are observations between ACT iterations. Counterexamples are only ACT PropertyChecker results. Fuzzing returns `falsified` or `unknown`, never `certified`.
 
-When `fuzz.control` API parity passes, one `act.pipeline.gui.common_gui.observe` sink reads
+When `fuzz.control` API parity passes, one `act.pipeline.gui.act_gui.observe` sink reads
 `FuzzStart`, `FuzzStep`, `FuzzConfigChange`, and `FuzzEnd`; no private seam is replaced.
 `FuzzRunControl` delegates pause, resume, stop and live updates to ACT's thread-safe control,
 including updates while paused. The option registry and validation remain ACT-owned.
