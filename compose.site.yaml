@@ -1,0 +1,13 @@
+# ACT-GUI website (static). Start:   docker compose -f compose.site.yaml up -d --build
+# -> http://127.0.0.1:${ACT_SITE_PORT:-18081}. Independent of the workbench project in compose.yaml.
+name: act-gui-site
+
+services:
+  site:
+    image: act-gui-site:0.1.0
+    build:
+      context: .
+      dockerfile: site/Dockerfile
+    ports:
+      - "127.0.0.1:${ACT_SITE_PORT:-18081}:80"
+    restart: unless-stopped

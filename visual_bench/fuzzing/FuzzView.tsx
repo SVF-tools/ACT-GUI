@@ -3,8 +3,6 @@ import { useEffect, useState } from "react";
 import { fmt } from "../shared/wire";
 import type { FuzzingOut, ModelDescriptionOut } from "../generated/wire";
 import { Empty } from "../shared/ui/Empty";
-import { StopButton } from "../shared/ui/StopButton";
-import { useStopRun } from "../verification/hooks";
 import { useFuzzing, useSaveCounterexample } from "./hooks";
 import { pct } from "./presentation";
 import { FuzzTimeline } from "./FuzzTimeline";
@@ -13,12 +11,12 @@ import { FuzzCounterexamples } from "./FuzzCounterexamples";
 import { FuzzSaved } from "./FuzzSaved";
 import { FuzzInputs } from "./FuzzInputs";
 import { FuzzStrategies } from "./FuzzStrategies";
+import { FuzzLiveControls } from "./FuzzLiveControls";
 
 export function FuzzView({ runId, model }: { runId: string | null; model: ModelDescriptionOut | null }) {
   const [frameSel, setFrameSel] = useState<number | null>(null); // null follows the latest frame
   const q = useFuzzing(runId);
   const save = useSaveCounterexample(runId ?? "");
-  const stop = useStopRun();
   useEffect(() => { setFrameSel(null); }, [runId]);
   const f = q.data;
   const live = f !== undefined && (f.status === "queued" || f.status === "running");
@@ -29,6 +27,7 @@ export function FuzzView({ runId, model }: { runId: string | null; model: ModelD
   if (f.availability === "unsupported") return <Empty title="Not a fuzzing run" text="This run used a verification method. Start a run with method “fuzz (ACTFuzzer)”." />;
   const last = f.timeline.at(-1) ?? null;
   const s = f.summary;
+  const maxIterations = f.control?.live.max_iterations ?? f.options?.max_iterations;
   const ces = s?.counterexample_count ?? last?.counterexamples ?? 0;
   const frames = f.frames ?? [];
   const savedItems = f.saved ?? [];
@@ -36,9 +35,10 @@ export function FuzzView({ runId, model }: { runId: string | null; model: ModelD
   const onSave = async (index: number) => { await save.mutateAsync(index); };
   return (
     <div className="fuzz">
-      <Banner f={f} ces={ces} onStop={() => stop.mutateAsync(f.run_id)} />
+      <Banner f={f} ces={ces} />
+      <FuzzLiveControls key={f.run_id} f={f} />
       <div className="kv">
-        <span>iterations</span><b>{s?.iterations ?? last?.iteration ?? 0}{f.options ? ` / ${f.options.max_iterations}` : ""}</b>
+        <span>iterations</span><b>{s?.iterations ?? last?.iteration ?? 0}{maxIterations != null ? ` / ${maxIterations}` : ""}</b>
         <span>elapsed</span><b>{fmt(s?.elapsed_s ?? last?.elapsed_s ?? 0, 2)} s{s && s.elapsed_s > 0 ? ` · ${(s.iterations / s.elapsed_s).toFixed(1)} it/s` : ""}</b>
         <span>neuron coverage</span><b>{pct(s?.neuron_coverage ?? last?.coverage ?? 0)}{s ? ` (${s.coverage_strategy})` : ""}</b>
         <span>counterexamples</span><b className={ces ? "state bad" : ""}>{ces}</b>
@@ -46,6 +46,9 @@ export function FuzzView({ runId, model }: { runId: string | null; model: ModelD
         {s && <><span>mutations</span><b>{s.total_mutations}</b></>}
         {s && <><span>never activated</span><b>{s.never_activated_count}{s.never_activated_sample.length ? ` · ${s.never_activated_sample.slice(0, 6).join(", ")}` : ""}</b></>}
         <span>rng seed</span><b>{f.options?.rng_seed ?? "—"}{s ? ` · device ${s.device}` : ""}</b>
+        {s?.stop_reason && <><span>stop reason</span><b>{({
+          max_iterations: "Iteration limit", timeout: "Time limit", first_violation: "First counterexample", stopped: "Stopped by user",
+        } as Record<string, string>)[s.stop_reason] ?? s.stop_reason}</b></>}
       </div>
       <h3>Progress <small>{live ? "live from committed fuzz.progress events" : "recorded timeline"}</small></h3>
       <div className="fuzzlive">
@@ -69,13 +72,12 @@ export function FuzzView({ runId, model }: { runId: string | null; model: ModelD
   );
 }
 
-function Banner({ f, ces, onStop }: { f: FuzzingOut; ces: number; onStop: () => Promise<unknown> }) {
+function Banner({ f, ces }: { f: FuzzingOut; ces: number }) {
   if (f.status === "failed") return <div className="banner bad"><b>Run failed.</b> The partial timeline below is what ACT reported before the failure.</div>;
   if (f.availability === "pending") {
     return (
-      <div className="banner bannerrow">
+      <div className="banner">
         <span><b>Fuzzing…</b> {ces ? `${ces} counterexample(s) found so far.` : "No counterexample yet."}</span>
-        {(f.status === "queued" || f.status === "running") && <StopButton method="fuzz" onStop={onStop} />}
       </div>
     );
   }

@@ -10,9 +10,10 @@ For project navigation, see [engine_bridge flow](../README.md#flow-diagram) and 
 | --- | --- | --- |
 | Change verification invocation/domain setup | [verify.py](verify.py), direct ACT parity tests | Compatible RunOutcome passes through the existing worker/service; no UI or lifecycle rewrite. |
 | Expose an ACT fuzz hyperparameter | [fuzz.py](fuzz.py) TUNABLE plus tests, then [workbench fuzzing](../../visual_bench/fuzzing/README.md#change-guide) | split_options and runner forwarding are generic for ordinary hyperparameters; change them only for independent run arguments. |
+| Change live fuzz controls or option metadata | [fuzz.py](fuzz.py): `FuzzRunControl`, `fuzzing_options`, public observer sink; [test_fuzz_control.py](test_fuzz_control.py) | `fuzz.control` parity in engine_session gates the public path; preserve the baseline seams when it is unavailable. |
 | Add progress/frame/outcome data | [fuzz.py](fuzz.py), [contracts.py](../contracts.py), relevant tests and consuming workbench mappings | Worker dataclass serialization/storage may already carry the field; inspect rather than rewrite it. |
 | Change supported methods | [methods.py](methods.py), tests | Workbench asks verify_methods; browser policy should not duplicate ACT limits. |
-| Add pause/step/split controls | EXE-02/03 and ACT-02/05 backlog | Not an extension of an existing control API; first establish safe ACT semantics. |
+| Add verification/BaB pause/step/split controls | EXE-02/03 and ACT-02/05 backlog | Fuzz controls do not establish safe verification/BaB control semantics. |
 
 ## Flow Diagram
 
@@ -51,9 +52,24 @@ Run the focused real-ACT tests:
 
 ```bash
 .venv/bin/python -m pytest engine_bridge/execution
+ACT_CODE_ROOT=/data1/guanqin/ACT-wt/act-gui-match .venv/bin/python -m pytest engine_bridge/execution/test_fuzz_control.py engine_bridge/execution/test_fuzz_worker.py
 ```
 
 These tests compare adapter statuses with recorded native ACT results and direct `verify_once` calls. Fuzz tests use real ACTFuzzer and check ACT counterexamples, input-box membership, stop behavior, and a BaB-certified net that fuzzing leaves `unknown`. The test suite does not establish browser or real-provider behavior. No test result is implied by this guide.
+
+Live-control acceptance recorded 2026-11-06:
+
+- `.venv/bin/python -m pytest -q`: 156 passed, 24 skipped, 3 known failures:
+  `test_probe_version_mismatch_is_a_warning`,
+  `test_run_verdict_matches_recorded_native_act[mnist_relu_6_100_eps015-bab]`, and
+  `test_classifier_builder_reproduces_the_pinned_catalog_net`.
+- `ACT_CODE_ROOT=/data1/guanqin/ACT-wt/act-gui-match .venv/bin/python -m pytest -q engine_bridge`:
+  61 passed, 20 failed, 0 skipped. All 17 new fuzz-control/worker tests passed.
+  Existing baseline tests account for the failures: two pinned-commit/optional-API expectations,
+  seventeen catalog loads rejected by this ACT branch with `Unsupported ACT metadata tag
+  'LabeledInputTensor'`, and the pinned classifier SHA256 mismatch. No ACT files were changed.
+- `npm run gen:types` and `npm run check:types`: exit 0; the latter reported
+  `wire.ts matches visual_bench/schemas.py`.
 
 ## Reference and Backlog
 
@@ -69,8 +85,10 @@ These tests compare adapter statuses with recorded native ACT results and direct
 | [methods.py](methods.py) | `verify_methods` and `UNIVERSAL_METHODS` |
 | [__init__.py](__init__.py) | Public execution functions and constants |
 | [test_execution.py](test_execution.py) | Native verdict/domain parity, fuzz counterexamples and stop behavior, and structured errors |
+| [test_fuzz_control.py](test_fuzz_control.py) | Native public/legacy observation parity, live updates, pause/resume/stop and stop reasons; legacy capability fallback |
+| [test_fuzz_worker.py](test_fuzz_worker.py) | Native worker control/progress pipe integration, including stopping while paused through the pipe and SIGTERM |
 
-Callers are [`visual_bench/verification/worker.py`](../../visual_bench/verification/worker.py), [`visual_bench/fuzzing/runner.py`](../../visual_bench/fuzzing/runner.py), and [`visual_bench/model_spec/service.py`](../../visual_bench/model_spec/service.py). The neutral contracts are `RunOutcome`, `FuzzOutcome`, `FuzzProgress`, `FuzzFrame`, `FuzzCounterexample`, `FuzzSeed`, `FuzzStrategyStats`, `Method`, `Domain`, `Verdict`, and `BridgeError` in [`../contracts.py`](../contracts.py).
+Callers are [`visual_bench/verification/worker.py`](../../visual_bench/verification/worker.py), [`visual_bench/fuzzing/runner.py`](../../visual_bench/fuzzing/runner.py), and [`visual_bench/model_spec/service.py`](../../visual_bench/model_spec/service.py). The neutral contracts are `RunOutcome`, `FuzzOutcome`, `FuzzOptionSpec`, `FuzzControlChange`, `FuzzProgress`, `FuzzFrame`, `FuzzCounterexample`, `FuzzSeed`, `FuzzStrategyStats`, `Method`, `Domain`, `Verdict`, and `BridgeError` in [`../contracts.py`](../contracts.py).
 
 ## Operation Notes
 
@@ -93,9 +111,17 @@ Edit [fuzz.py](fuzz.py):
 * `split_options()` separates run arguments from `FuzzingConfig` hyperparameters.
 * `fuzzing_defaults()` reads the pinned ACT configuration.
 * `PROVENANCE` documents the ACT call, config source, and display frames.
+* Display-only input vectors (frame input and seed input, seed rows, a counterexample's seed input) are None above `contracts.DISPLAY_VALUES` values; a counterexample keeps its full `input` for save and export, and recorded frames drop a large counterexample already listed in `counterexamples`.
 * Progress and frames are observations between ACT iterations. Counterexamples are only ACT PropertyChecker results. Fuzzing returns `falsified` or `unknown`, never `certified`.
 
-The current implementation relies on ACTFuzzer's private `_print_progress` and `mutation_engine.mutate` seams. Recheck both against the pinned ACT commit when changing ACT.
+When `fuzz.control` API parity passes, one `act.pipeline.gui.act_gui.observe` sink reads
+`FuzzStart`, `FuzzStep`, `FuzzConfigChange`, and `FuzzEnd`; no private seam is replaced.
+`FuzzRunControl` delegates pause, resume, stop and live updates to ACT's thread-safe control,
+including updates while paused. The option registry and validation remain ACT-owned.
+`FuzzOutcome.stop_reason` preserves ACT's reason and the existing display/thinning limits remain.
+Older ACT keeps the `_print_progress`/`mutation_engine.mutate` seams and best-effort stop reasons;
+its option schema marks every legacy tunable `live=False`. Recheck those seams against the pinned
+ACT commit when changing the legacy path.
 
 ### Change method availability
 
@@ -119,6 +145,7 @@ Edit [methods.py](methods.py) when ACT accepts or rejects a method based on inpu
 | EXE-04 | Adapt ACT's inference-based fuzzer | EXE-01 | `run_fuzzing` rebuilds the net with ACT's `ACTToTorch`, seeds ACTFuzzer with the net's INPUT rows, and reports ACT's `FuzzingReport`; counterexamples are only those ACT's PropertyChecker accepted. Verdict is `falsified` iff ACT reported a counterexample, otherwise `unknown` (fuzzing never certifies). Progress (iteration, coverage, counterexample count, corpus) is read between iterations. `test_execution.py`: a counterexample on `unsafe_linear` lies inside the input box; 200 iterations on `bab_deep_mlp` (BaB-certified) report none. |
 | EXE-05 | Report which run methods ACT accepts for a net | EXE-01, EXE-04 | `methods.verify_methods(input_rows)` returns `interval`/`bab` for single-lane nets and only `interval` for batched nets (`verify_once` returns one verdict per INPUT row, reported as `RunOutcome.rows` with their conjunction as the run verdict; `verify_bab_batched` takes a single instance) and `UNIVERSAL_METHODS` holds `fuzz` (ACTFuzzer runs on every JSON net ACTToTorch rebuilds); `fuzz.split_options` and `fuzz.PROVENANCE` keep fuzz option and provenance knowledge in the bridge. Evidence: `visual_bench/fuzzing/test_fuzzing.py::test_torch_batch_is_one_net_fuzzed_row_by_row` (a 3-image net lists `interval` and `fuzz` and rejects `bab`), `engine_bridge/execution/test_execution.py::test_batched_net_reports_native_verdict_per_row_and_their_conjunction`, `visual_bench/verification/test_verification.py::test_torch_batch_verification_records_a_verdict_per_image`. |
 | EXE-06 | Pass verify_once domain options to ACT | EXE-01, ACT-07 | `run_verification(..., dual=DualOptions, hybridz_tolerance=...)`: default `DualOptions` add no keyword, so a plain `verify_once` runs on every checkout; other values become `dual_iters`, `dual_config` (ACT `DualConfig`) and `dual_refresh_forward`, gated by capability `verify.dual.options` (`parity.py`). The HybridZ tolerance replaces the fixed 1e-7. |
+| EXE-07 | Adapt public fuzz observation and live controls | EXE-04, ES-07, ACT-08 | `test_fuzz_control.py` compares fixed-seed counterexample counts and inputs against the legacy path, applies changes at batch boundaries, updates while paused, resumes/stops, and verifies all stop reasons. `test_fuzz_worker.py` exercises the real worker's two pipes and SIGTERM while paused. These native tests skip when `fuzz.control` is absent. |
 
 ## Boundaries and Cross-Module Changes
 

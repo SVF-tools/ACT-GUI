@@ -7,9 +7,11 @@ from __future__ import annotations
 
 import math
 import threading
+from dataclasses import asdict
 from typing import Any
 
-from engine_bridge.execution import FUZZ_PROVENANCE
+from engine_bridge.contracts import BridgeError
+from engine_bridge.execution import FUZZ_PROVENANCE, FuzzRunControl, fuzzing_options
 from visual_bench.errors import AppError
 from visual_bench.fuzzing import schemas as S
 from visual_bench.fuzzing.live import FuzzLive
@@ -17,7 +19,7 @@ from visual_bench.model_spec.service import ModelService
 from visual_bench.records import RecordStore
 from visual_bench.records.store import now_iso
 from visual_bench.verification.service import SAVED, RunService, vnncomp_sat
-from visual_bench.wire import wire_number, wire_numbers
+from visual_bench.wire import display_numbers, wire_number, wire_numbers
 
 
 class FuzzingService:
@@ -32,6 +34,54 @@ class FuzzingService:
     def defaults() -> S.FuzzOptions:
         return S.FuzzOptions()
 
+    def options(self) -> S.FuzzOptionsSchemaOut:
+        self.runs.engine.require_engine()
+        return S.FuzzOptionsSchemaOut(
+            options=[S.FuzzOptionOut.model_validate(asdict(o)) for o in fuzzing_options()],
+            live_control=self.runs.engine.capability_available("fuzz.control"))
+
+    def control(self, run_id: str, req: S.FuzzControlRequest) -> S.FuzzControlOut:
+        """Queue one command per request ID. A retry returns the first receipt, including after completion."""
+        with self._lock:
+            run = self.runs.get(run_id)
+            receipts = self.records.annotation(run_id, "fuzz_control_requests.json") or []
+            prior = next((r for r in receipts if r["request_id"] == req.request_id), None)
+            if prior is not None:
+                return S.FuzzControlOut.model_validate({**prior, "status": "duplicate"})
+            if run.method != "fuzz" or run.status != "running":
+                raise AppError(409, "run_not_running", "Live fuzz control requires a running fuzz worker.")
+            if req.action != "stop" and not self.runs.engine.capability_available("fuzz.control"):
+                raise AppError(409, "capability_unavailable", "The active ACT checkout does not support fuzz.control.")
+            changes = req.changes
+            if req.action == "update":
+                if not changes:
+                    raise AppError(422, "invalid_options", "An update requires at least one live option.")
+                try:
+                    changes = FuzzRunControl().update(changes)
+                except BridgeError as exc:
+                    raise AppError(422 if exc.code == "invalid_options" else 409, exc.code, exc.message) from exc
+            self.runs.send_fuzz_control(run_id, req.action, changes)
+            receipt = S.FuzzControlOut(run_id=run_id, action=req.action, request_id=req.request_id,
+                                      status="queued", changes=changes)
+            self.records.write_annotation(run_id, "fuzz_control_requests.json", [*receipts, receipt.model_dump()])
+            return receipt
+
+    def _control_state(self, run_id: str) -> S.FuzzControlStateOut | None:
+        initial = self.records.manifest(run_id).get("execution", {}).get("fuzz_live")
+        if initial is None:
+            return None
+        state = S.FuzzControlStateOut(paused=False, live=dict(initial), changes=[])
+        for event in self.records.events(run_id):
+            if event["kind"] == "fuzz.control":
+                change = S.FuzzConfigChangeOut.model_validate(event["payload"])
+                state.changes.append(change)
+                state.live.update(change.applied)
+            elif event["kind"] in ("fuzz.paused", "fuzz.resumed"):
+                state.paused = event["payload"]["paused"]
+            elif event["kind"] in ("run.completed", "run.failed"):
+                state.paused = False
+        return state
+
     def fuzzing(self, run_id: str) -> S.FuzzingOut:
         run = self.runs.get(run_id)
         base: dict[str, Any] = {"run_id": run_id, "status": run.status, "options": self.runs.request(run_id).fuzz,
@@ -39,6 +89,7 @@ class FuzzingService:
         if run.method != "fuzz":
             return S.FuzzingOut(availability="unsupported", summary=None, timeline=[], strategies=[],
                                 counterexamples=[], **base)
+        base["control"] = self._control_state(run_id)
         raw = self.records.artifact(run_id, "fuzzing.json") if run.status == "completed" else None
         base["saved"] = [S.SavedCounterexampleOut(saved_at=e["saved_at"], counterexample=counterexample_out(e["counterexample"]))
                          for e in self.records.annotation(run_id, SAVED) or []]
@@ -51,7 +102,7 @@ class FuzzingService:
                                 summary=None, timeline=live, strategies=[],
                                 counterexamples=[counterexample_out(c) for c in hits],
                                 frames=[frame_out(latest)] if latest else [], **base)
-        seeds = [S.FuzzSeedOut(row=s["row"], input=wire_numbers(s["input"]), output=wire_numbers(s["output"]))
+        seeds = [S.FuzzSeedOut(row=s["row"], input=display_numbers(s["input"]), output=wire_numbers(s["output"]))
                  for s in raw.get("seeds", [])]
         summary = S.FuzzSummaryOut.model_validate({k: raw[k] for k in S.FuzzSummaryOut.model_fields if k in raw})
         base["config"] = raw["config"]
@@ -102,14 +153,14 @@ class FuzzingService:
 
 
 def counterexample_out(c: dict[str, Any]) -> S.FuzzCounterexampleOut:
-    return S.FuzzCounterexampleOut(**{**c, "severity": wire_number(c["severity"]), "input": wire_numbers(c["input"]),
-                                      "output": wire_numbers(c["output"]), "seed_input": wire_numbers(c["seed_input"]),
+    return S.FuzzCounterexampleOut(**{**c, "severity": wire_number(c["severity"]), "input": display_numbers(c["input"]),
+                                      "output": wire_numbers(c["output"]), "seed_input": display_numbers(c["seed_input"]),
                                       "seed_output": None if c.get("seed_output") is None else
                                       wire_numbers(c["seed_output"])})
 
 
 def frame_out(fr: dict[str, Any]) -> S.FuzzFrameOut:
     ce = fr.get("counterexample")
-    return S.FuzzFrameOut.model_validate({**fr, "input": wire_numbers(fr["input"]),
-                                          "seed_input": wire_numbers(fr["seed_input"]),
+    return S.FuzzFrameOut.model_validate({**fr, "input": display_numbers(fr["input"]),
+                                          "seed_input": display_numbers(fr["seed_input"]),
                                           "counterexample": counterexample_out(ce) if ce else None})

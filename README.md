@@ -1,12 +1,12 @@
 # ACT-GUI
 
 <p align="center">
-  <img src="fuzzingGuide.gif" alt="ACT-GUI fuzzing walkthrough" width="900">
+  <img src="./fuzzingGuide.gif" alt="ACT-GUI fuzzing walkthrough" width="900">
 </p>
 
 ACT-GUI is the visualization and interaction workbench for [ACT](https://github.com/SVF-tools/ACT). ACT computes verification results; this repository loads inputs, runs experiments, displays evidence, and saves records.
 
-**Online (v0.1):** ACT-GUI now supports online use at [https://act-online.au](https://act-online.au).
+**Online (v0.1):** the website and user guide are at [act-online.au](https://act-online.au); the hosted workbench is at [app.act-online.au](https://app.act-online.au).
 
 **Available:** real model loading, verification, BaB final summaries, live fuzzing, recorded interval-layer views, and record export. **Not available:** node-level BaB history/controls, geometry beyond interval boxes, and a real AI provider. The assistant currently uses a deterministic fake provider.
 
@@ -27,6 +27,7 @@ Start with the row matching your intended behavior. Follow its module guide for 
 | Persistence, integrity, replay, or export | [records](visual_bench/records/README.md#change-guide) | A feature needs a new artifact or annotation; keep its meaning in the producing module. |
 | Engine diagnostics or Gurobi licensing | [engine](visual_bench/engine/README.md#change-guide) | The actual engine/license probe changes: [engine_session](engine_bridge/engine_session/README.md#change-guide). |
 | ACT compatibility or scientific result adaptation | [Engine Bridge](engine_bridge/README.md#change-guide) | ACT itself lacks the required algorithm or public capability. |
+| The public website or user guide | [site](site/README.md#change-guide) | A guide page describes new behavior: change the owning module first, then the guide and its translations. |
 | Architecture or implementation planning | [Documentation](docs/README.md#change-guide) | A decision spans modules; local feature evidence stays in its module README. |
 
 ## Flow Diagram
@@ -96,6 +97,8 @@ The image serves the built browser app, the API, and SSE from one origin on `127
 The **Load model** panel builds models from ACT's git-ignored `data/` (VNN-LIB benchmarks, MNIST/CIFAR-10 test sets) and `literature/` (ONNX classifiers) directories, which the image does not contain. Mount them read-only with `-f compose.actdata.yaml` (`ACT_DATA_FROM` defaults to `$ACT_ROOT`); without them the panel lists no sources and the catalog still works. Loaded models persist in the `act-gui-data` volume (`/data/models`); in development they go to `var/models/` (`ACT_GUI_MODELS` overrides).
 
 Gurobi is optional; the image contains gurobipy (`GUROBIPY_VERSION`) but never a license. Either upload your `gurobi.lic` in the **Engine** tab, or mount it with `GUROBI_LICENSE_FILE=/path/to/gurobi.lic` in `.env` and `-f compose.gurobi.yaml`. The Engine tab shows Gurobi's own license check. WLS and token-server licenses work in containers; host-bound (named-user/academic) licenses usually do not. The current interval and BaB methods do not call Gurobi.
+
+Other settings (all optional, read from `.env` by Compose or from the environment by `dev.sh`): `ACT_GUI_IMAGE` (image tag, default `act-gui:0.1.0`), `ACT_GUI_ENGINES` (imported ACT branch checkouts and the active engine selection, next to the records root by default), `ACT_GUI_SECRETS` (uploaded licenses, `/data/secrets` in Docker), `ACT_GUI_ACT_REMOTES` (preconfigured ACT repositories for branch switching, `name=url,...`), and `ACT_GUI_ALLOW_CUSTOM_REMOTES` (`0` stops users from entering other repository URLs; entering a URL runs that repository's code on the server, so a public deployment needs access control or `0`). Engine switching is described in [visual_bench/engine](visual_bench/engine/README.md).
 
 Checks:
 

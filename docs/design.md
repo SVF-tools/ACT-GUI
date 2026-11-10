@@ -63,12 +63,16 @@ Start with a small real-data inspection slice. Propagation requirements live in 
 
 ## 4. Data and Execution Invariants
 
-These are design constraints, not a claim that all associated APIs exist. Current run lifecycle events and fuzz progress are implemented; revision-bound node snapshots, pause/step/split and command receipts remain planned. Use module Change Guides for today's paths.
+These are design constraints, not a claim that all associated APIs exist. Current run lifecycle events,
+fuzz progress and capability-gated fuzz controls are implemented; revision-bound node snapshots and
+verification/BaB pause/step/split remain planned. Use module Change Guides for today's paths.
 
 - Bind queries to run/node/layer/revision. A late response must not replace a newer selection.
 - Keep node identity separate from batch lane indices. Bounds retain scope, direction, computed/inherited origin, method, and provenance.
 - Geometry states its coordinates, representation, projection, and guarantee. Samples are not sound outer approximations; a local visualization does not establish a global verdict.
-- Fix model/spec/config snapshots for a run. Changes create another run.
+- Fix model/spec/initial-config snapshots for a run. Model/spec changes create another run.
+  Capability-gated live fuzz config changes retain that initial snapshot and append ACT's applied/rejected
+  receipts; replay combines the initial live values and committed changes.
 - Models come from two places: the pinned catalog (`fixtures/catalog.json`, ACT files by commit + sha256, with recorded native verdicts) and model sources (a VNN-COMP ONNX + VNN-LIB instance, or an ONNX image classifier with a chosen test image and eps). engine_bridge builds a source into an ACT net through ACT's own front end and `save_net_to_file`; the workbench stores it content-addressed (`<kind>-<sha12>`, `ACT_GUI_MODELS`, default next to the records root) with its build parameters. A different image or eps is a different model snapshot, never an edit of an existing one. Built models have no recorded native verdicts.
 - Publish scientific state only after a valid observation boundary. Current lifecycle/progress events support ordered replay; committed node snapshots, gap protocols and rollback-aware scientific batches require future ACT interfaces.
 - Replay reconstructs recorded display state, not solver memory. Missing historical bounds are not_recorded.
@@ -104,6 +108,8 @@ Maintainers deploy the computation service. Distinguish uploading a client file 
 - Gurobi is optional and user-licensed. gurobipy is installed (version is a build argument) but no license is ever built into the image. A user supplies one either by mounting a license file (`compose.gurobi.yaml`, `GRB_LICENSE_FILE`) or by uploading it through the workbench, which stores it server-side with owner-only permissions next to the records and passes it to each run worker. An uploaded license takes precedence over a mounted one; the content is never returned by the API. The service reports Gurobi's own license check result; host-bound licenses generally fail inside containers, while WLS and token-server licenses work. The current interval and BaB paths use ACT's TorchLPSolver, so a license changes no current verdict.
 - Loopback by default. Compose publishes the port on `127.0.0.1` only. Remote access still requires the HTTPS and authentication front end described above (DIST-01).
 
+**Public website (2026-11-08).** The product overview, user guide (English, Chinese, French) and developer docs are a separate static VitePress site in `site/`, served by its own container (`compose.site.yaml`) at `act-online.au`; the workbench is served at `app.act-online.au`. The site copies the repository's Markdown at build time instead of keeping a second copy, so module READMEs remain the single source for developer documentation. It shares no code, dependencies or process with the workbench.
+
 ## 7. Technology Decisions and Open Items
 
 FastAPI/Pydantic and React/TypeScript are the baseline. Evaluate and introduce layout, network/BaB rendering, and plotting dependencies when their features start.
@@ -115,3 +121,13 @@ First-version implementation decisions (2026-11-03): development uses the Vite d
 Fuzzing decision (2026-11-03): ACT's fuzzer is a third run method (`fuzz`) on the existing run lifecycle rather than a separate subsystem, so it inherits the worker, idempotency, records, SSE replay, and export. The worker reports progress as JSON lines over an inherited pipe, because ACT owns stdout; the supervisor commits each line as a `fuzz.progress` event. A fuzzing verdict is `falsified` only when ACT's PropertyChecker accepted a counterexample and is otherwise `unknown`; the workbench never presents fuzzing as certification (EXE-04, VER-06).
 
 Record decision changes here first. Extract ADRs when independent maintenance becomes useful.
+
+Live fuzz control decision (2026-11-06, ACT-08): `fuzz.control` independently gates the public ACT
+option registry, observation records and thread-safe batch-boundary controls. The pinned baseline
+retains its private observation seams and stop fallback. The workbench sends JSON commands over a
+second inherited worker pipe; ACT change records and worker pause flags return on the progress pipe
+and become committed fuzz events. The run manifest freezes initial live values, applied updates
+reconstruct current state, and persisted per-run request-ID receipts prevent retry duplication.
+Queued responses are distinct from ACT's applied/rejected changes. The supervisor excludes pause
+time and uses applied timeout changes when enforcing its outer deadline. Workbench code imports
+only bridge controls; it never imports ACT.

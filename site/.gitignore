@@ -1,0 +1,11 @@
+node_modules/
+.vitepress/cache/
+.vitepress/dist/
+# Copied by sync-docs.mjs from the repository; edit the originals.
+content/README.md
+content/AGENTS.md
+content/fuzzingGuide.gif
+content/docs/
+content/visual_bench/
+content/engine_bridge/
+content/site/

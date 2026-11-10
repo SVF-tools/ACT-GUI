@@ -31,16 +31,16 @@ BASE-02 does not wait for ACT; only BASE-03 needs the pinned engine. Development
 | --- | --- | --- | --- |
 | visual_bench/workspace | C | WS-01, WS-02, WS-03, WS-04 | [README](../visual_bench/workspace/README.md) |
 | visual_bench/model_spec | C | MSV-01, MSV-02, MSV-03, MSV-04, MSV-05 | [README](../visual_bench/model_spec/README.md) |
-| visual_bench/verification | B | VER-01, VER-02, VER-03, VER-04, VER-07 (stop, verdict banner), VER-11 (counterexample save/export), VER-12 (run diagnostics, reproduction snapshot) | [README](../visual_bench/verification/README.md) |
-| visual_bench/fuzzing | B (service), C (views) | VER-06, VER-07 (saved counterexamples) | [README](../visual_bench/fuzzing/README.md) |
+| visual_bench/verification | B | VER-01, VER-02, VER-03, VER-04, VER-07 (stop, verdict banner), VER-11 (counterexample save/export), VER-12 (run diagnostics, reproduction snapshot), VER-16 (fuzz worker control channel) | [README](../visual_bench/verification/README.md) |
+| visual_bench/fuzzing | B (service), C (views) | VER-06, VER-07 (saved counterexamples), VER-15 (option schema and live controls) | [README](../visual_bench/fuzzing/README.md) |
 | visual_bench/engine | B | VER-05, VER-08 (ACT branch switching), VER-09 (capability gating), VER-10 (user-entered repositories) | [README](../visual_bench/engine/README.md) |
 | visual_bench/bab | C | BAB-01, BAB-02, BAB-03 | [README](../visual_bench/bab/README.md) |
 | visual_bench/analysis | D | ANA-01, ANA-02, ANA-03 | [README](../visual_bench/analysis/README.md) |
 | visual_bench/assistant | B | AI-01, AI-02, AI-03, AI-04 | [README](../visual_bench/assistant/README.md) |
-| visual_bench/records | B | REC-01, REC-02, REC-03, REC-04 | [README](../visual_bench/records/README.md) |
-| engine_bridge/engine_session | B | ES-01, ES-02, ES-03, ES-04, ES-05, ES-06 | [README](../engine_bridge/engine_session/README.md) |
+| visual_bench/records | B | REC-01, REC-02, REC-03, REC-04, REC-05 (fuzz command receipts) | [README](../visual_bench/records/README.md) |
+| engine_bridge/engine_session | B | ES-01, ES-02, ES-03, ES-04, ES-05, ES-06, ES-07 | [README](../engine_bridge/engine_session/README.md) |
 | engine_bridge/model_spec | B | MSB-01, MSB-02, MSB-03, MSB-04 | [README](../engine_bridge/model_spec/README.md) |
-| engine_bridge/execution | B | EXE-01, EXE-02, EXE-03, EXE-04, EXE-05 | [README](../engine_bridge/execution/README.md) |
+| engine_bridge/execution | B | EXE-01, EXE-02, EXE-03, EXE-04, EXE-05, EXE-06, EXE-07 | [README](../engine_bridge/execution/README.md) |
 | engine_bridge/inspection | A | INSP-01, INSP-02, INSP-03 | [README](../engine_bridge/inspection/README.md) |
 | engine_bridge/events | A | EVT-01, EVT-02, EVT-03 | [README](../engine_bridge/events/README.md) |
 
@@ -70,8 +70,9 @@ A owns ACT public-interface and scientific-semantics work. BASE-01 produces the 
 | ACT-03 | A | Committed node/wave observation hooks with commit and rollback points | EVT-02 | EVT-01 | A native ACT test shows rolled-back work never appears as committed; batch identity, sequence, and revision are emitted. |
 | ACT-04 | A | Geometry/projection export with coordinates, representation, and guarantee | INSP-02 | ACT-01 | A native ACT test exports a declared projection with its guarantee; interval-only methods report interval-only. |
 | ACT-05 | A | Pause/step/split/cancel at safe boundaries with explicit rejection results | EXE-03 | ACT-02, ACT-03 | Each supported control has a native ACT test, including stale-target and failed-precondition rejection; unsupported controls are declared unsupported. |
-| ACT-06 | A | Per-layer, per-neuron propagation records for `verify_once` (branch `act-gui-match` of guanqin-123/ACT, API `act/back_end/observe.py`; the branch's `verify_once` dual path also falsifies with the concrete dual witness) | INSP-04, INSP-05 | ACT-01 | Native ACT tests: records keyed by scope/domain/pass/layer/stage/version arrive in propagation order; last versions equal `collect_facts` facts bitwise; dual alpha equals `DualResult.alpha_state`; verdicts bitwise equal with the observer off/on; measured observer-off overhead vs SVF main is reported (< 1% target). |
+| ACT-06 | A | Per-layer, per-neuron propagation records for `verify_once` (branch `act-gui-match` of guanqin-123/ACT, API `act/pipeline/gui/verifier_gui.py`; the branch's `verify_once` dual path also falsifies with the concrete dual witness) | INSP-04, INSP-05 | ACT-01 | Native ACT tests: records keyed by scope/domain/pass/layer/stage/version arrive in propagation order; last versions equal `collect_facts` facts bitwise; dual alpha equals `DualResult.alpha_state`; verdicts bitwise equal with the observer off/on; measured observer-off overhead vs SVF main is reported (< 1% target). |
 | ACT-07 | A | `verify_once` dual options: alpha iterations with fixed or recomputed forward bounds and a `DualConfig` optimizer policy (`dual_iters`, `dual_config`, `dual_refresh_forward`; branch `act-gui-match`) | EXE-06, VER-14 | ACT-06 | Defaults keep `verify_once` bitwise unchanged; optimized alpha tightens the dual bound on `bab_deep_mlp` (GUI test `test_dual_alpha_optimization_reaches_act`). |
+| ACT-08 | A | Public fuzz option metadata, start/step/change/end records and `FuzzControl` pause/resume/stop/update at batch boundaries (branch `act-gui-match`) | ES-07, EXE-07, VER-15/16 | ACT-06 | GUI native `execution/test_fuzz_control.py` compares observation with the legacy path, verifies updates while paused and stop reasons; `test_fuzz_worker.py` checks both pipe and SIGTERM stop. Capability remains optional on the pinned baseline. |
 
 Each ACT task completes either with a linked ACT issue/PR whose tested commit becomes the new pinned GUI baseline, or with BASE-01 evidence that the current baseline already provides the capability (closed with no ACT change). Keep the GUI baseline pinned; do not silently track ACT main. Switching to another branch in the Engine tab (VER-08) is an explicit, recorded user choice and does not move the pinned baseline.
 
@@ -135,6 +136,14 @@ Recorded 2026-11-03 against ACT `deff2fb0c031` (branch CLIMB, tracked tree clean
 | ID | Owner | Depends on | Required evidence |
 | --- | --- | --- | --- |
 | REL-01 | B | MSV-02, MSV-03, WS-03, BAB-03, ANA-03, AI-04, REC-04, EVT-03, ES-03, DIST-01 | Run the real model→verification→BaB→propagation→AI evidence/authorized plan→record/replay/export flow on declared Windows/macOS/Linux browser configurations; record supported engine combinations, performance measurements, and limitations. |
+
+Live fuzz backend milestone (2026-11-06): ACT-08 → ES-07 → EXE-07 → VER-16/REC-05 → VER-15
+adds optional public observation, option discovery, worker controls, committed change/pause events,
+and persisted command deduplication. Default suite: 156 passed, 24 skipped, 3 known failures.
+Native bridge suite: 61 passed, 20 existing baseline/catalog failures; all 17 new native fuzz tests
+passed. Wire generation/drift check passed. Exact commands, failure categories, and scope are in
+[execution validation](../engine_bridge/execution/README.md#validation). Browser acceptance remains
+separate from this backend evidence.
 
 A release may explicitly omit an unsupported control only through a documented scope change: keep the capability disabled, update affected task acceptance, and report the limitation. Do not mark an unimplemented task complete merely because its button is hidden.
 

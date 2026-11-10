@@ -7,7 +7,61 @@ from pydantic import Field, model_validator
 
 from visual_bench.wire import WireNumber, Scalar, Availability, RunState, Wire
 
-__all__ = ['FuzzMutationWeights', 'FuzzOptions', 'FuzzPointOut', 'FuzzStrategyOut', 'FuzzCounterexampleOut', 'FuzzSeedOut', 'FuzzSummaryOut', 'FuzzFrameOut', 'SavedCounterexampleOut', 'SaveCounterexampleRequest', 'FuzzingOut']
+__all__ = ['FuzzMutationWeights', 'FuzzOptions', 'FuzzPointOut', 'FuzzStrategyOut', 'FuzzCounterexampleOut', 'FuzzSeedOut', 'FuzzSummaryOut', 'FuzzFrameOut', 'SavedCounterexampleOut', 'SaveCounterexampleRequest', 'FuzzingOut',
+           'FuzzOptionOut', 'FuzzOptionsSchemaOut', 'FuzzControlRequest', 'FuzzControlOut', 'FuzzConfigChangeOut',
+           'FuzzControlStateOut']
+
+FuzzOptionValue = int | float | bool | str | dict[str, float] | None
+
+
+class FuzzOptionOut(Wire):
+    name: str
+    kind: Literal["int", "float", "bool", "choice", "weights"]
+    live: bool
+    description: str
+    choices: list[str]
+    minimum: float | None
+    maximum: float | None
+    exclusive_minimum: bool
+    default: FuzzOptionValue
+
+
+class FuzzOptionsSchemaOut(Wire):
+    options: list[FuzzOptionOut]
+    live_control: bool
+
+
+class FuzzControlRequest(Wire):
+    action: Literal["pause", "resume", "stop", "update"]
+    changes: dict[str, FuzzOptionValue] | None = None
+    request_id: str = Field(min_length=1, max_length=200)
+
+    @model_validator(mode="after")
+    def _update_payload(self) -> "FuzzControlRequest":
+        if self.action != "update" and self.changes is not None:
+            raise ValueError("changes is only valid for action update")
+        return self
+
+
+class FuzzControlOut(Wire):
+    run_id: str
+    action: Literal["pause", "resume", "stop", "update"]
+    request_id: str
+    status: Literal["queued", "duplicate"]
+    changes: dict[str, FuzzOptionValue] | None
+
+
+class FuzzConfigChangeOut(Wire):
+    iteration: int
+    requested: dict[str, FuzzOptionValue]
+    applied: dict[str, FuzzOptionValue]
+    rejected: str
+
+
+class FuzzControlStateOut(Wire):
+    paused: bool
+    live: dict[str, FuzzOptionValue]
+    changes: list[FuzzConfigChangeOut]
 
 
 class FuzzMutationWeights(Wire):
@@ -62,14 +116,15 @@ class FuzzCounterexampleOut(Wire):
     spec_row: int
     severity: WireNumber
     true_class: int | None
-    input: list[WireNumber]
+    # Input-sized vectors are None above DISPLAY_VALUES values (too large to display); the record keeps `input`.
+    input: list[WireNumber] | None
     output: list[WireNumber]
-    seed_input: list[WireNumber]
+    seed_input: list[WireNumber] | None
     seed_output: list[WireNumber] | None = None  # absent in records written before it was captured
 
 class FuzzSeedOut(Wire):
     row: int
-    input: list[WireNumber]
+    input: list[WireNumber] | None  # None above DISPLAY_VALUES values
     output: list[WireNumber]
 
 class FuzzSummaryOut(Wire):
@@ -86,6 +141,7 @@ class FuzzSummaryOut(Wire):
     rng_seed: int
     device: str
     stopped: bool = False  # ended early on a user stop request
+    stop_reason: str | None = None
 
 class FuzzFrameOut(Wire):
     """Lane 0 of the batch ACTFuzzer mutated in one iteration. Display only; not a counterexample unless violation."""
@@ -95,8 +151,8 @@ class FuzzFrameOut(Wire):
     seed_row: int
     depth: int
     violation: bool
-    input: list[WireNumber]
-    seed_input: list[WireNumber]
+    input: list[WireNumber] | None  # None above DISPLAY_VALUES values
+    seed_input: list[WireNumber] | None
     counterexample: FuzzCounterexampleOut | None = None  # ACT's newest counterexample of a violating iteration
 
 class SavedCounterexampleOut(Wire):
@@ -123,3 +179,4 @@ class FuzzingOut(Wire):
     saved: list[SavedCounterexampleOut] = []  # counterexamples the user saved, in save order
     config: dict[str, Scalar]
     provenance: dict[str, str]
+    control: FuzzControlStateOut | None = None

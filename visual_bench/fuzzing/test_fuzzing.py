@@ -11,6 +11,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from engine_bridge.contracts import DISPLAY_VALUES
+from visual_bench.fuzzing.service import counterexample_out, frame_out
 from visual_bench.server import create_app
 from visual_bench.testing import follow_to_end, sources_or_skip
 
@@ -93,6 +95,16 @@ def test_fuzz_defaults_match_the_pinned_act_pipeline_yaml(client: TestClient):
     act = fuzzing_defaults()
     assert act and {k: served[k] for k in act} == act
 
+
+def test_fuzz_options_schema_describes_legacy_defaults(client: TestClient):
+    from engine_bridge.execution import fuzzing_defaults
+
+    schema = client.get("/api/fuzz/options")
+    assert schema.status_code == 200
+    options = schema.json()["options"]
+    assert {o["name"]: o["default"] for o in options} == fuzzing_defaults()
+    assert not schema.json()["live_control"] and not any(o["live"] for o in options)
+
 def test_fuzz_hyperparameters_reach_act_and_invalid_ones_are_rejected(client: TestClient):
     zero = {k: 0 for k in ("gradient", "pgd", "activation", "boundary", "random")}
     bad = client.post("/api/runs", json={"model_id": "unsafe_linear", "method": "fuzz",
@@ -156,3 +168,16 @@ def test_vnnlib_properties_on_one_network_are_one_net_fuzzed_row_by_row(client: 
     assert fz["config"]["batch_size"] == 3 and [s["row"] for s in fz["seeds"]] == [0, 1, 2]
     rebuilt = client.post(f"/api/models/{m['model_id']}/rebuild").json()
     assert rebuilt["model_id"] == m["model_id"]
+
+
+def test_input_vectors_too_large_to_display_are_omitted_from_responses():
+    big, small = [0.5] * (DISPLAY_VALUES + 1), [0.5] * 4
+    ce = {"index": 0, "iteration": 1, "elapsed_s": 0.1, "strategy": "s", "kind": "UNSAFE_LINEAR", "spec_row": 0,
+          "severity": 1.0, "true_class": None, "input": big, "output": [0.6], "seed_input": None, "seed_output": [0.5]}
+    out = counterexample_out(ce)
+    assert (out.input, out.seed_input, out.output) == (None, None, [0.6])
+    frame = {"iteration": 1, "elapsed_s": 0.1, "strategy": "s", "seed_row": 0, "depth": 1, "violation": True,
+             "input": small, "seed_input": small, "counterexample": {**ce, "input": small, "seed_input": small}}
+    shown = frame_out(frame)
+    assert shown.input == small and shown.counterexample is not None and shown.counterexample.input == small
+    assert frame_out({**frame, "input": big, "seed_input": None}).input is None

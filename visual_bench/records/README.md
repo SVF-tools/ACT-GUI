@@ -11,6 +11,7 @@ Current responsibility: persist run manifests, ordered lifecycle events, sealed 
 | Change zip contents | RecordStore.export_zip in [store.py](store.py), export coverage tests | [routes.py](routes.py) for HTTP headers/errors only; [api.ts](api.ts) or view only if URL/download interaction changes. |
 | Add a scientific artifact | Producing worker/bridge plus [verification](../verification/README.md#change-guide) artifact write path | Existing generic RecordStore may need no change. [analysis](../analysis/README.md#change-guide) is a reader, not the layers.json writer. |
 | Change saved counterexample annotations | [fuzzing](../fuzzing/README.md#change-guide) service/schema/view | RecordStore annotation methods are reused unless persistence guarantees change. Annotations are not part of the artifact seal. |
+| Add persisted command receipts | [store.py](store.py) annotation allowlist and the owning service | Fuzzing writes `fuzz_control_requests.json` for per-run request-ID deduplication; receipts are included in export and never replayed as commands. |
 
 Run metadata belongs to verification's schema/query; an added metadata field requires its owning schema change and `npm run gen:types`. Import and scientific snapshot replay remain planned, not available export features.
 
@@ -51,10 +52,15 @@ Run the existing record and fuzzing coverage:
 ```bash
 .venv/bin/python -m pytest visual_bench/verification/test_verification.py
 .venv/bin/python -m pytest visual_bench/fuzzing/test_fuzzing.py
+.venv/bin/python -m pytest visual_bench/fuzzing/test_control.py
 npm test
 ```
 
 Observable behavior: the Records tab shows verification's selected run metadata, the export button requests the records route, incomplete runs report that export requires a sealed record, and the downloaded zip contains only relative run paths plus sealed artifacts, events, hashes, and available annotations. These are validation instructions, not a new test result.
+
+REC-05 acceptance on 2026-11-06: the full default suite included 19 passing fake-provider fuzz
+control tests, including persisted receipt lookup after completion with no repeated command.
+Full-suite commands/counts are recorded in [execution validation](../../engine_bridge/execution/README.md#validation).
 
 ## Reference and Backlog
 
@@ -87,6 +93,7 @@ blobs/<sha256>.f32             propagation tensor envelopes, deduplicated within
 fuzzing.json                  fuzzing result when applicable
 artifacts.json                sha256 seal for available artifacts
 saved_counterexamples.json    mutable user annotation, included in export
+fuzz_control_requests.json    queued command receipts keyed by request_id, included in export
 diagnostics.json              worker warnings/logs/error location and engine snapshot (verification VER-12)
 act_stdout.log                scrubbed tail of the worker's stdout (ACT's prints)
 worker_stderr.log             scrubbed tail of the worker's stderr
@@ -119,6 +126,7 @@ Focused storage and API check: `.venv/bin/python -m pytest visual_bench/analysis
 | REC-02 | Persist commit batches and snapshot boundaries | REC-01, EVT-02 | A simulated interrupted write recovers the last committed prefix; incomplete references are never visible. |
 | REC-03 | Implement replay, coverage, and resync reads | REC-02 | Snapshot S plus following events reproduces recorded state; missing/expired history is explicitly represented. |
 | REC-04 | Export fixed research data and figure configuration | REC-03, ANA-02 | Export/import preserves numerical data, selected coordinates, guarantees, revision, and plot configuration; invalid bundle paths are rejected. |
+| REC-05 | Persist fuzz control idempotency receipts | REC-01, VER-16 | The annotation allowlist includes `fuzz_control_requests.json`; `fuzzing/test_control.py` verifies that a duplicate after completion returns the original receipt without another pipe write. Receipt semantics remain fuzzing-owned. |
 
 Current status: REC-01 is implemented. REC-02 and REC-03 are partial through lifecycle events, recovery, and replay. REC-04 has sealed export only, not import. User annotations are written atomically, are not hashed into `artifacts.json`, and are included in exports.
 

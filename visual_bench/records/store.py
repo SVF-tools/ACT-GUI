@@ -31,7 +31,7 @@ from typing import Any
 _RUN_ID = re.compile(r"^run-[0-9a-f]{12}$")
 ARTIFACTS = ("manifest.json", "result.json", "layers.json", "fuzzing.json", "propagation.json")
 # User annotations may be written before or after sealing; they never change a sealed artifact.
-ANNOTATIONS = ("saved_counterexamples.json",)
+ANNOTATIONS = ("saved_counterexamples.json", "fuzz_control_requests.json")
 DIAGNOSTICS = ("diagnostics.json", "act_stdout.log", "worker_stderr.log")
 
 

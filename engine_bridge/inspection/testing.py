@@ -10,14 +10,21 @@ from typing import Any
 from engine_bridge.engine_session import act_imports
 
 
+_RECORDS = ("RecordKey", "LayerBounds", "Relaxation", "DualBackward", "SpecBound")
+
+
 def observation_api():
-    """Use the real observer registry when present, otherwise a schema-only stub."""
+    """Use ACT's shared channel and verifier records when present, otherwise a schema-only stub."""
     with act_imports():
         try:
-            return importlib.import_module("act.back_end.observe")
+            common = importlib.import_module("act.pipeline.gui.act_gui")
+            verifier = importlib.import_module("act.pipeline.gui.verifier_gui")
         except ModuleNotFoundError as exc:
-            if exc.name != "act.back_end.observe":
+            if exc.name not in ("act.pipeline.gui", "act.pipeline.gui.act_gui", "act.pipeline.gui.verifier_gui"):
                 raise
+        else:
+            return SimpleNamespace(**{name: getattr(verifier, name) for name in _RECORDS},
+                                   PhaseEvent=common.PhaseEvent, observe=common.observe, emit=common.emit)
 
     @dataclass
     class RecordKey:
@@ -34,8 +41,8 @@ def observation_api():
     class PhaseEvent:
         phase: str
         status: str
-        t_ns: int
         meta: dict = field(default_factory=dict)
+        t_ns: int = field(default=0, kw_only=True)
 
     @dataclass
     class LayerBounds:
@@ -43,8 +50,8 @@ def observation_api():
         kind: str
         lb: Any
         ub: Any
-        t_ns: int
         changed: bool = True
+        t_ns: int = field(default=0, kw_only=True)
 
     @dataclass
     class Relaxation:

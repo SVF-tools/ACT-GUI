@@ -25,6 +25,7 @@ export const keys = {
   coverage: (id: string | null) => [...run(id), "coverage"] as const,
   fuzzing: (id: string | null) => [...run(id), "fuzzing"] as const,
   fuzzDefaults: () => ["fuzz", "defaults"] as const,
+  fuzzOptions: () => ["fuzz", "options"] as const,
   verificationDefaults: () => ["verification", "defaults"] as const,
   engine: () => ["engine"] as const,
   gurobi: () => ["engine", "gurobi"] as const,

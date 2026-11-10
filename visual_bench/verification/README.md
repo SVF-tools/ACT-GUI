@@ -11,6 +11,7 @@ The module does not implement verification algorithms, import ACT directly, own 
 | Change run validation or idempotency | [schemas.py](schemas.py) / [service.py](service.py), focused lifecycle tests | Worker only if an execution argument changes; existing nested fuzz options are forwarded, not individually mapped here. |
 | Add an ACT run method | Bridge method/invocation support, [schemas.py](schemas.py), [worker.py](worker.py), tests and consuming mode/control | Service scheduling and records can be reused if the request/outcome shape still fits. Coordinate [workspace](../workspace/README.md#change-guide) for mode registration. |
 | Change stop or worker supervision | [service.py](service.py), lifecycle tests | [worker.py](worker.py) only if signal/output handling changes; fuzz-specific adaptation belongs to fuzzing/bridge. |
+| Change fuzz control transport or deadlines | `RunService.send_fuzz_control`, `_supervise` in [service.py](service.py), [worker.py](worker.py) | Fuzzing owns request validation/idempotency and projects the returned control events. Native pipe tests are in `engine_bridge/execution/test_fuzz_worker.py`. |
 | Add an event or run projection field | Owning commit/projection code and schema when shape changes, focused tests | Event payloads and SSE forwarding are generic; change routes/hooks only if replay, subscription or invalidation semantics change. |
 | Change history/control presentation | [RunsPanel.tsx](RunsPanel.tsx), [RunHistory.tsx](RunHistory.tsx), [VerdictBanner.tsx](VerdictBanner.tsx) as relevant | No ACT or record change when existing RunOut suffices. |
 | Change captured diagnostics or the reproduction snapshot | [diagnostics.py](diagnostics.py) (capture, path scrubbing, snapshot zip), [test_diagnostics.py](test_diagnostics.py) | [worker.py](worker.py) for what the worker captures; `RunService._write_diagnostics`/`snapshot` in [service.py](service.py) for supervisor-side data; `RunDiagnosticsOut` + `npm run gen:types` only if the history summary changes. |
@@ -105,12 +106,21 @@ flowchart TB
 | Stop | `RunService.stop`, `_signal_stop` | Idempotent; fuzz gets a grace period, verify and BaB are killed | [Fuzzing](../fuzzing/README.md) owns ACT stopped summary |
 | Verdict | `_commit_result`, `RunResultOut` | Workbench reports ACT verdict and keeps no result after forced verify stop | Banner is shared by Verification and BaB modes |
 
+Fuzz workers inherit a second pipe: the supervisor writes JSON control commands and the worker's
+reader thread invokes bridge `FuzzRunControl`. The progress pipe returns applied updates and pause
+flags through `FuzzLive.observe` for ordered event commit. The service freezes initial live option
+values in the manifest, closes control descriptors when the worker finishes, and retains SIGTERM
+plus the existing grace kill as stop fallback. SIGTERM wakes paused ACT runs. The supervisor
+deadline excludes reported pause time and follows applied `timeout_seconds` updates, so it does
+not kill a valid paused or extended run at the original wall-clock deadline.
+
 ## Validation
 
 Run the module's real ACT tests:
 
 ```bash
 .venv/bin/python -m pytest visual_bench/verification
+ACT_CODE_ROOT=/data1/guanqin/ACT-wt/act-gui-match .venv/bin/python -m pytest engine_bridge/execution/test_fuzz_worker.py
 ```
 
 Acceptance is observable when start returns without waiting for ACT completion, SSE delivers ordered events through a terminal event, identical `client_request_id` requests return the same run, conflicting parameters return 409, ACT results and native parity are exposed, and forced verify or BaB stop ends failed without a verdict.
@@ -118,6 +128,12 @@ Acceptance is observable when start returns without waiting for ACT completion, 
 `test_diagnostics.py` fails a real ACT load on a synthetic broken net and checks the located ACT frame, the snapshot contents, path scrubbing, and that the snapshot's `reproduce.py` reproduces the same error and location.
 
 Use `visual_bench/fuzzing/test_fuzzing.py` for fuzz stop and saved counterexamples. Use `npm test` for browser selection and query behavior. Do not claim checks were run unless the command and result are recorded.
+
+Live-control acceptance on 2026-11-06: native worker tests passed for pause/update/resume and
+stopping while paused through either the inherited pipe or SIGTERM. The complete default suite
+reported 156 passed, 24 skipped and the three known failures. The native bridge suite reported
+61 passed and 20 existing baseline/catalog failures; all new fuzz cases passed. Exact commands and
+failure categories are recorded in [execution validation](../../engine_bridge/execution/README.md#validation).
 
 Propagation validation on 2026-11-05:
 
@@ -147,7 +163,7 @@ Propagation validation on 2026-11-05:
 | Layer | Entry | Contract or artifact | Owner for handoff |
 | --- | --- | --- | --- |
 | Wire | [schemas.py](schemas.py) | `RunRequest`, `RunOut`, `RunResultOut`, `RunEvent` | `visual_bench/schemas.py` re-exports wire models for generation |
-| Service | [service.py](service.py) | `RunService.start`, `stop`, `get`, `list`, `request`, `save_counterexample`, `saved_counterexample_file`; `vnncomp_sat` formats VNN-COMP witnesses for this module and fuzzing; records are authoritative | `workbench.py` injects records, model, engine, and live collaborators |
+| Service | [service.py](service.py) | `RunService.start`, `stop`, `send_fuzz_control`, `get`, `list`, `request`, `save_counterexample`, `saved_counterexample_file`; `vnncomp_sat` formats VNN-COMP witnesses for this module and fuzzing; records are authoritative | `workbench.py` injects records, model, engine, and live collaborators |
 | Worker | [worker.py](worker.py) | Executes one request in a child process, writes output (with `diagnostics`) atomically, sends fuzz or propagation index entries on an inherited pipe; records full propagation through `records/propagation.py` | Bridge owns ACT invocation; fuzzing shapes its method result |
 | Propagation tests | [test_propagation.py](test_propagation.py) | Real observer-capable ACT worker, pipe, `verify.propagation` SSE, own-domain layer states, index/detail queries and sealed blobs in interval/HybridZ/dual runs | Skipped on checkouts without `observe.propagation`; synthetic storage coverage is in analysis |
 | Diagnostics | [diagnostics.py](diagnostics.py) | `Capture`, `scrubber`, `summary`, `printed_problems`, `snapshot_zip`; `RunDiagnosticsOut` on `RunOut.diagnostics`; `GET /api/runs/{id}/snapshot` | records stores the diagnostics files; RunHistory offers the download |
@@ -181,8 +197,10 @@ Dependencies are acceptance prerequisites, not code-import instructions. Moved t
 | VER-04 | Implement the shared command gateway | VER-03, EXE-03 | Same-ID retry cannot apply twice; changed parameters, stale revision, unsupported actions, and expired authority are rejected. |
 | VER-13 | Stream propagation records live and store them | VER-02, INSP-04 | Implemented in `worker.py`, `service.py`, and `records/propagation.py`: all `interval` methods (interval/HybridZ/dual domains) run under the sink when `observe.propagation` passes. Full float32 tensor envelopes are content-addressed and the complete `propagation.json` index plus blobs are sealed. Pipe lines `{"propagation": <index entry>}` become `verify.propagation` SSE events; notifications coalesce to at most 10/s plus a final flush, while stored history stays complete. Final layer states come from the run's own forward records, including labeled dual pre-activation bounds. Older ACT records `availability: unavailable` and retains INSP-01 fallback. `test_propagation.py` exercises the real worker/pipe/SSE/API flow for all domains when the active ACT supports observation; otherwise those tests skip. |
 | VER-14 | Set verify_once domain options in the run form | VER-02, EXE-06 | `RunRequest.dual` (`DualOptions`: alpha `fixed` / `optimize` / `optimize_refresh`, iterations, learning rate, decay, per-class alpha, stagnation patience/tolerance, max time, forward linear cap) and `RunRequest.hybridz` (`HybridzOptions.tolerance`) are valid only with their domain; the service fills in the defaults, records them on the run (`RunOut.dual` / `.hybridz`) and requires `verify.dual.options` for non-default dual options. `GET /api/verification/defaults` serves the defaults (equal to ACT's `DualConfig`). `VerifySettings.tsx` shows Alpha and Iterations after the domain select and the rest in a collapsible section with reset, like the fuzz settings. Evidence: `test_verification.py::test_verification_defaults_match_act_dual_config`, `::test_dual_alpha_optimization_reaches_act` (skips unless the engine passes `verify.dual.options`), invalid-option cases in `::test_invalid_run_requests_are_structured_errors`. |
+| VER-16 | Carry live fuzz controls through the shared worker lifecycle | VER-02, EXE-07 | A second inherited pipe carries commands; progress messages commit control and pause events; supervisor deadlines follow pause state and applied timeout changes. Native `test_fuzz_worker.py` verifies pause/update/resume and pipe/SIGTERM stop while paused; service tests verify command delivery and legacy fallback. |
 
-
-The original design targets `run_state.py` and `commands.py` are not current files. Add them only with VER-03 or VER-04 work. Scientific snapshots, command receipts, pause, step, split, and live ACT handles require the corresponding engine capabilities and committed event contract.
+The original design targets `run_state.py` and `commands.py` are not current files. Scientific
+snapshots and verification/BaB pause/step/split still require their own engine capabilities;
+the implemented fuzz control channel does not imply those capabilities.
 
 </details>

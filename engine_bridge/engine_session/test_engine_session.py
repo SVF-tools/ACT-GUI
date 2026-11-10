@@ -36,7 +36,8 @@ def test_probe_missing_act_is_a_deterministic_error(tmp_path):
 def test_probe_version_mismatch_is_a_warning():
     info = probe("0" * 40)
     assert info.usable
-    assert [d.code for d in info.diagnostics] == ["version_mismatch"]
+    assert "version_mismatch" in [d.code for d in info.diagnostics]
+    assert {d.severity for d in info.diagnostics} == {"warning"}
 
 def test_branch_checkout_is_staged_reused_and_linked_to_baseline_assets(tmp_path):
     url, commits = fake_act_remote(tmp_path / "remote")
@@ -75,14 +76,16 @@ def test_pinned_baseline_passes_every_api_check():
     # ACT-06 and ACT-07 are deliberately optional on this pinned baseline. Keep every existing
     # adapter check mandatory and assert the precise missing observation surface.
     assert info.api_checks
-    required = [c for c in info.api_checks if c.capability not in ("observe.propagation", "verify.dual.options")]
+    required = [c for c in info.api_checks if c.capability not in ("observe.propagation", "verify.dual.options", "fuzz.control")]
     assert required and [c for c in required if not c.ok] == []
     observation = [c for c in info.api_checks if c.capability == "observe.propagation"]
     assert {c.symbol for c in observation if not c.ok} == {
-        f"act.back_end.observe:{name}" for name in
-        ("observe", "emit", "RecordKey", "LayerBounds", "Relaxation", "DualBackward", "SpecBound")}
+        *(f"act.pipeline.gui.act_gui:{name}" for name in ("observe", "emit")),
+        *(f"act.pipeline.gui.verifier_gui:{name}" for name in
+          ("RecordKey", "LayerBounds", "Relaxation", "DualBackward", "SpecBound"))}
     assert next(c for c in info.capabilities if c.name == "observe.propagation").availability == "unsupported"
     assert next(c for c in info.capabilities if c.name == "verify.dual.options").availability == "unsupported"
+    assert next(c for c in info.capabilities if c.name == "fuzz.control").availability == "unsupported"
     assert {c.capability for c in info.api_checks} <= {c.name for c in info.capabilities}
 
 def test_api_check_reports_missing_symbols_and_signature_mismatches():
@@ -93,6 +96,25 @@ def test_api_check_reports_missing_symbols_and_signature_mismatches():
         assert "does not accept no_such_param" in _check(
             Requirement("act.back_end.bab.bab:verify_bab_batched", ("net", "no_such_param")))
         assert "positional arguments" in _check(Requirement("act.back_end.analyze:analyze", positional=9))
+
+
+def test_capability_availability_is_cached_per_checkout(monkeypatch, tmp_path):
+    """Synthetic requirement: cache mechanics only, not evidence of native ACT capability."""
+    from contextlib import nullcontext
+    from engine_bridge.engine_session import parity, session
+
+    checked = []
+    monkeypatch.setattr(parity, "requirements", lambda: {"test.control": (Requirement("fake:control"),)})
+    monkeypatch.setattr(parity, "_check", lambda req: checked.append(req.symbol))
+    monkeypatch.setattr(session, "act_imports", lambda root: nullcontext(root))
+    monkeypatch.setattr(session, "act_code_root", lambda: tmp_path / "first")
+    assert parity.capability_available("test.control")
+    assert parity.capability_available("test.control")
+    assert checked == ["fake:control"]
+    monkeypatch.setattr(session, "act_code_root", lambda: tmp_path / "second")
+    assert parity.capability_available("test.control")
+    assert checked == ["fake:control", "fake:control"]
+    assert not parity.capability_available("unknown")
 
 def test_gurobi_probe_reports_gurobi_license_rejection(tmp_path):
     lic = tmp_path / "gurobi.lic"

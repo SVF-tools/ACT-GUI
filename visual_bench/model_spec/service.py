@@ -14,7 +14,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from engine_bridge.contracts import BridgeError, VnnlibInstance
+from engine_bridge.contracts import DISPLAY_VALUES, BridgeError, VnnlibInstance
 from engine_bridge.engine_session import act_root
 from engine_bridge.execution import UNIVERSAL_METHODS, required_capability, verify_methods
 from engine_bridge.model_spec import describe_model, file_sha256
@@ -177,9 +177,12 @@ class ModelService:
         self._load_checks[(model_id, act_commit)] = True
         raw = asdict(d)
         for spec in raw["input_specs"]:
-            spec["lb"], spec["ub"] = wire_numbers(spec["lb"]), wire_numbers(spec["ub"])
-            if spec["center"] is not None:
-                spec["center"] = wire_numbers(spec["center"])
+            rows = spec["shape"][0] if len(spec["shape"]) == 4 and spec["shape"][0] > 1 else 1
+            per_row = len(spec["lb"]) // rows  # the browser shows a batched spec one row at a time
+            shown = per_row <= DISPLAY_VALUES
+            spec["lb"] = wire_numbers(spec["lb"]) if shown else None
+            spec["ub"] = wire_numbers(spec["ub"]) if shown else None
+            spec["center"] = wire_numbers(spec["center"]) if shown and spec["center"] is not None else None
         if raw["output_spec"] and raw["output_spec"]["thresholds"] is not None:
             raw["output_spec"]["thresholds"] = wire_numbers(raw["output_spec"]["thresholds"])
         raw.pop("source_path")

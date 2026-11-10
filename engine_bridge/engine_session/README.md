@@ -12,6 +12,7 @@ For project navigation, see [engine_bridge flow](../README.md#flow-diagram) and 
 | Change branch staging or import switching | [checkouts.py](checkouts.py) (git), `act_code_root` / `act_imports` in [session.py](session.py), tests | Which remotes are offered and which checkout is active belong to [visual_bench/engine](../../visual_bench/engine/README.md#change-guide). |
 | Call a new ACT function from an adapter | Add it to that capability's requirements in [parity.py](parity.py) with the keyword parameters and positional count the adapter passes | `test_pinned_baseline_passes_every_api_check` must stay green; the workbench then gates the feature on the result. |
 | Advertise a capability | Prove the native ACT path, then update _BASELINE_CAPABILITIES, its [parity.py](parity.py) requirements and the owning adapter/test | Update workbench gating only if availability/contract changes, not just because a capability label is added. |
+| Query optional fuzz control support inside an adapter | Public `capability_available(name)` in [parity.py](parity.py), exported by `__init__.py` | Cached by capability and active checkout path; full `probe` still reports each requirement and its diagnostic. |
 | Change Gurobi probing | probe_gurobi in [session.py](session.py), probe tests | License storage/upload policy belongs to [visual_bench/engine](../../visual_bench/engine/README.md#change-guide). |
 | Add process-local handles | ES-02 backlog and ACT lifecycle prerequisite | No current handle API exists; keep worker supervision in verification. |
 
@@ -56,7 +57,7 @@ Acceptance evidence for the stable current slice is ES-01 and ES-04 below. ES-02
 | File | Current responsibility |
 | --- | --- |
 | [session.py](session.py) | `act_root`, `act_imports`, `probe`, `probe_gurobi`, and the baseline capability table |
-| [parity.py](parity.py) | Per-capability ACT API requirements (symbol, keyword parameters, positional count) and `check_api`; interface checks, not numerical semantics |
+| [parity.py](parity.py) | Per-capability ACT API requirements, `check_api`, and cached `capability_available`; interface checks, not numerical semantics |
 | [checkouts.py](checkouts.py) | `list_branches` (`git ls-remote`), `fetch_checkout`: shallow clone of one branch head to `<engines_root>/<url hash>/<commit>`, reused per commit, with the baseline's git-ignored `data/` and `literature/` linked in |
 | [__init__.py](__init__.py) | Re-exports `act_code_root`, `act_imports`, `act_root`, `fetch_checkout`, `list_branches`, `probe`, `probe_isolated`, and `probe_gurobi` |
 | [test_engine_session.py](test_engine_session.py) | Real pinned-commit probe, missing ACT, version mismatch, Gurobi license rejection, branch staging, isolated probe and API checks against a synthetic git remote (`engine_bridge/testing.py: fake_act_remote`, not ACT), every API check passing on the pinned baseline, and missing-symbol/parameter/arity detection |
@@ -70,6 +71,15 @@ Import callers are model_spec, execution and inspection through `act_imports`, p
 requirements. Only checkouts satisfying all of them advertise availability; verification otherwise
 keeps the existing recorded interval-state fallback. The observation API is checked independently
 of the solver/domain capability needed to start a run.
+
+`fuzz.control` is independently optional on the pinned baseline. Requirements cover the public
+fuzz option registry, control methods, start/step/change/end records, observer registration,
+live validation, and the `ACTFuzzer(control=...)` parameter. A failed check leaves existing fuzz
+execution available through the legacy adapter. Native acceptance is
+`ACT_CODE_ROOT=/data1/guanqin/ACT-wt/act-gui-match .venv/bin/python -m pytest engine_bridge/execution/test_fuzz_control.py`.
+The 2026-11-06 full-suite counts and existing baseline incompatibilities are recorded in
+[execution validation](../execution/README.md#validation); the per-checkout cache regression passed
+in both runs.
 
 ### Change the ACT probe or capability list
 
@@ -110,6 +120,7 @@ This is planned work, not a current API. It requires ES-01, then ES-02 and ACT-0
 | ES-05 | Stage and probe an ACT branch head | ES-01 | `list_branches` and `fetch_checkout` stage a branch head as a reusable per-commit checkout linked to baseline assets; unknown branches raise `branch_not_found`; `ACT_CODE_ROOT` makes a fresh process import it; `probe_isolated` probes it without importing it here (`test_engine_session.py`, synthetic remote). |
 | ES-06 | Check ACT API parity per capability | ES-01 | Every capability with adapter calls lists its ACT requirements in `parity.py`; `probe` reports one `ApiCheck` each and downgrades a capability with a failed check to `unsupported` with the reason; all checks pass on the pinned baseline; a missing symbol, keyword parameter or positional arity is detected (`test_engine_session.py`). Checks cover interfaces only; numerical parity stays with the native parity tests. |
 | ES-03 | Validate cleanup and compatibility regression | ES-02 | Repeated close and post-close access produce deterministic diagnostics with no leaked resources; ES-01 incompatibility diagnostics hold across every declared engine combination. |
+| ES-07 | Gate optional public fuzz controls by API parity | ES-06, ACT-08 | `fuzz.control` is unavailable on the pinned baseline and available only when all public symbols and the control constructor argument match. `test_engine_session.py` retains mandatory baseline checks and tests capability caching per checkout; EXE-07 exercises the native API. |
 
 ## Boundaries and Cross-Module Changes
 

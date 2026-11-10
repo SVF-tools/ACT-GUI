@@ -1,0 +1,58 @@
+/* Reuse the workbench's 150px field floor, 4/6/8/12 spacing, and semantic theme roles. */
+.fuzzsettings, .fuzzcontrols {
+  --fuzz-field-min: 150px;
+  --fuzz-space-xs: 4px;
+  --fuzz-space-sm: 6px;
+  --fuzz-space: 8px;
+  --fuzz-space-group: 12px;
+  --fuzz-label-size: 12px;
+}
+.fuzzsettings, .fuzzsettings .fuzzgrid, .fuzzcontrols .fuzzgrid {
+  grid-template-columns: repeat(auto-fit, minmax(min(var(--fuzz-field-min), 100%), 1fr));
+}
+.fuzzweights {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.fuzzweights legend {
+  color: var(--muted);
+  font-size: var(--fuzz-label-size);
+  padding: var(--fuzz-space) 0 var(--fuzz-space-sm);
+}
+.fuzzweights legend small { display: inline; }
+.fuzzcontrols { margin-block: var(--fuzz-space-group); min-width: 0; }
+.fuzzcontrols .actions { align-items: center; }
+.fuzzpause { min-width: calc(8ch + 2 * var(--fuzz-space-group)); }
+.fuzzcontrols .danger { min-width: calc(17ch + 2 * var(--fuzz-space)); }
+.fuzzliveoptions { margin-top: var(--fuzz-space); }
+.fuzzliveoptions form > .actions { margin-top: var(--fuzz-space); }
+.fuzzcontrols label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fuzz-space-xs);
+  color: var(--muted);
+  font-size: var(--fuzz-label-size);
+  min-width: 0;
+}
+.fuzzcontrols input, .fuzzcontrols select { width: 100%; min-width: 0; }
+.fuzzcontrols .check { flex-direction: row; align-items: center; align-self: end; gap: var(--fuzz-space-sm); }
+.fuzzcontrols .check input { width: auto; }
+.fuzzcontrols :is(button, input, select, summary):focus-visible,
+.fuzzsettings :is(button, input, select, summary):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.fuzzcontrols :is(button, summary) { min-height: 24px; }
+.fuzzcontrols input, .fuzzsettings input { caret-color: var(--accent); }
+.fuzzcontrols input:disabled, .fuzzcontrols select:disabled { opacity: .5; }
+.fuzzchangelist { list-style: none; margin: 0; padding: 0; font-size: var(--fuzz-label-size); }
+.fuzzchangelist li { margin-block: var(--fuzz-space); overflow-wrap: anywhere; }
+.fuzzrejected { color: var(--error-text); }
+.fuzzchanges summary { cursor: pointer; color: var(--muted); font-size: var(--fuzz-label-size); }
+@media (pointer: coarse) {
+  .fuzzcontrols :is(button, summary), .fuzzsettings summary { min-height: 44px; }
+  .fuzzcontrols label, .fuzzsettings label { min-height: 44px; }
+}

@@ -1,0 +1,26 @@
+:root {
+  --vp-c-brand-1: #2f6fde;
+  --vp-c-brand-2: #4a84e8;
+  --vp-c-brand-3: #2f6fde;
+  --vp-home-hero-name-color: transparent;
+  --vp-home-hero-name-background: linear-gradient(120deg, #2f6fde 20%, #18b3a4);
+}
+
+.dark {
+  --vp-c-brand-1: #7aa7f5;
+  --vp-c-brand-2: #5c90ee;
+  --vp-c-brand-3: #3d78e6;
+}
+
+.home-demo {
+  max-width: 1152px;
+  margin: 48px auto 0;
+  padding: 0 24px;
+}
+
+.home-demo img {
+  width: 100%;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 12px;
+  box-shadow: var(--vp-shadow-3);
+}

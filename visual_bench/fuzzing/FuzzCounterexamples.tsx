@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { fmt, num } from "../shared/wire";
+import { fmt, num, tooLarge } from "../shared/wire";
 import type { FuzzCounterexampleOut, ModelDescriptionOut } from "../generated/wire";
 import { classLabel, Pixels, PerturbCompare, type Shape } from "../shared/ui/pixels";
 import { analyze, inputBox, modelShape, finiteRange, MAX_DIMS, type Box, type Ce } from "./presentation";
@@ -38,7 +38,7 @@ export function FuzzCounterexamples({ items, total, model, saved, onSave, live }
         {(all ? list : list.slice(0, GALLERY)).map((c, i) => (
           <button key={c.ce.index} className={i === sel ? "cecard active" : "cecard"} onClick={() => setSel(i)}>
             <span className="cehead"><b>#{c.ce.index + 1}</b><span className="muted">it {c.ce.iteration} · {c.ce.strategy ?? "—"}</span>{saved.has(c.ce.index) && <span className="chip good">saved</span>}</span>
-            {shape ? (
+            {!c.shown ? <span className="muted">{tooLarge(model?.input_dim ?? 0)}</span> : shape ? (
               <span className="pixrow">
                 <Pixels xs={c.seed} shape={shape} lo={lo} hi={hi} label="seed" />
                 <Pixels xs={c.x} shape={shape} lo={lo} hi={hi} label="mutated" />
@@ -87,11 +87,11 @@ function CounterexampleDetail({ a, model, box, shape, lo, hi, saved, onSave }: {
             : <>{ce.kind} violated on spec row {ce.spec_row}</>}
         </b>
         <span>severity</span><b>{fmt(num(ce.severity))} <span className="muted">(ACT's signed violation margin)</span></b>
-        <span>perturbation</span><b>‖δ‖∞ {fmt(a.linf)} · ‖δ‖₂ {fmt(a.l2)} · {a.changed} of {xs.length} dims changed</b>
+        {a.shown && <><span>perturbation</span><b>‖δ‖∞ {fmt(a.linf)} · ‖δ‖₂ {fmt(a.l2)} · {a.changed} of {xs.length} dims changed</b></>}
         {top.length > 0 && <><span>largest changes</span><b className="mono">{top.map(([i, v]) => `x[${i}] ${v >= 0 ? "+" : ""}${fmt(v, 3)}`).join(" · ")}</b></>}
       </div>
       <h4>Input: seed vs mutated</h4>
-      {shape ? (
+      {!a.shown ? <div className="note">{tooLarge(model?.input_dim ?? 0)}. Save the counterexample to export its input.</div> : shape ? (
         <PerturbCompare base={seed} perturbed={xs} shape={shape} lo={lo} hi={hi} baseLabel="seed" perturbedLabel="mutated (counterexample)" />
       ) : (
         <>

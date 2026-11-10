@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fmt, num } from "../shared/wire";
+import { fmt, num, tooLarge } from "../shared/wire";
 import type { FuzzFrameOut, ModelDescriptionOut } from "../generated/wire";
 import { Pixels } from "../shared/ui/pixels";
 import { modelShape, inputBox, finiteRange } from "./presentation";
@@ -28,6 +28,18 @@ export function FuzzMutations({ frames, live, model, sel, onSel, saved, onSave }
     return (
       <div className="mutpanel">
         <div className="note">{live ? "Waiting for the first mutated input…" : "No mutated-input frames in this record (written before they were captured). Re-run to see them."}</div>
+      </div>
+    );
+  }
+  if (!fr.input || !fr.seed_input) {
+    return (
+      <div className="mutpanel">
+        <div className="muthead">
+          <b>Mutated input</b>
+          {live ? <span className="chip s-running">live · latest</span> : <span className="muted">frame {idx + 1} / {n}</span>}
+          {fr.violation && <span className="chip bad">counterexample</span>}
+        </div>
+        <div className="note">{tooLarge(model?.input_dim ?? 0)}. Iteration {fr.iteration} · {fr.strategy ?? "—"} · depth {fr.depth}.</div>
       </div>
     );
   }

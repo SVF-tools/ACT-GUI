@@ -7,7 +7,7 @@ from pydantic import Field, model_validator
 
 from visual_bench.wire import Scalar, Verdict, Method, Domain, RunState, Wire, ErrorBody
 from visual_bench.model_spec.schemas import NativeResult
-from visual_bench.fuzzing.schemas import FuzzOptions
+from visual_bench.fuzzing.schemas import FuzzConfigChangeOut, FuzzOptions
 from visual_bench.analysis.schemas import PropagationRecordOut
 
 __all__ = ['DualOptions', 'HybridzOptions', 'VerifyDefaults', 'RunRequest', 'RowVerdictOut', 'RunResultOut', 'RunDiagnosticsOut', 'RunOut', 'RunList', 'RunEventKind', 'RunEvent']
@@ -119,7 +119,7 @@ class RunList(Wire):
     runs: list[RunOut]
 
 RunEventKind = Literal["run.queued", "run.started", "run.stop_requested", "run.completed", "run.failed", "bab.summary",
-                       "fuzz.progress", "verify.propagation"]
+                       "fuzz.progress", "fuzz.control", "fuzz.paused", "fuzz.resumed", "verify.propagation"]
 
 class RunEvent(Wire):
     run_id: str
@@ -127,4 +127,4 @@ class RunEvent(Wire):
     kind: RunEventKind
     at: str
     status: RunState
-    payload: dict[str, Scalar] | PropagationRecordOut
+    payload: dict[str, Scalar] | PropagationRecordOut | FuzzConfigChangeOut

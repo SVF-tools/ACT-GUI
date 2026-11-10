@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { fmt } from "../shared/wire";
+import { fmt, tooLarge } from "../shared/wire";
 import type { SavedCounterexampleOut, ModelDescriptionOut } from "../generated/wire";
 import { classLabel, downloadBlob, imagePng, Pixels } from "../shared/ui/pixels";
 import { analyze, inputBox, modelShape, finiteRange, type Ce } from "./presentation";
@@ -28,7 +28,7 @@ export function FuzzSaved({ runId, items, model }: { runId: string; items: Saved
         {list.map(({ s, a }) => (
           <div key={a.ce.index} className="cecard saved">
             <span className="cehead"><b>#{a.ce.index + 1}</b><span className="muted">it {a.ce.iteration} · {a.ce.strategy ?? "—"}</span></span>
-            {shape ? (
+            {!a.shown ? <span className="muted">{tooLarge(model?.input_dim ?? 0)}</span> : shape ? (
               <span className="pixrow">
                 <Pixels xs={a.seed} shape={shape} lo={lo} hi={hi} label="seed" />
                 <Pixels xs={a.x} shape={shape} lo={lo} hi={hi} label="mutated" />
