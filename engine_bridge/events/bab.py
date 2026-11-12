@@ -130,12 +130,13 @@ class BabTreeSink:
 
 
 def run_observed_bab(model_path: Path, time_budget_s: float, callback: Callable[[BabRecord], None],
-                     start_ns: int | None = None) -> tuple[RunOutcome, BabTreeSink]:
-    """verify_bab_batched exactly as run_verification(method="bab") runs it, observed by a BabTreeSink."""
+                     start_ns: int | None = None,
+                     bab: Mapping[str, object] | None = None) -> tuple[RunOutcome, BabTreeSink]:
+    """verify_bab_batched exactly as run_verification(method="bab", bab=bab) runs it, observed by a BabTreeSink."""
     sink = BabTreeSink(callback, describe_model(model_path), start_ns)
     with act_imports():
         from act.pipeline.gui.act_gui import observe
 
         with observe(sink):
-            outcome = run_verification(model_path, "bab", time_budget_s)
+            outcome = run_verification(model_path, "bab", time_budget_s, bab=bab)
     return outcome, sink

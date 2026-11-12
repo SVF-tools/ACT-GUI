@@ -81,7 +81,8 @@ def _run(req: dict[str, Any], progress: IO[str], stop: threading.Event,
 
         writer = BabWriter(Path(req["record_directory"]), send_bab)
         try:
-            outcome, sink = run_observed_bab(model, float(req["time_budget_s"]), writer, time.perf_counter_ns())
+            outcome, sink = run_observed_bab(model, float(req["time_budget_s"]), writer, time.perf_counter_ns(),
+                                             bab=req.get("bab"))
         except BaseException:
             writer.close()
             raise
@@ -91,6 +92,7 @@ def _run(req: dict[str, Any], progress: IO[str], stop: threading.Event,
             layers["bab_tree_error"] = {"code": "bab_recording_failed", "message": error}
     else:
         outcome = run_verification(model, req["method"], float(req["time_budget_s"]), domain=domain, dual=dual,
+                                   bab=req.get("bab"),
                                    hybridz_tolerance=tolerance)
         if req["method"] == "interval":
             layers["propagation"] = {"domain": domain, "availability": "unavailable", "complete": True,

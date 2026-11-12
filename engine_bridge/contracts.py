@@ -238,6 +238,20 @@ class FuzzOptionSpec:
 
 
 @dataclass(frozen=True)
+class BabOptionSpec:
+    """One verify_bab_batched setting from ACT's bab_gui.bab_options (capability verify.bab.options)."""
+    name: str  # a PipelineConfig.from_yaml override (bab_<field>, dual_<field>) or max_batch_size
+    kind: str
+    description: str
+    choices: tuple[str, ...]
+    minimum: float | None
+    maximum: float | None
+    exclusive_minimum: bool
+    default: object
+    group: str
+
+
+@dataclass(frozen=True)
 class FuzzControlChange:
     iteration: int
     requested: dict

@@ -76,7 +76,7 @@ def test_pinned_baseline_passes_every_api_check():
     # ACT-03, ACT-06 and ACT-07 are deliberately optional on this pinned baseline. Keep every existing
     # adapter check mandatory and assert the precise missing observation surface.
     assert info.api_checks
-    optional = ("observe.propagation", "verify.dual.options", "fuzz.control", "events.bab_nodes")
+    optional = ("observe.propagation", "verify.dual.options", "fuzz.control", "events.bab_nodes", "verify.bab.options")
     required = [c for c in info.api_checks if c.capability not in optional]
     assert required and [c for c in required if not c.ok] == []
     observation = [c for c in info.api_checks if c.capability == "observe.propagation"]
@@ -87,6 +87,7 @@ def test_pinned_baseline_passes_every_api_check():
     assert next(c for c in info.capabilities if c.name == "observe.propagation").availability == "unsupported"
     assert next(c for c in info.capabilities if c.name == "verify.dual.options").availability == "unsupported"
     assert next(c for c in info.capabilities if c.name == "fuzz.control").availability == "unsupported"
+    assert next(c for c in info.capabilities if c.name == "verify.bab.options").availability == "unsupported"
     waves = [c for c in info.api_checks if c.capability == "events.bab_nodes"]
     assert {c.symbol for c in waves if not c.ok} == {
         "act.back_end.bab.bab:verify_bab_batched", "act.pipeline.gui.act_gui:observe",

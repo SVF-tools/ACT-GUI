@@ -1,7 +1,7 @@
 // Routes: GET/POST /api/runs, GET /api/runs/{id}, POST /api/runs/{id}/stop, /api/runs/{id}/saved-counterexample[/vnnlib],
-// GET /api/runs/{id}/snapshot (reproduction zip), GET /api/verification/defaults.
+// GET /api/runs/{id}/snapshot (reproduction zip), GET /api/verification/defaults, GET /api/verification/bab-options.
 import { call } from "../shared/http";
-import type { RunList, RunOut, RunRequest, VerifyDefaults } from "../generated/wire";
+import type { BabOptionsOut, RunList, RunOut, RunRequest, VerifyDefaults } from "../generated/wire";
 
 export const runs = () => call<RunList>("/api/runs");
 export const run = (id: string) => call<RunOut>(`/api/runs/${id}`);
@@ -15,3 +15,4 @@ export const savedCounterexampleUrl = (id: string, row: number | null) =>
 export const snapshotUrl = (id: string) => `/api/runs/${id}/snapshot`;
 export const stopRun = (id: string) => call<RunOut>(`/api/runs/${id}/stop`, { method: "POST" });
 export const verificationDefaults = () => call<VerifyDefaults>("/api/verification/defaults");
+export const babOptions = () => call<BabOptionsOut>("/api/verification/bab-options");

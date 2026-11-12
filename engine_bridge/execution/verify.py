@@ -8,10 +8,12 @@ from __future__ import annotations
 import dataclasses
 import math
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from engine_bridge.contracts import DOMAINS, BridgeError, Domain, DualOptions, LaneOutcome, Method, RunOutcome, Verdict
+from engine_bridge.contracts import (DOMAINS, BabOptionSpec, BridgeError, Domain, DualOptions, LaneOutcome, Method,
+                                     RunOutcome, Verdict)
 from engine_bridge.engine_session import act_imports
 from engine_bridge.model_spec.describe import load_net
 
@@ -145,8 +147,42 @@ def dual_kwargs(options: DualOptions) -> dict[str, Any]:
             "dual_refresh_forward": options.alpha == "optimize_refresh"}
 
 
+def _native_bab_options() -> tuple[Any, ...]:
+    import act.back_end.bab.bab  # noqa: F401  # first: on ACT 22693fb importing bab_gui before it is circular
+    from act.pipeline.gui.bab_gui import bab_options
+
+    return bab_options()
+
+
+def bab_options() -> tuple[BabOptionSpec, ...]:
+    """ACT's verify_bab_batched settings with their defaults (capability verify.bab.options)."""
+    with act_imports():
+        return tuple(BabOptionSpec(name=o.option.name, kind=o.option.kind, description=o.option.description,
+                                   choices=tuple(o.option.choices), minimum=o.option.minimum,
+                                   maximum=o.option.maximum, exclusive_minimum=o.option.exclusive_minimum,
+                                   default=o.default, group=o.group) for o in _native_bab_options())
+
+
+def bab_settings(changes: Mapping[str, object]) -> dict[str, object]:
+    """Every BaB setting with ``changes`` applied, as ACT normalizes and accepts them (verify.bab.options).
+    BridgeError invalid_bab_options carries ACT's message for an unknown or invalid setting or combination."""
+    with act_imports():
+        options = _native_bab_options()
+        from act.pipeline.gui.act_gui import validate_changes
+        from act.pipeline.gui.bab_gui import bab_run_config
+
+        try:
+            checked = validate_changes([o.option for o in options], changes)
+            bab_run_config(checked)
+        except ValueError as exc:  # ACT's ConfigError is a ValueError
+            raise BridgeError("invalid_bab_options", str(exc)) from exc
+        return {**{o.option.name: o.default for o in options}, **checked}
+
+
 def run_verification(model_path: Path, method: Method, time_budget_s: float, domain: Domain = "interval",
-                     dual: DualOptions | None = None, hybridz_tolerance: float = 1e-7) -> RunOutcome:
+                     dual: DualOptions | None = None, hybridz_tolerance: float = 1e-7,
+                     bab: Mapping[str, object] | None = None) -> RunOutcome:
+    """``bab`` (method bab): bab_settings values for ACT's bab_run_config; None runs pipeline.yaml's BaB settings."""
     if method not in ("interval", "bab"):
         raise BridgeError("unsupported_method", f"Unknown method {method!r}")
     if domain not in DOMAINS:
@@ -176,11 +212,16 @@ def run_verification(model_path: Path, method: Method, time_budget_s: float, dom
         from act.back_end.solver.solver_torchlp import TorchLPSolver
         from act.config.config import BackendConfig, PipelineConfig
 
-        pc = PipelineConfig.from_yaml()
+        if bab is None:
+            pc = PipelineConfig.from_yaml()
+            config, dual_config, batch = pc.bab, pc.dual, BackendConfig.from_yaml().bab_max_batch_size
+        else:
+            from act.pipeline.gui.bab_gui import bab_run_config
+
+            config, dual_config, batch = bab_run_config(bab)
         t = time.perf_counter()
         result = verify_bab_batched(
-            net=net, solver_factory=TorchLPSolver, config=pc.bab,
-            max_batch_size=BackendConfig.from_yaml().bab_max_batch_size,
-            time_budget_s=float(time_budget_s), dual_config=pc.dual,
+            net=net, solver_factory=TorchLPSolver, config=config, max_batch_size=batch,
+            time_budget_s=float(time_budget_s), dual_config=dual_config,
         )
         return _with_output(_outcome("bab", result, time.perf_counter() - t), net, _ces([result]))

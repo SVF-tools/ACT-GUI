@@ -91,6 +91,12 @@ def requirements() -> dict[str, tuple[Requirement, ...]]:
         "verify.bab": bab,
         "events.bab_summary": bab,
         # verify_bab_batched is checked first: on ACT 22693fb, importing bab_gui before act.back_end.bab is circular.
+        "verify.bab.options": (
+            *bab,
+            Requirement("act.pipeline.gui.bab_gui:bab_options"),
+            Requirement("act.pipeline.gui.bab_gui:bab_run_config", positional=1),
+            Requirement("act.pipeline.gui.act_gui:validate_changes", positional=2),
+        ),
         "events.bab_nodes": (
             *bab,
             Requirement("act.back_end.bab.bab:verify_bab_batched", ("on_progress",)),

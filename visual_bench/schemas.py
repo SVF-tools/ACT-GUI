@@ -28,7 +28,7 @@ from visual_bench.engine.schemas import (EngineBranchesOut, EngineInfoOut, Engin
 from visual_bench.model_spec.schemas import LoadModelBody, ModelDescriptionOut, ModelSummary, SampleOut, SourcesOut
 from visual_bench.fuzzing.schemas import (FuzzingOut, SaveCounterexampleRequest, SavedCounterexampleOut,
                                           FuzzOptionsSchemaOut, FuzzControlRequest, FuzzControlOut)
-from visual_bench.verification.schemas import RunEvent, RunList, RunOut, RunRequest, VerifyDefaults
+from visual_bench.verification.schemas import BabOptionsOut, RunEvent, RunList, RunOut, RunRequest, VerifyDefaults
 from visual_bench.analysis.schemas import LayerStatesOut, PropagationIndexOut, PropagationLayerOut
 from visual_bench.bab.schemas import BabNodeDetailOut, BabTreeOut, CoverageOut
 from visual_bench.assistant.schemas import ExplainRequest, ExplainResponse, ProviderList
@@ -40,5 +40,5 @@ WIRE_MODELS: tuple[type[BaseModel], ...] = (
     SolverStatusOut, SourcesOut, SampleOut, LoadModelBody, SaveCounterexampleRequest, SavedCounterexampleOut,
     EngineSourcesOut, EngineBranchesOut, EngineSwitchRequest, PresenceHeartbeat, PresenceOut,
     PropagationIndexOut, PropagationLayerOut,
-    FuzzOptionsSchemaOut, FuzzControlRequest, FuzzControlOut, BabTreeOut, BabNodeDetailOut,
+    FuzzOptionsSchemaOut, FuzzControlRequest, FuzzControlOut, BabTreeOut, BabNodeDetailOut, BabOptionsOut,
 )

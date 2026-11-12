@@ -10,7 +10,7 @@ from visual_bench.model_spec.schemas import NativeResult
 from visual_bench.fuzzing.schemas import FuzzConfigChangeOut, FuzzOptions
 from visual_bench.analysis.schemas import PropagationRecordOut
 
-__all__ = ['DualOptions', 'HybridzOptions', 'VerifyDefaults', 'RunRequest', 'RowVerdictOut', 'RunResultOut', 'RunDiagnosticsOut', 'RunOut', 'RunList', 'RunEventKind', 'RunEvent']
+__all__ = ['DualOptions', 'HybridzOptions', 'VerifyDefaults', 'BabOptionOut', 'BabOptionsOut', 'RunRequest', 'RowVerdictOut', 'RunResultOut', 'RunDiagnosticsOut', 'RunOut', 'RunList', 'RunEventKind', 'RunEvent']
 
 
 class DualOptions(Wire):
@@ -32,6 +32,25 @@ class HybridzOptions(Wire):
     """HybridZ verdict-solver settings of a hybridz-domain verify_once run; its time limit is the run budget."""
     tolerance: float = Field(default=1e-7, gt=0, le=1e-2)
 
+BabOptionValue = bool | int | float | str
+
+class BabOptionOut(Wire):
+    """One verify_bab_batched setting from ACT's bab_gui.bab_options; kinds, limits and defaults are ACT's."""
+    name: str  # bab_<BaBConfig field>, dual_<DualConfig field> or max_batch_size
+    kind: Literal["int", "float", "bool", "choice"]
+    description: str
+    choices: list[str]
+    minimum: float | None
+    maximum: float | None
+    exclusive_minimum: bool
+    default: BabOptionValue
+    group: str  # bounding, search, dual or advanced
+
+class BabOptionsOut(Wire):
+    """GET /api/verification/bab-options: every BaB setting of the active ACT (capability verify.bab.options)."""
+    available: bool  # False: this ACT has no bab_options, and BaB runs use its pipeline.yaml settings
+    options: list[BabOptionOut]
+
 class VerifyDefaults(Wire):
     """GET /api/verification/defaults: the settings a verify_once run uses when the request leaves them out."""
     dual: DualOptions
@@ -46,9 +65,13 @@ class RunRequest(Wire):
     domain: Domain | None = None  # method "interval" only; the service defaults it to "interval"
     dual: DualOptions | None = None  # domain "dual" only; the service fills in the defaults
     hybridz: HybridzOptions | None = None  # domain "hybridz" only; the service fills in the defaults
+    # method "bab" only: settings to change (bab-options names); ACT validates them and the run records every setting
+    bab: dict[str, BabOptionValue] | None = None
 
     @model_validator(mode="after")
     def _options_match_method(self) -> "RunRequest":
+        if self.bab is not None and self.method != "bab":
+            raise ValueError("bab options are only valid with method 'bab'")
         if self.fuzz is not None and self.method != "fuzz":
             raise ValueError("fuzz options are only valid with method 'fuzz'")
         if self.domain is not None and self.method != "interval":
@@ -98,6 +121,7 @@ class RunOut(Wire):
     domain: Domain | None  # abstract domain of a verify_once run; None for bab/fuzz
     dual: DualOptions | None = None  # settings of a dual run; None for other runs and for runs recorded before them
     hybridz: HybridzOptions | None = None  # settings of a hybridz run, likewise
+    bab: dict[str, BabOptionValue] | None = None  # every BaB setting of a bab run, ACT's defaults included, likewise
     time_budget_s: float
     client_request_id: str | None
     status: RunState

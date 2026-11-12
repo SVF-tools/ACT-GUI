@@ -43,6 +43,17 @@ export type Layers = BabLayerOut[]
 export type Path = BabNodeOut[]
 export type RunId = string
 export type SolveStatus = (string | null)
+export type Choices = string[]
+export type Default = (boolean | number | string)
+export type Description = string
+export type ExclusiveMinimum = boolean
+export type Group = string
+export type Kind3 = ("int" | "float" | "bool" | "choice")
+export type Maximum = (number | null)
+export type Minimum = (number | null)
+export type Name = string
+export type Available = boolean
+export type Options = BabOptionOut[]
 export type Evicted = number
 export type Falsified = number
 export type Pending = number
@@ -83,13 +94,13 @@ export type Wave1 = number
 export type Waves = BabWaveOut[]
 export type Branch = (string | null)
 export type Commit = (string | null)
-export type Kind3 = ("baseline" | "branch")
+export type Kind4 = ("baseline" | "branch")
 export type Remote = (string | null)
 export type Availability1 = ("available" | "pending" | "not_recorded" | "unsupported")
-export type Name = string
+export type Name1 = string
 export type Source = string
 export type Dataset = string
-export type Description = string
+export type Description1 = string
 export type Onnx = string
 export type SourceId = string
 export type Count = number
@@ -130,7 +141,7 @@ export type ExpectedCommit = (string | null)
 export type Python = string
 export type Branch1 = (string | null)
 export type Commit2 = (string | null)
-export type Kind4 = ("baseline" | "branch")
+export type Kind5 = ("baseline" | "branch")
 export type Remote2 = (string | null)
 export type SwitchedAt = (string | null)
 export type Url1 = (string | null)
@@ -138,7 +149,7 @@ export type Torch = (string | null)
 export type TrackedChanges = (boolean | null)
 export type Usable = boolean
 export type Custom = boolean
-export type Name1 = string
+export type Name2 = string
 export type Url2 = string
 export type CustomAllowed = boolean
 export type Remotes = EngineRemoteOut[]
@@ -148,7 +159,7 @@ export type Url3 = (string | null)
 export type Code1 = string
 export type Message1 = string
 export type Retryable = boolean
-export type Kind5 = ("layer_state" | "run_result" | "spec" | "coverage")
+export type Kind6 = ("layer_state" | "run_result" | "spec" | "coverage")
 export type Label = string
 export type LayerId2 = (number | null)
 export type Neuron1 = (number | null)
@@ -190,7 +201,7 @@ export type ElapsedS = number
 export type Index = number
 export type Input = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type Iteration1 = number
-export type Kind6 = string
+export type Kind7 = string
 export type Output = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type SeedInput = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type SeedOutput = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
@@ -211,17 +222,17 @@ export type Boundary = number
 export type Gradient = number
 export type Pgd = number
 export type Random = number
-export type Choices = string[]
-export type Default = (number | boolean | string | {
+export type Choices1 = string[]
+export type Default1 = (number | boolean | string | {
 [k: string]: number
 } | null)
-export type Description1 = string
-export type ExclusiveMinimum = boolean
-export type Kind7 = ("int" | "float" | "bool" | "choice" | "weights")
+export type Description2 = string
+export type ExclusiveMinimum1 = boolean
+export type Kind8 = ("int" | "float" | "bool" | "choice" | "weights")
 export type Live1 = boolean
-export type Maximum = (number | null)
-export type Minimum = (number | null)
-export type Name2 = string
+export type Maximum1 = (number | null)
+export type Minimum1 = (number | null)
+export type Name3 = string
 export type ActivationThreshold = number
 export type CoverageStrategy = ("GlobalCov" | "BestInputCov")
 export type MaxIterations = number
@@ -233,7 +244,7 @@ export type RngSeed = number
 export type SeedSelectionStrategy = ("energy" | "random")
 export type StopOnFirst = boolean
 export type LiveControl = boolean
-export type Options = FuzzOptionOut[]
+export type Options1 = FuzzOptionOut[]
 export type Corpus = number
 export type Counterexamples = number
 export type Coverage = number
@@ -242,7 +253,7 @@ export type Iteration3 = number
 export type Input2 = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type Output1 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type Row = number
-export type Name3 = string
+export type Name4 = string
 export type Selected = number
 export type Violations = number
 export type Weight = number
@@ -277,24 +288,24 @@ export type Version = string
 export type Tolerance = number
 export type Center = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type Dataset1 = (string | null)
-export type Kind8 = string
+export type Kind9 = string
 export type LayerId4 = number
 export type Lb1 = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type Shape = number[]
 export type Ub1 = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type InVars = number
-export type Kind9 = string
+export type Kind10 = string
 export type LayerId5 = number
 export type OutVars = number
 export type OutputShape = (number[] | null)
-export type Name4 = string
+export type Name5 = string
 export type Shape1 = (number[] | null)
 export type Value1 = (string | null)
 export type Params = ParamOut[]
 export type Preds = number[]
 export type Succs = number[]
 export type BeforeLayerIds = number[]
-export type Kind10 = string
+export type Kind11 = string
 export type LayerId6 = number
 export type Lb2 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type Shape2 = number[]
@@ -306,14 +317,14 @@ export type Method = (("interval" | "dual" | "hybridz") | null)
 export type RunId7 = string
 export type Source1 = (LoadVnnlibRequest | LoadTorchRequest)
 export type Benchmark = string
-export type Kind11 = "vnnlib"
+export type Kind12 = "vnnlib"
 export type Onnx1 = string
 export type Vnnlib = string
 export type Vnnlibs = ([string, ...(string)[]] | null)
 export type Eps = number
 export type Index1 = number
 export type Indices = ([number, ...(number)[]] | null)
-export type Kind12 = "torch"
+export type Kind13 = "torch"
 export type SourceId1 = string
 export type ActCommit = (string | null)
 export type InputDim = number
@@ -321,7 +332,7 @@ export type InputSpecs = InputSpecOut[]
 export type Layers2 = LayerOut[]
 export type ModelId1 = string
 export type OutputDim = number
-export type Kind13 = string
+export type Kind14 = string
 export type LayerId7 = number
 export type Matrix = (number[][] | null)
 export type Rows = number
@@ -330,7 +341,7 @@ export type Thresholds = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null
 export type TrueClass1 = (number | null)
 export type Sha256 = string
 export type ActPath = string
-export type Description2 = string
+export type Description3 = string
 export type EngineCheck = (("same_commit" | "loads" | "load_failed" | "unchecked") | null)
 export type Methods = ("interval" | "bab" | "fuzz")[]
 export type ModelId2 = string
@@ -369,7 +380,7 @@ export type LayerKind = (string | null)
 export type OutputShape1 = number[]
 export type RecordCount = number
 export type Layers3 = PropagationLayerSummaryOut[]
-export type Kind14 = ("PhaseEvent" | "LayerBounds" | "Relaxation" | "DualBackward" | "SpecBound")
+export type Kind15 = ("PhaseEvent" | "LayerBounds" | "Relaxation" | "DualBackward" | "SpecBound")
 export type LayerKind1 = (string | null)
 export type OutputShape2 = number[]
 export type RecordId = number
@@ -387,7 +398,7 @@ export type Domain2 = (("interval" | "dual" | "hybridz") | null)
 export type LayerId9 = number
 export type Neuron3 = (number | null)
 export type OutputShape3 = number[]
-export type Kind15 = ("PhaseEvent" | "LayerBounds" | "Relaxation" | "DualBackward" | "SpecBound")
+export type Kind16 = ("PhaseEvent" | "LayerBounds" | "Relaxation" | "DualBackward" | "SpecBound")
 export type LayerKind2 = (string | null)
 export type OutputShape4 = number[]
 export type RecordId1 = number
@@ -397,8 +408,8 @@ export type Records1 = PropagationLayerRecordOut[]
 export type RunId9 = string
 export type ValueLimit1 = number
 export type Availability6 = ("available" | "not_configured")
-export type Kind16 = ("fake" | "real")
-export type Name5 = string
+export type Kind17 = ("fake" | "real")
+export type Name6 = string
 export type Note = string
 export type Providers = ProviderOut[]
 export type ActStatus1 = string
@@ -413,7 +424,7 @@ export type Location = (string | null)
 export type Messages = string[]
 export type Warnings = number
 export type At = string
-export type Kind17 = ("run.queued" | "run.started" | "run.stop_requested" | "run.completed" | "run.failed" | "bab.summary" | "fuzz.progress" | "fuzz.control" | "fuzz.paused" | "fuzz.resumed" | "verify.propagation" | "verify.bab")
+export type Kind18 = ("run.queued" | "run.started" | "run.stop_requested" | "run.completed" | "run.failed" | "bab.summary" | "fuzz.progress" | "fuzz.control" | "fuzz.paused" | "fuzz.resumed" | "verify.propagation" | "verify.bab")
 export type Payload = ({
 [k: string]: string | number | boolean | null
 } | PropagationRecordOut | FuzzConfigChangeOut)
@@ -421,6 +432,9 @@ export type RunId10 = string
 export type Seq2 = number
 export type Status6 = ("queued" | "running" | "completed" | "failed")
 export type ActCommit1 = (string | null)
+export type Bab = ({
+[k: string]: boolean | number | string
+} | null)
 export type ClientRequestId = (string | null)
 export type CounterexampleSavedAt = (string | null)
 export type CreatedAt = string
@@ -449,6 +463,9 @@ export type StartedAt = (string | null)
 export type Status7 = ("queued" | "running" | "completed" | "failed")
 export type TimeBudgetS = number
 export type Runs = RunOut[]
+export type Bab1 = ({
+[k: string]: boolean | number | string
+} | null)
 export type ClientRequestId1 = (string | null)
 export type Domain4 = (("interval" | "dual" | "hybridz") | null)
 export type Method2 = ("interval" | "bab" | "fuzz")
@@ -486,6 +503,8 @@ BabIntervalOut?: BabIntervalOut
 BabLayerOut?: BabLayerOut
 BabNodeDetailOut?: BabNodeDetailOut
 BabNodeOut?: BabNodeOut
+BabOptionOut?: BabOptionOut
+BabOptionsOut?: BabOptionsOut
 BabPhaseOut?: BabPhaseOut
 BabSharesOut?: BabSharesOut
 BabTerminalOut?: BabTerminalOut
@@ -663,6 +682,33 @@ solved_wave: SolvedWave
 state: State
 }
 /**
+ * One verify_bab_batched setting from ACT's bab_gui.bab_options; kinds, limits and defaults are ACT's.
+ * 
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "BabOptionOut".
+ */
+export interface BabOptionOut {
+choices: Choices
+default: Default
+description: Description
+exclusive_minimum: ExclusiveMinimum
+group: Group
+kind: Kind3
+maximum: Maximum
+minimum: Minimum
+name: Name
+}
+/**
+ * GET /api/verification/bab-options: every BaB setting of the active ACT (capability verify.bab.options).
+ * 
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "BabOptionsOut".
+ */
+export interface BabOptionsOut {
+available: Available
+options: Options
+}
+/**
  * The focused subtree as fractions per leaf state (they sum to 1), each node's share split equally among its
  * children: a measure of the split tree, not of input volume, and never a verdict.
  * 
@@ -742,7 +788,7 @@ wave: Wave1
 export interface BuiltWithOut {
 branch?: Branch
 commit: Commit
-kind: Kind3
+kind: Kind4
 remote?: Remote
 }
 /**
@@ -751,7 +797,7 @@ remote?: Remote
  */
 export interface CapabilityOut {
 availability: Availability1
-name: Name
+name: Name1
 source: Source
 }
 /**
@@ -760,7 +806,7 @@ source: Source
  */
 export interface ClassifierSourceOut {
 dataset: Dataset
-description: Description
+description: Description1
 onnx: Onnx
 source_id: SourceId
 }
@@ -847,7 +893,7 @@ usable: Usable
 export interface EngineSourceOut {
 branch?: Branch1
 commit?: Commit2
-kind: Kind4
+kind: Kind5
 remote?: Remote2
 switched_at?: SwitchedAt
 url?: Url1
@@ -858,7 +904,7 @@ url?: Url1
  */
 export interface EngineRemoteOut {
 custom: Custom
-name: Name1
+name: Name2
 url: Url2
 }
 /**
@@ -903,7 +949,7 @@ error: ErrorBody
  * via the `definition` "EvidenceRef".
  */
 export interface EvidenceRef {
-kind: Kind5
+kind: Kind6
 label: Label
 layer_id: LayerId2
 neuron: Neuron1
@@ -1005,7 +1051,7 @@ elapsed_s: ElapsedS
 index: Index
 input: Input
 iteration: Iteration1
-kind: Kind6
+kind: Kind7
 output: Output
 seed_input: SeedInput
 seed_output?: SeedOutput
@@ -1049,15 +1095,15 @@ random?: Random
  * via the `definition` "FuzzOptionOut".
  */
 export interface FuzzOptionOut {
-choices: Choices
-default: Default
-description: Description1
-exclusive_minimum: ExclusiveMinimum
-kind: Kind7
+choices: Choices1
+default: Default1
+description: Description2
+exclusive_minimum: ExclusiveMinimum1
+kind: Kind8
 live: Live1
-maximum: Maximum
-minimum: Minimum
-name: Name2
+maximum: Maximum1
+minimum: Minimum1
+name: Name3
 }
 /**
  * ACTFuzzer settings for method "fuzz". Defaults other than max_iterations equal the fuzzing section of
@@ -1086,7 +1132,7 @@ stop_on_first?: StopOnFirst
  */
 export interface FuzzOptionsSchemaOut {
 live_control: LiveControl
-options: Options
+options: Options1
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -1113,7 +1159,7 @@ row: Row
  * via the `definition` "FuzzStrategyOut".
  */
 export interface FuzzStrategyOut {
-name: Name3
+name: Name4
 selected: Selected
 violations: Violations
 weight: Weight
@@ -1203,7 +1249,7 @@ tolerance?: Tolerance
 export interface InputSpecOut {
 center: Center
 dataset: Dataset1
-kind: Kind8
+kind: Kind9
 layer_id: LayerId4
 lb: Lb1
 shape: Shape
@@ -1215,7 +1261,7 @@ ub: Ub1
  */
 export interface LayerOut {
 in_vars: InVars
-kind: Kind9
+kind: Kind10
 layer_id: LayerId5
 out_vars: OutVars
 output_shape: OutputShape
@@ -1228,7 +1274,7 @@ succs: Succs
  * via the `definition` "ParamOut".
  */
 export interface ParamOut {
-name: Name4
+name: Name5
 shape: Shape1
 value: Value1
 }
@@ -1238,7 +1284,7 @@ value: Value1
  */
 export interface LayerStateOut {
 before_layer_ids: BeforeLayerIds
-kind: Kind10
+kind: Kind11
 layer_id: LayerId6
 lb: Lb2
 shape: Shape2
@@ -1272,7 +1318,7 @@ source: Source1
  */
 export interface LoadVnnlibRequest {
 benchmark: Benchmark
-kind: Kind11
+kind: Kind12
 onnx: Onnx1
 vnnlib: Vnnlib
 vnnlibs?: Vnnlibs
@@ -1285,7 +1331,7 @@ export interface LoadTorchRequest {
 eps: Eps
 index: Index1
 indices?: Indices
-kind: Kind12
+kind: Kind13
 source_id: SourceId1
 }
 /**
@@ -1307,7 +1353,7 @@ sha256: Sha256
  * via the `definition` "OutputSpecOut".
  */
 export interface OutputSpecOut {
-kind: Kind13
+kind: Kind14
 layer_id: LayerId7
 matrix: Matrix
 rows: Rows
@@ -1322,7 +1368,7 @@ true_class: TrueClass1
 export interface ModelSummary {
 act_path: ActPath
 built_with?: (BuiltWithOut | null)
-description: Description2
+description: Description3
 engine_check?: EngineCheck
 methods: Methods
 model_id: ModelId2
@@ -1415,7 +1461,7 @@ version: Version1
 export interface PropagationRecordOut {
 counts: Counts2
 key: (PropagationKeyOut | null)
-kind: Kind14
+kind: Kind15
 layer_kind: LayerKind1
 metadata: Metadata
 output_shape: OutputShape2
@@ -1463,7 +1509,7 @@ value_limit: ValueLimit1
 export interface PropagationLayerRecordOut {
 counts: Counts3
 key: (PropagationKeyOut | null)
-kind: Kind15
+kind: Kind16
 layer_kind: LayerKind2
 metadata: Metadata1
 output_shape: OutputShape4
@@ -1498,8 +1544,8 @@ providers: Providers
  */
 export interface ProviderOut {
 availability: Availability6
-kind: Kind16
-name: Name5
+kind: Kind17
+name: Name6
 note: Note
 }
 /**
@@ -1533,7 +1579,7 @@ warnings: Warnings
  */
 export interface RunEvent {
 at: At
-kind: Kind17
+kind: Kind18
 payload: Payload
 run_id: RunId10
 seq: Seq2
@@ -1552,6 +1598,7 @@ runs: Runs
  */
 export interface RunOut {
 act_commit: ActCommit1
+bab?: Bab
 client_request_id: ClientRequestId
 counterexample_saved_at?: CounterexampleSavedAt
 created_at: CreatedAt
@@ -1599,6 +1646,7 @@ export interface Metadata2 {
  * via the `definition` "RunRequest".
  */
 export interface RunRequest {
+bab?: Bab1
 client_request_id?: ClientRequestId1
 domain?: Domain4
 dual?: (DualOptions | null)

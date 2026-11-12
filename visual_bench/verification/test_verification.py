@@ -127,6 +127,62 @@ def test_dual_alpha_optimization_reaches_act(client: TestClient):
         assert optimized["status"] == "completed", optimized["error"]
         assert optimized["result"]["metadata"]["min_slack"] > slack
 
+def _capability(client: TestClient, name: str) -> str | None:
+    return {c["name"]: c["availability"] for c in client.get("/api/engine").json()["capabilities"]}.get(name)
+
+def test_bab_settings_reach_act(client: TestClient):
+    if _capability(client, "verify.bab.options") != "available":
+        pytest.skip("active ACT checkout has no bab_gui.bab_options (branch feat/bab-gui-options)")
+    from engine_bridge.engine_session import act_imports
+
+    served = client.get("/api/verification/bab-options").json()
+    options = {o["name"]: o for o in served["options"]}
+    with act_imports():
+        from act.config.config import PipelineConfig
+
+        pipeline = PipelineConfig.from_yaml()
+    assert served["available"] and not any("llm_probe" in name for name in options)
+    assert options["bab_solver_tier"]["choices"] == ["lp", "dual", "dual_alpha", "dual_alpha_eta"]
+    assert [options[n]["default"] for n in ("bab_solver_tier", "bab_max_depth", "bab_max_nodes", "dual_n_iters")] == [
+        pipeline.bab.solver_tier, pipeline.bab.max_depth, pipeline.bab.max_nodes, pipeline.dual.n_iters]
+
+    body = {"model_id": "bab_deep_mlp", "method": "bab", "time_budget_s": 15,
+            "bab": {"bab_solver_tier": "lp", "bab_max_nodes": 1}}
+    run_id = client.post("/api/runs", json=body).json()["run_id"]
+    follow_to_end(client, run_id)
+
+    run = client.get(f"/api/runs/{run_id}").json()
+    assert run["status"] == "completed", run["error"]
+    assert run["bab"] == {**{n: o["default"] for n, o in options.items()}, "bab_solver_tier": "lp", "bab_max_nodes": 1}
+    # pipeline.yaml's dual_alpha_eta tier certifies bab_deep_mlp (lifecycle test above); one lp node cannot
+    assert run["result"]["metadata"]["nodes"] <= 1 and run["result"]["act_status"] == "UNKNOWN"
+
+@pytest.mark.parametrize("bab, reason", [({"bab_no_such_setting": 1}, "bab_no_such_setting"),
+                                         ({"bab_max_nodes": 0}, "bab_max_nodes"),
+                                         ({"bab_bounding": "random", "bab_top_k": 5}, "top_k")])
+def test_invalid_bab_settings_are_rejected_with_acts_reason(client: TestClient, bab: dict[str, object], reason: str):
+    if _capability(client, "verify.bab.options") != "available":
+        pytest.skip("active ACT checkout has no bab_gui.bab_options (branch feat/bab-gui-options)")
+
+    resp = client.post("/api/runs", json={"model_id": "bab_deep_mlp", "method": "bab", "bab": bab})
+
+    assert resp.status_code == 422 and resp.json()["error"]["code"] == "invalid_bab_options"
+    assert reason in resp.json()["error"]["message"] and client.get("/api/runs").json()["runs"] == []
+
+def test_bab_settings_need_the_bab_options_capability(client: TestClient):
+    if _capability(client, "verify.bab.options") == "available":
+        pytest.skip("active ACT checkout has bab_gui.bab_options")
+    assert client.get("/api/verification/bab-options").json() == {"available": False, "options": []}
+
+    resp = client.post("/api/runs", json={"model_id": "bab_deep_mlp", "method": "bab", "bab": {"bab_max_nodes": 5}})
+
+    assert resp.status_code == 422 and resp.json()["error"]["code"] == "capability_unavailable"
+
+def test_bab_settings_only_belong_to_bab_runs(client: TestClient):
+    resp = client.post("/api/runs", json={"model_id": "bab_deep_mlp", "method": "interval", "bab": {}})
+
+    assert resp.status_code == 422 and resp.json()["error"]["code"] == "invalid_request"
+
 def test_torch_batch_verification_records_a_verdict_per_image(client: TestClient):
     sources_or_skip(client)
     m = client.post("/api/models", json={"source": {"kind": "torch", "source_id": "mnist_conv_small", "index": 3,

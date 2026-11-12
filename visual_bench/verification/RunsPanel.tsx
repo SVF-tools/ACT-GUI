@@ -1,7 +1,9 @@
 import { useState, type ReactNode } from "react";
 import type { FuzzOptions, RunRequest } from "../generated/wire";
 import { useModels } from "../model_spec/hooks";
-import { useStartRun, type useVerifyConfiguration } from "./hooks";
+import { useStartRun, type useBabConfiguration, type useVerifyConfiguration } from "./hooks";
+import { BabSettings } from "./BabSettings";
+import { babChanges, babValid } from "./babSettings";
 import { VerifySettings } from "./VerifySettings";
 import { useCapabilities } from "../engine/hooks";
 import { modeForMethod } from "../workspace/modes";
@@ -15,11 +17,12 @@ const DOMAIN_LABEL: Record<Domain, string> = {
 };
 
 // The method is owned by the center mode tabs: switching the mode switches it, and choosing it here switches the mode.
-// Domain and verify settings are owned by the caller, so they survive the remount that follows a run selection.
-export function RunsPanel({ modelId, method, onMethod, onSelect, fuzzOptions, fuzzSettings, domain, onDomain, verify }: {
+// Domain, verify and BaB settings are owned by the caller, so they survive the remount that follows a run selection.
+export function RunsPanel({ modelId, method, onMethod, onSelect, fuzzOptions, fuzzSettings, domain, onDomain, verify, bab }: {
   modelId: string; method: Method; onMethod: (m: Method) => void; onSelect: (runId: string) => void;
   fuzzOptions: FuzzOptions | null; fuzzSettings: ReactNode;
   domain: Domain; onDomain: (d: Domain) => void; verify: ReturnType<typeof useVerifyConfiguration>;
+  bab: ReturnType<typeof useBabConfiguration>;
 }) {
   const models = useModels();
   const startRun = useStartRun();
@@ -31,6 +34,8 @@ export function RunsPanel({ modelId, method, onMethod, onSelect, fuzzOptions, fu
   const settingsDomain = method === "interval" && domain !== "interval" ? domain : null;
   const dualOptionsMissing = lacks("verify.dual.options");
   const missing = method === "interval" ? lacks(`verify.${domain}`) : lacks(modeForMethod(method).capability);
+  const babSettings = method === "bab" && bab.options && bab.value ? { options: bab.options, value: bab.value } : null;
+  const babInvalid = babSettings !== null && babSettings.options.some((o) => !babValid(o, babSettings.value[o.name]));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -44,6 +49,7 @@ export function RunsPanel({ modelId, method, onMethod, onSelect, fuzzOptions, fu
         domain: method === "interval" ? domain : null,
         dual: settingsDomain === "dual" && !dualOptionsMissing ? verify.value?.dual ?? null : null,
         hybridz: settingsDomain === "hybridz" ? verify.value?.hybridz ?? null : null,
+        bab: babSettings ? babChanges(babSettings.value, babSettings.options) : null,
       });
       onSelect(run.run_id);
     } catch (e) {
@@ -76,14 +82,21 @@ export function RunsPanel({ modelId, method, onMethod, onSelect, fuzzOptions, fu
           <VerifySettings domain={settingsDomain} value={verify.value} defaults={verify.defaults}
             onChange={verify.setValue} optionsMissing={dualOptionsMissing} />
         )}
+        {method === "bab" && bab.query.isError && <div className="error">BaB settings unavailable: {bab.query.error.message}</div>}
+        {babSettings && bab.defaults && (
+          <BabSettings options={babSettings.options} value={babSettings.value} defaults={bab.defaults} onChange={bab.setValue} />
+        )}
         <label>Budget (s)
           <input type="number" min={1} max={600} value={budget} onChange={(e) => setBudget(Number(e.target.value))} />
         </label>
         {method === "fuzz" && fuzzSettings}
-        <button className="primary" disabled={busy || !supported || missing !== null || (method === "fuzz" && !fuzzOptions)} onClick={start}>{busy ? "Starting…" : "Run ACT"}</button>
+        <button className="primary" disabled={busy || !supported || missing !== null || (method === "fuzz" && !fuzzOptions) || babInvalid} onClick={start}>{busy ? "Starting…" : "Run ACT"}</button>
       </div>
       {missing ? <div className="note">Disabled on this ACT checkout. {missing}</div>
         : !supported && models.status === "success" && <div className="note">This model does not support {METHOD_LABEL[method]}.</div>}
+      {method === "bab" && bab.query.isSuccess && !bab.query.data.available && (
+        <div className="note">This ACT checkout has no BaB settings API (verify.bab.options): BaB runs with its pipeline.yaml settings.</div>
+      )}
       {err && <div className="error">{err}</div>}
     </section>
   );

@@ -29,6 +29,7 @@ export const keys = {
   fuzzDefaults: () => ["fuzz", "defaults"] as const,
   fuzzOptions: () => ["fuzz", "options"] as const,
   verificationDefaults: () => ["verification", "defaults"] as const,
+  babOptions: () => ["verification", "bab-options"] as const,
   engine: () => ["engine"] as const,
   gurobi: () => ["engine", "gurobi"] as const,
   engineSources: () => ["engine", "source"] as const,
