@@ -2,7 +2,7 @@
 
 The current bridge can locate the configured ACT checkout, stage another branch head of an ACT git remote and switch imports to it, import it, probe its commit and runtime, report the pinned baseline capabilities, and run Gurobi's own license check in a fresh process. It does not create session handles or manage workers, queues, HTTP connections, or user sessions. The workbench owns worker lifecycle. Follow the [repository rules](../../AGENTS.md) and [engine_bridge scope](../README.md).
 
-For project navigation, see [engine_bridge flow](../README.md#flow-diagram) and [choose a development task](../../README.md#choose-a-development-task).
+For project navigation, see [engine_bridge flow](../README.md#flow-diagram) and [choose a development task](../../docs/README.md#choose-a-development-task).
 
 ## Change Guide
 
@@ -33,7 +33,7 @@ Caller["visual_bench/engine"] -->|"Expected commit / optional license path"| Pro
 | Probe | [session.py](session.py): probe, probe_gurobi; [contracts.py](../contracts.py): EngineInfo, SolverStatus | [Workbench engine](../../visual_bench/engine/README.md#flow-diagram) maps status and gating. |
 | Branch staging | [checkouts.py](checkouts.py): list_branches, fetch_checkout → Checkout | visual_bench/engine selects the staged path through `ACT_CODE_ROOT` and a service restart. |
 | API parity | [parity.py](parity.py): requirements, check_api → ApiCheck; called by probe | A capability is `available` only when every ACT symbol its adapter calls resolves with compatible parameters; failures add an `api_mismatch` warning. `probe_isolated` runs the same probe in a fresh interpreter for a checkout this process must not import. |
-| Import setup | [session.py](session.py): act_root (baseline assets), act_code_root (imported code), act_imports | [model_spec](../model_spec/README.md#flow-diagram), [execution](../execution/README.md#flow-diagram), [inspection](../inspection/README.md#flow-diagram) reuse it internally; events does not import ACT. |
+| Import setup | [session.py](session.py): act_root (baseline assets), act_code_root (imported code), act_imports | [model_spec](../model_spec/README.md#flow-diagram), [execution](../execution/README.md#flow-diagram), [inspection](../inspection/README.md#flow-diagram) and [events](../events/README.md#flow-diagram) reuse it internally. |
 
 ## Validation
 
@@ -62,7 +62,7 @@ Acceptance evidence for the stable current slice is ES-01 and ES-04 below. ES-02
 | [__init__.py](__init__.py) | Re-exports `act_code_root`, `act_imports`, `act_root`, `fetch_checkout`, `list_branches`, `probe`, `probe_isolated`, and `probe_gurobi` |
 | [test_engine_session.py](test_engine_session.py) | Real pinned-commit probe, missing ACT, version mismatch, Gurobi license rejection, branch staging, isolated probe and API checks against a synthetic git remote (`engine_bridge/testing.py: fake_act_remote`, not ACT), every API check passing on the pinned baseline, and missing-symbol/parameter/arity detection |
 
-Import callers are model_spec, execution and inspection through `act_imports`, plus `visual_bench/engine` through `probe` and `probe_gurobi`. The bridge types are `EngineInfo`, `Capability`, `Diagnostic`, `SolverStatus`, and `BridgeError` in [`../contracts.py`](../contracts.py).
+Import callers are model_spec, execution, inspection and events through `act_imports`, plus `visual_bench/engine` through `probe` and `probe_gurobi`. The bridge types are `EngineInfo`, `Capability`, `Diagnostic`, `SolverStatus`, and `BridgeError` in [`../contracts.py`](../contracts.py).
 
 ## Operation Notes
 
@@ -80,6 +80,13 @@ execution available through the legacy adapter. Native acceptance is
 The 2026-11-06 full-suite counts and existing baseline incompatibilities are recorded in
 [execution validation](../execution/README.md#validation); the per-checkout cache regression passed
 in both runs.
+
+`events.bab_nodes` and `verify.bab.options` are optional as well and need ACT with
+`act.pipeline.gui.bab_gui`. Their requirements check `verify_bab_batched` before `bab_gui`, because
+importing `bab_gui` first is circular on ACT 22693fb. `events.bab_nodes` adds the `on_progress`
+parameter, `act_gui.observe`, `BaBWave` and `BaBTerminal`; without it BaB records only the final
+summary. `verify.bab.options` adds `bab_options`, `bab_run_config` and `act_gui.validate_changes`;
+without it the run form offers no BaB settings and BaB runs with ACT's `pipeline.yaml` settings.
 
 ### Change the ACT probe or capability list
 

@@ -2,7 +2,7 @@
 
 **Current responsibility and status.** This module owns the application run lifecycle for interval, BaB, and fuzz methods. It validates requests, checks idempotency, creates records, supervises one worker process per run, commits lifecycle events, exposes SSE replay, and reports ACT's result. The first version is implemented for VER-01, VER-02, VER-07, with VER-03 and VER-04 partial. B owns the service path, C owns run interaction, and A reviews verdict semantics.
 
-The module does not implement verification algorithms, import ACT directly, own model loading, or own fuzz presentation and solver licensing. ACT calls go through [engine_bridge](../../engine_bridge/README.md). Fuzz-specific behavior is [fuzzing](../fuzzing/README.md), and engine gating and licenses are [engine](../engine/README.md). See the [parent flow diagram](../README.md#flow-diagram) and [project development entry point](../../README.md#choose-a-development-task).
+The module does not implement verification algorithms, import ACT directly, own model loading, or own fuzz presentation and solver licensing. ACT calls go through [engine_bridge](../../engine_bridge/README.md). Fuzz-specific behavior is [fuzzing](../fuzzing/README.md), and engine gating and licenses are [engine](../engine/README.md). See the [parent flow diagram](../README.md#flow-diagram) and [project development entry point](../../docs/README.md#choose-a-development-task).
 
 ## Change Guide
 

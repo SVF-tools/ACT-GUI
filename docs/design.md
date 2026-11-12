@@ -4,7 +4,7 @@
 
 The primary boundaries are visual_bench, engine_bridge, and docs. FastAPI/React and browser/service processes are implementation details within those boundaries. A runnable workbench exists. This document owns cross-module invariants and design decisions; module READMEs distinguish implemented behavior from future designs.
 
-For a feature change, start at the [development task chooser](../README.md#choose-a-development-task), not by reading this document end to end. Parent READMEs identify collaborating modules; module Change Guides identify required edits, conditional edits, contracts and tests. The [documentation guide](README.md#module-readme-structure) defines this hierarchy.
+For a feature change, start at the [development task chooser](README.md#choose-a-development-task), not by reading this document end to end. Parent READMEs identify collaborating modules; module Change Guides identify required edits, conditional edits, contracts and tests. The [documentation guide](README.md#module-readme-structure) defines this hierarchy.
 
 ## 1. Product Boundaries
 

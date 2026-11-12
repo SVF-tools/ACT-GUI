@@ -1,8 +1,8 @@
 # Committed Events Adapter
 
-The module copies ACT's committed BaB search records out of ACT and filters ACT's final BaB metadata into a stable summary. On ACT checkouts with `act.pipeline.gui.bab_gui` (capability `events.bab_nodes`), `run_observed_bab` runs BaB exactly as `run_verification(method="bab")` does, under a `BabTreeSink` on ACT's shared observation channel, and hands every committed wave and the terminal record to a callback as neutral contracts. The workbench owns the log, notifications, replay and browser SSE. Older ACT, including the pinned baseline, only exposes the final summary.
+The module copies ACT's committed BaB search records out of ACT and filters ACT's final BaB metadata into a stable summary. On ACT checkouts with `act.pipeline.gui.bab_gui` (capability `events.bab_nodes`), `run_observed_bab` runs BaB exactly as `run_verification(method="bab")` does, with the run's BaB settings, under a `BabTreeSink` on ACT's shared observation channel, and hands every committed wave and the terminal record to a callback as neutral contracts. The workbench owns the log, notifications, replay and browser SSE. Older ACT, including the pinned baseline, only exposes the final summary.
 
-For project navigation, see [engine_bridge flow](../README.md#flow-diagram) and [choose a development task](../../README.md#choose-a-development-task).
+For project navigation, see [engine_bridge flow](../README.md#flow-diagram) and [choose a development task](../../docs/README.md#choose-a-development-task).
 
 ## Change Guide
 

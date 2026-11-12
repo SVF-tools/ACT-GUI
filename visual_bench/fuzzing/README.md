@@ -2,7 +2,7 @@
 
 **Current responsibility and status.** This module presents ACTFuzzer as the `fuzz` method of the shared run lifecycle. It owns fuzz options, live progress projection, recorded fuzz artifacts, saved counterexamples, and VNN-LIB export. The first version is implemented. B owns the service path, C owns the Fuzzing mode, and A reviews violation semantics.
 
-This module does not start or stop runs itself, decide whether a property is violated, or import ACT. ACT decides the counterexample and verdict. The shared run lifecycle is [verification](../verification/README.md), and ACT adaptation is [engine_bridge/execution](../../engine_bridge/execution/README.md). See the [parent flow diagram](../README.md#flow-diagram) and [project development entry point](../../README.md#choose-a-development-task).
+This module does not start or stop runs itself, decide whether a property is violated, or import ACT. ACT decides the counterexample and verdict. The shared run lifecycle is [verification](../verification/README.md), and ACT adaptation is [engine_bridge/execution](../../engine_bridge/execution/README.md). See the [parent flow diagram](../README.md#flow-diagram) and [project development entry point](../../docs/README.md#choose-a-development-task).
 
 ## Change Guide
 
@@ -171,7 +171,7 @@ baseline/catalog incompatibilities. Exact commands/counts are in
 
 | Layer | Entry | Contract or artifact | Owner for handoff |
 | --- | --- | --- | --- |
-| Wire | [schemas.py](schemas.py) | `FuzzOptions`, `FuzzingOut`, progress, frame, seed, counterexample, and saved-counterexample payloads | `verification` embeds options in `RunRequest`; `generated/wire.ts` is generated |
+| Wire | [schemas.py](schemas.py) | `FuzzOptions`, `FuzzingOut`, progress, frame, seed, counterexample, and saved-counterexample payloads; input-sized vectors above `DISPLAY_VALUES` (3x224x224) values are omitted (records keep them) | `verification` embeds options in `RunRequest`; `generated/wire.ts` is generated |
 | Worker | [runner.py](runner.py) | Reads live commands, calls `run_fuzzing`, writes progress/frame/control/control_state JSON lines, and returns outcome/fuzzing | `engine_bridge/execution` owns ACT option and result adaptation |
 | Live service | [live.py](live.py) | Keeps frames/hits in memory; returns progress/control/pause/resume events for supervisor commit | `verification.RunService` owns both pipes and the event log |
 | Application service | [service.py](service.py) | Reads `fuzzing.json` and committed progress, saves annotations, emits VNN-LIB 2.0 text | `records` owns artifacts and annotations; `model_spec` owns input descriptions |

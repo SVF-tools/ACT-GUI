@@ -6,7 +6,7 @@
 
 | Your task | Read first |
 | --- | --- |
-| Change an implemented feature | [Root task chooser](../README.md#choose-a-development-task), then the owning module's Change Guide and Validation sections |
+| Change an implemented feature | [Developer guide task chooser](README.md#choose-a-development-task), then the owning module's Change Guide and Validation sections |
 | Understand a cross-module handoff | [Workbench map](../visual_bench/README.md#flow-diagram) or [bridge map](../engine_bridge/README.md#flow-diagram) |
 | Plan an unsupported capability | The module backlog, then [Cross-repository Work](#cross-repository-work) and the integration slices below |
 | Review past acceptance evidence | [First-version status](#first-version-status) and the owning module's task record; rerun relevant checks for a new change |

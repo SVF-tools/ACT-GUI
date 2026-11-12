@@ -2,7 +2,7 @@
 
 **Current responsibility and status.** This module lists pinned and built models, loads supported VNN-LIB and classifier sources, serves ACT-backed model descriptions and dataset samples, and renders the network and input or output specification. MSV-01 and MSV-04 are implemented. MSV-02 and MSV-03 remain backlog. C owns the views, B integrates the service, and A reviews variable and constraint semantics.
 
-The module owns presentation and content addressed model snapshots. It does not reinterpret ACT semantics, calculate bounds, or replace unsupported specifications with boxes. ACT-side loading and description are [engine_bridge/model_spec](../../engine_bridge/model_spec/README.md). Run creation is [verification](../verification/README.md), engine readiness is [engine](../engine/README.md), and selection is [workspace](../workspace/README.md). See the [parent flow diagram](../README.md#flow-diagram) and [project development entry point](../../README.md#choose-a-development-task).
+The module owns presentation and content addressed model snapshots. It does not reinterpret ACT semantics, calculate bounds, or replace unsupported specifications with boxes. ACT-side loading and description are [engine_bridge/model_spec](../../engine_bridge/model_spec/README.md). Run creation is [verification](../verification/README.md), engine readiness is [engine](../engine/README.md), and selection is [workspace](../workspace/README.md). See the [parent flow diagram](../README.md#flow-diagram) and [project development entry point](../../docs/README.md#choose-a-development-task).
 
 ## Change Guide
 
@@ -72,7 +72,7 @@ flowchart TB
 
 | Block | Code entry | Contract or artifact | Neighbor handoff |
 | --- | --- | --- | --- |
-| Description | `InputSpecOut`, `OutputSpecOut` | ACT shape, bounds, center, dataset, constraint text, and true class | No browser reinterpretation of constraints |
+| Description | `InputSpecOut`, `OutputSpecOut` | ACT shape, bounds, center, dataset, constraint text, and true class; bounds and center are omitted above `DISPLAY_VALUES` (3x224x224) values per row, and the panel says so | No browser reinterpretation of constraints |
 | Image view | [InputDomain.tsx](InputDomain.tsx) | Clean, bounds, heat map, and sampled display perturbations | Samples are visual only, not verification evidence |
 | Navigation | [ModelGraph.tsx](ModelGraph.tsx) | Stable layer ID | [Workspace](../workspace/README.md) and [analysis](../analysis/README.md) consume selection |
 

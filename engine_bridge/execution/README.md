@@ -2,7 +2,7 @@
 
 The current bridge invokes ACT's `verify_once` for interval, dual, and HybridZ domains, ACT's batched BaB entry point, and ACTFuzzer. It maps ACT statuses without deciding scientific verdicts, exposes method eligibility and fuzzing provenance, and returns neutral frozen outcomes. Runs are blocking inside the caller's worker process. The workbench owns process lifecycle, run records, idempotency, HTTP, and SSE.
 
-For project navigation, see [engine_bridge flow](../README.md#flow-diagram) and [choose a development task](../../README.md#choose-a-development-task).
+For project navigation, see [engine_bridge flow](../README.md#flow-diagram) and [choose a development task](../../docs/README.md#choose-a-development-task).
 
 ## Change Guide
 

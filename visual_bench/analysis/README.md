@@ -1,19 +1,46 @@
 # Analysis and Propagation
 
-Current responsibility: show recorded layer-wise interval states for a completed run and let the user move through layers, compare before and after bars, select values, and inspect a two-coordinate interval box. The first slice is implemented. `AnalysisService` reads a sealed `layers.json` artifact. ANA-03, recorded playback and evidence navigation, is not started. This module does not step ACT, compute new projections in the browser, or control BaB. See the [parent scope](../README.md), [repository rules](../../AGENTS.md), and the [development task guide](../../README.md#choose-a-development-task).
+Current responsibility: show what a verification run recorded about bound propagation. When the active ACT exposes `observe.propagation`, a `verify_once` run (method `interval` with the interval, dual or HybridZ domain) records every layer's per-neuron bounds, stability and relaxation, and the propagation view drills down from a block network to a layer's neuron map to one neuron, live during the run and in replay afterwards. Runs without recorded propagation show the legacy view of the sealed `layers.json`: before/after interval bars per layer and a two-coordinate interval box. ANA-02 geometry beyond the interval box and ANA-03 evidence navigation remain planned. This module does not step ACT, compute new projections in the browser, or control BaB. See the [parent scope](../README.md), [repository rules](../../AGENTS.md), and the [development task guide](../../docs/README.md#choose-a-development-task).
 
 ## Change Guide
 
 | Goal | Edit here | Conditional / reused path |
 | --- | --- | --- |
-| Change bars, stepper, or existing interval-box presentation | [AnalysisView.tsx](AnalysisView.tsx) | Reuse [hooks.ts](hooks.ts) and workspace callbacks; no new ACT call or storage change. |
+| Change the propagation drill-down (block network, neuron map, neuron detail, replay) | [PropagationView.tsx](PropagationView.tsx), [NeuronMap.tsx](NeuronMap.tsx), [NeuronDetail.tsx](NeuronDetail.tsx); pure logic in [propagation.ts](propagation.ts) with [propagation.test.ts](propagation.test.ts) | Reuse `usePropagation` / `usePropagationRecords` in [hooks.ts](hooks.ts); a display change needs no ACT call, worker or storage change. |
+| Serve another recorded propagation field or filter | `propagation` / `propagation_layer` in [service.py](service.py), [schemas.py](schemas.py), [test_propagation.py](test_propagation.py); generate wire types | [routes.py](routes.py) and [api.ts](api.ts) only for a new query parameter. Data ACT does not record starts in [bridge inspection](../../engine_bridge/inspection/README.md#change-guide). |
+| Change the legacy bars, stepper, or interval-box presentation | [AnalysisView.tsx](AnalysisView.tsx) | Reuse [hooks.ts](hooks.ts) and workspace callbacks; no new ACT call or storage change. |
 | Expose another field already in layers.json | [service.py](service.py), [schemas.py](schemas.py), consuming view; generate wire types | [routes.py](routes.py), [api.ts](api.ts), [hooks.ts](hooks.ts) only if endpoint/arguments/cache behavior change. |
 | Collect data missing from the artifact | Start in [bridge inspection](../../engine_bridge/inspection/README.md#change-guide), then update worker/output mapping and this service/view | [verification](../verification/README.md#change-guide) owns sealing, [records](../records/README.md#change-guide) owns integrity. Do not change either merely to draw an existing field. |
 | Change pending/missing-data behavior | [service.py](service.py), view, focused route tests | Corrupt records are errors, not fabricated empty bounds. Keep failed/missing data distinct from active runs. |
 
-After schema changes, run `npm run gen:types`. Advanced geometry and recorded playback remain ANA-02/03 work; the current interval box is not a new scientific projection.
+After schema changes, run `npm run gen:types`. Advanced geometry (ANA-02) and evidence navigation (ANA-03) remain planned; the current interval box is not a new scientific projection.
 
 ## Flow Diagram
+
+### Propagation, live and in replay
+
+```mermaid
+flowchart TB
+  Worker["verification worker<br/>verify_once under the bridge sink"] -->|"Each record"| Writer["records/propagation.py"]
+  Writer -->|"Index and tensor blobs"| Store[("Run record")]
+  Writer -->|"Index entry via the run supervisor"| SSE["verify.propagation SSE"]
+  SSE -->|"Invalidate run queries"| H["hooks.ts + api.ts"]
+  H -->|"GET /api/runs/{id}/propagation"| S["AnalysisService"]
+  S -->|"Read live or sealed"| Store
+  S -->|"Index and layer records"| H
+  H --> V["PropagationView"]
+  V -->|"Network, layer, neuron"| O["Neuron map, Neuron tab, replay"]
+```
+
+| Block | Implementation and contract |
+| --- | --- |
+| Record | The worker passes `PropagationWriter` from [records/propagation.py](../records/propagation.py) to the bridge sink ([inspection](../../engine_bridge/inspection/README.md#flow-diagram)). It stores content-addressed float32 tensors and an atomic index, and sends each index entry over the worker pipe. |
+| Notify | The run supervisor publishes `verify.propagation` SSE events (index entries without values); [verification/hooks.ts](../verification/hooks.ts) invalidates the run's query keys. |
+| HTTP | `GET /api/runs/{run_id}/propagation` and `/propagation/layers/{layer_id}` in [routes.py](routes.py); fields and limits are in [Propagation API](#propagation-api). |
+| Service | `AnalysisService.propagation` and `propagation_layer` in [service.py](service.py): live reads while the run is active, sealed reads after completion, explicit `too_large` (413) and `record_corrupt` (409) errors. |
+| View | [PropagationView.tsx](PropagationView.tsx) draws the block network with a live/replay cursor; [NeuronMap.tsx](NeuronMap.tsx) and [NeuronDetail.tsx](NeuronDetail.tsx) show a layer's neurons and one neuron in the right inspector's **Neuron** tab, which appears once a run is selected outside Fuzzing mode. |
+
+### Legacy interval layer states
 
 ```mermaid
 flowchart TB
@@ -39,9 +66,9 @@ flowchart TB
 | View | `AnalysisView` and `LayerBounds` in [AnalysisView.tsx](AnalysisView.tsx). Before means the predecessor's after state. The projection is the ACT interval box, not tighter geometry. |
 | Neighbor handoff | `workspace` owns layer and neuron selection. `verification` owns run lifecycle. `records` owns sealed reads. `assistant` may request the same service for evidence. See the [parent flow diagram](../README.md#flow-diagram). |
 
-## Validation
+## Propagation API
 
-The service also exposes propagation observations during a run and after sealing:
+Routes and wire models of the propagation path, during a run and after sealing:
 
 | Route | Wire model | Meaning |
 | --- | --- | --- |
@@ -74,7 +101,9 @@ The producer publishes its atomic index before sending an event. `LayerStatesOut
 actual domain when observation is available, and `LayerStateOut.stage` permits `pre` for dual bounds.
 The legacy `/layers` route remains available.
 
-Focused tests:
+## Validation
+
+Focused propagation tests:
 
 ```bash
 .venv/bin/python -m pytest visual_bench/analysis/test_propagation.py
@@ -93,7 +122,7 @@ Run the relevant service and bridge tests:
 npm test
 ```
 
-Observable behavior: no run shows a no-run state, an active run shows pending data, a missing artifact shows not recorded, a corrupt/unsealed completed record raises an integrity error, and a completed sealed run shows the stepper, before and after bars, selected values, and the labeled interval box. These are validation instructions, not a new test result.
+Observable behavior: no run shows a no-run state. With recorded propagation, an active run highlights the layer being evaluated, a completed run replays it, a layer opens its neuron map and a neuron its detail, and a selection above 65,536 values shows the `too_large` error instead of sampled data. Without it, an active run shows pending data, a missing artifact shows not recorded, a corrupt/unsealed completed record raises an integrity error, and a completed sealed run shows the stepper, before and after bars, selected values, and the labeled interval box. These are validation instructions, not a new test result.
 
 ## Reference and Backlog
 
@@ -147,9 +176,12 @@ Owner: D. With three contributors, C implements views, B integrates data, and A 
 
 </details>
 
+<details>
+<summary>Browser propagation implementation and evidence (2026-11-05)</summary>
+
 ## Browser propagation implementation and evidence (2026-11-05)
 
-Verification uses the existing mode and right inspector's **Neuron** tab. The DAG
+Verification uses the existing mode and the right inspector's **Neuron** tab, which appears once a run is selected outside Fuzzing mode. The DAG
 groups affine/activation chains because the current model contract has no ACT
 source names. Stability bars use recorded counts; the map uses recorded status or
 recorded pre-bounds, never post-ReLU zeros. Unknown status is explicit.
@@ -187,3 +219,5 @@ decoration findings; no finding mapped to the selected propagation/detail region
 This is not a claim of whole-app WCAG conformance. Full visual acceptance is owned
 by the integrating parent session. Batch-lane and >4k binning logic have unit
 coverage; those large/batched states are not claimed as browser-verified here.
+
+</details>

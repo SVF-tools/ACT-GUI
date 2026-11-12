@@ -1,6 +1,6 @@
 # Website
 
-[Project task chooser](../README.md#choose-a-development-task) → **website**.
+[Project task chooser](../docs/README.md#choose-a-development-task) → **website**.
 
 This directory builds the public ACT website with [VitePress](https://vitepress.dev): the home page and the user guide introduce ACT itself (installation, architecture, verification, fuzzing, validation and configuration, based on ACT's own README and CLIs), and the developer docs are this repository's ACT-GUI documentation. It is static, has its own `package.json`, and shares no code or dependencies with the workbench. The hosted site is served at `act-online.au`, and the workbench is served at `app.act-online.au`.
 

@@ -2,7 +2,7 @@
 
 **Current responsibility and status.** This module reports whether the active ACT checkout is usable, selects which ACT branch the workbench imports (the pinned baseline or a branch head of an operator-configured remote), and manages the optional user supplied Gurobi license. The first versions are implemented for VER-05 and VER-08. B owns the service path and C owns the Engine tab.
 
-This module does not run verification, call a solver for its own purposes, or decide a license's scientific effect. ACT probing and Gurobi probing are bridge responsibilities. Model loading and run lifecycle call this module through `require_engine` and worker environment setup. See the [parent flow diagram](../README.md#flow-diagram) and [project development entry point](../../README.md#choose-a-development-task).
+This module does not run verification, call a solver for its own purposes, or decide a license's scientific effect. ACT probing and Gurobi probing are bridge responsibilities. Model loading and run lifecycle call this module through `require_engine` and worker environment setup. See the [parent flow diagram](../README.md#flow-diagram) and [project development entry point](../../docs/README.md#choose-a-development-task).
 
 ## Change Guide
 

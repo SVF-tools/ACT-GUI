@@ -1,6 +1,6 @@
 # Workspace
 
-Current responsibility: own the browser's shared model, run, layer, and neuron selection, mode registry, layout context, theme, and onboarding tour. The first slice is implemented in `selection.ts`, `modes.ts`, `layout.tsx`, `theme.tsx`, and the tour files. WS-03, pinning and layout restoration, is not started. It also owns the online-visitor bar under Run history (WS-04), its only server slice: `schemas.py` → `service.py` → `routes.py` and `api.ts` → `hooks.ts` → `Presence.tsx` (hover shows a per-country world map, `WorldMap.tsx`). It does not own run data, solver state, or ACT commands. See the [parent scope](../README.md), the [repository rules](../../AGENTS.md), and the [development task guide](../../README.md#choose-a-development-task).
+Current responsibility: own the browser's shared model, run, layer, and neuron selection, mode registry, layout context, theme, and onboarding tour. The first slice is implemented in `selection.ts`, `modes.ts`, `layout.tsx`, `theme.tsx`, and the tour files. WS-03, pinning and layout restoration, is not started. It also owns the online-visitor bar under Run history (WS-04), its only server slice: `schemas.py` → `service.py` → `routes.py` and `api.ts` → `hooks.ts` → `Presence.tsx` (hover shows a per-country world map, `WorldMap.tsx`). It does not own run data, solver state, or ACT commands. See the [parent scope](../README.md), the [repository rules](../../AGENTS.md), and the [development task guide](../../docs/README.md#choose-a-development-task).
 
 ## Change Guide
 

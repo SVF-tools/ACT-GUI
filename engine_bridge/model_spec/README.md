@@ -2,7 +2,7 @@
 
 The current bridge loads JSON ACT nets, maps their DAG and box specification into immutable `ModelDescription` data, computes source hashes, and builds nets from VNN-LIB instances or supported image-classifier sources through ACT's own front ends. It does not own browser model views, graph layout, arbitrary path access, or a second specification parser. Keep this module distinct from [`visual_bench/model_spec`](../../visual_bench/model_spec/README.md), which owns catalog presentation, source selection, persistence, and wire mapping.
 
-For project navigation, see [engine_bridge flow](../README.md#flow-diagram) and [choose a development task](../../README.md#choose-a-development-task).
+For project navigation, see [engine_bridge flow](../README.md#flow-diagram) and [choose a development task](../../docs/README.md#choose-a-development-task).
 
 ## Change Guide
 

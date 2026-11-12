@@ -1,6 +1,6 @@
 # Records and Replay
 
-Current responsibility: persist run manifests, ordered lifecycle events, sealed artifacts, mutable user annotations, and zip exports. The first version supports integrity checks, torn-tail recovery, SSE event waiting, and export of sealed records. Run metadata queries are served by verification and reused by the Records tab. Export is this module's own route and must not be conflated with the query endpoint. See the [parent scope](../README.md), [repository rules](../../AGENTS.md), and the [development task guide](../../README.md#choose-a-development-task).
+Current responsibility: persist run manifests, ordered lifecycle events, sealed artifacts, mutable user annotations, and zip exports. The first version supports integrity checks, torn-tail recovery, SSE event waiting, and export of sealed records. Run metadata queries are served by verification and reused by the Records tab. Export is this module's own route and must not be conflated with the query endpoint. See the [parent scope](../README.md), [repository rules](../../AGENTS.md), and the [development task guide](../../docs/README.md#choose-a-development-task).
 
 ## Change Guide
 

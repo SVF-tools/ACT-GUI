@@ -2,12 +2,14 @@
 
 The bridge records propagation during `verify_once` when the active ACT exposes `observe.propagation`. Records retain the run's domain, pass, scope, stage, version, and full per-neuron data. Final forward records supply the existing layer-state view; dual activation records are labeled `pre` (forward pre-activation bounds). On older ACT checkouts the INSP-01 fresh interval analysis remains available as an explicitly labeled fallback. Geometry, live BaB node reads, and solver stepping are not implemented.
 
-For project navigation, see [engine_bridge flow](../README.md#flow-diagram) and [choose a development task](../../README.md#choose-a-development-task).
+For project navigation, see [engine_bridge flow](../README.md#flow-diagram) and [choose a development task](../../docs/README.md#choose-a-development-task).
 
 ## Change Guide
 
 | Goal | Required edits | Conditional / reused path |
 | --- | --- | --- |
+| Copy another field of ACT's propagation records | `PropagationSink` and the neutral record types in [propagation.py](propagation.py), [test_propagation.py](test_propagation.py) | The records writer stores every record the sink passes; [analysis](../../visual_bench/analysis/README.md#change-guide) decides what is served and shown. |
+| Follow an ACT change of the observer API | [propagation.py](propagation.py) and the `observe.propagation` requirements in [parity.py](../engine_session/parity.py) | A failing requirement makes the capability unsupported; runs then fall back to interval layer states. |
 | Change interval-state collection or limits | [layers.py](layers.py), native [test_inspection.py](test_inspection.py) | Keep LayerStates compatible unless new data is required. |
 | Add a bound/provenance field | [layers.py](layers.py), [contracts.py](../contracts.py), parity tests, [analysis mapping](../../visual_bench/analysis/README.md#change-guide) | Worker serializes dataclasses generically; change worker/records only if artifact or failure semantics change. |
 | Change stepper or box rendering | [visual_bench/analysis](../../visual_bench/analysis/README.md#change-guide) | No new inspection call for a display-only change. |
@@ -16,6 +18,25 @@ For project navigation, see [engine_bridge flow](../README.md#flow-diagram) and 
 ## Flow Diagram
 
 Arrows name requests, returned data, or persistence handoffs. Only implemented paths are shown.
+
+### Propagation records (ACT with `observe.propagation`)
+
+```mermaid
+flowchart TB
+  Worker["verification worker"] -->|"run_observed_verification"| Sink["propagation.py<br/>PropagationSink"]
+  Sink -->|"observe(sink)"| ACT["ACT verify_once"]
+  ACT -->|"Layer, relaxation, dual and spec records"| Sink
+  Sink -->|"Copied records"| Writer["visual_bench records/propagation.py"]
+  Sink -->|"RunOutcome, final layer states"| Worker
+  Writer -->|"Stored index and tensors"| Reader["visual_bench/analysis"]
+```
+
+| Block | Code / contract | Handoff |
+| --- | --- | --- |
+| Sink | [propagation.py](propagation.py): `run_observed_verification`, `PropagationSink`, `PropagationKey`, `TensorData`, `PropagationRecord`; `observe.propagation` requirements in [parity.py](../engine_session/parity.py) | Runs the existing verifier under ACT's `observe` and copies each record's key and tensors before ACT can release them; a storage failure is reported after verification, never raised into ACT. |
+| Writer | The worker's callback: `PropagationWriter` in [records/propagation.py](../../visual_bench/records/propagation.py) | [verification](../../visual_bench/verification/README.md#flow-diagram) streams index entries; [analysis](../../visual_bench/analysis/README.md#flow-diagram) serves the stored records. |
+
+### Interval layer states (fallback)
 
 ```mermaid
 flowchart TB
