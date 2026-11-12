@@ -12,7 +12,7 @@ This directory builds the public ACT website with [VitePress](https://vitepress.
 | Change navigation, sidebar, languages or the workbench link | [.vitepress/config.mts](.vitepress/config.mts) |
 | Change a developer page | The original file in the repository (for example `docs/design.md`). The site copies it at build time. |
 | Publish another repository Markdown file | `SOURCES` in [sync-docs.mjs](sync-docs.mjs) and the developer sidebar in the config |
-| Change how the site is served | [Dockerfile](Dockerfile), [nginx.conf](nginx.conf), [compose.site.yaml](../compose.site.yaml) |
+| Change how the site is served | [Dockerfile](Dockerfile), [nginx.conf](nginx.conf), [compose.yaml](compose.yaml) |
 
 English is the default language. Chinese (`/zh/`) and French (`/fr/`) translate the home page and the user guide; developer docs are English only and live next to the code they describe (each module's README), so every locale's sidebar links to the same English pages, and [nginx.conf](nginx.conf) redirects `/zh/` and `/fr/` developer paths (reached through the language switcher) to them. When an English guide page changes, update both translations in the same change.
 
@@ -40,5 +40,5 @@ npm run dev          # http://localhost:5173, live preview (re-run after editing
 Serve the built site the way production does:
 
 ```bash
-docker compose -f compose.site.yaml up -d --build    # http://127.0.0.1:18081
+docker compose -f site/compose.yaml up -d --build    # http://127.0.0.1:18081
 ```

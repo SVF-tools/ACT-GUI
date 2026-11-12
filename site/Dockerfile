@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # ACT-GUI website: VitePress build served by nginx. Build context is the repository root:
-#   docker compose -f compose.site.yaml up -d --build
+#   docker compose -f site/compose.yaml up -d --build
 FROM node:22-bookworm-slim AS build
 WORKDIR /repo
 COPY site/package.json site/package-lock.json site/

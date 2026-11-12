@@ -18,7 +18,7 @@ ARG GUROBIPY_VERSION=13.0.0
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 PYTHONUNBUFFERED=1
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 RUN pip install --index-url "$TORCH_INDEX" "torch==$TORCH_VERSION" "torchvision==$TORCHVISION_VERSION"
-COPY requirements-runtime.txt /tmp/requirements-runtime.txt
+COPY requirements/runtime.txt /tmp/requirements-runtime.txt
 RUN pip install -r /tmp/requirements-runtime.txt "gurobipy==$GUROBIPY_VERSION"
 
 RUN useradd --create-home --uid 10001 actgui && mkdir -p /data && chown actgui /data

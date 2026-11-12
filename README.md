@@ -44,14 +44,14 @@ Both setups read an ACT checkout from `ACT_ROOT`; the Docker build stages its pi
 
 ```bash
 # Docker (Compose v2.24+)
-scripts/docker_build.sh                                   # stage the pinned ACT commit, build the image
-docker compose up -d                                      # CPU: open http://127.0.0.1:8080
-docker compose -f compose.yaml -f compose.gpu.yaml up -d  # or with an NVIDIA GPU
+scripts/docker_build.sh                                          # stage the pinned ACT commit, build the image
+docker compose up -d                                             # CPU: open http://127.0.0.1:8080
+docker compose -f compose.yaml -f deploy/compose.gpu.yaml up -d  # or with an NVIDIA GPU
 
 # Local development (ACT's act-py312 conda environment, Node 22+, uv)
 uv venv --python "$(conda run -n act-py312 which python)" --system-site-packages .venv
-VIRTUAL_ENV=.venv uv pip install -r requirements-dev.txt && npm install
-./scripts/dev.sh                                          # open http://127.0.0.1:5173
+VIRTUAL_ENV=.venv uv pip install -r requirements/dev.txt && npm install
+./scripts/dev.sh                                                 # open http://127.0.0.1:5173
 ```
 
 [Development and deployment](docs/development.md) covers ACT data, Gurobi, settings and checks.
