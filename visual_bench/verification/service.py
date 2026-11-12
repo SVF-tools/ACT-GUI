@@ -133,13 +133,14 @@ class RunService:
                 values = {**req.fuzz.model_dump(), "timeout_seconds": req.time_budget_s,
                           "stop_on_first_violation": req.fuzz.stop_on_first}
                 fuzz_live = {o.name: values.get(o.name, o.default) for o in fuzzing_options() if o.live}
+            bab_tree = req.method == "bab" and self.engine.capability_available("events.bab_nodes")
             self.records.create(run_id, {
                 "run_id": run_id, "created_at": now_iso(), "request": req.model_dump(),
                 "model": {"act_path": entry["act_path"], "sha256": entry["sha256"]},
                 "act": {"commit": self.engine.info.commit, "expected_commit": self.engine.expected_commit,
                         "source": self.engine.source.model_dump()},
                 "execution": {"requested_device": requested_device(), "gurobi_license": license_source,
-                              "fuzz_live": fuzz_live},
+                              "fuzz_live": fuzz_live, "bab_tree": bab_tree},
             })
             self.records.append_event(run_id, "run.queued", "queued", {"method": req.method})
             context = {"engine": self._engine_snapshot(),
@@ -224,6 +225,7 @@ class RunService:
                               "hybridz": req.hybridz.model_dump() if req.hybridz else None,
                               "record_layers": self.engine.capability_available("inspect.layer_bounds.interval"),
                               "record_propagation": self.engine.capability_available("observe.propagation"),
+                              "record_bab": bool(self.records.manifest(run_id)["execution"].get("bab_tree")),
                               "record_directory": str(self.records.run_dir(run_id).resolve()),
                               "fuzz": req.fuzz.model_dump() if req.fuzz else None}
                 req_file.write_text(json.dumps(worker_req))
@@ -294,6 +296,7 @@ class RunService:
                                     budget = float(msg["control"]["applied"]["timeout_seconds"])
                                     deadline()
                                 event = (("verify.propagation", msg["propagation"]) if "propagation" in msg
+                                         else ("verify.bab", msg["bab"]) if "bab" in msg
                                          else self.live.observe(run_id, msg))
                                 if event is not None:
                                     self.records.append_event(run_id, event[0], "running", event[1])

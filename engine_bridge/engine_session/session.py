@@ -68,7 +68,7 @@ _BASELINE_CAPABILITIES = (
     Capability("observe.propagation", "available", "act.pipeline.gui.verifier_gui records during verify_once (ACT-06)"),
     Capability("source.vnnlib", "available", "act.front_end.vnnlib_loader.create_specs.create_specs_from_paths + TorchToACT"),
     Capability("source.onnx_classifier", "available", "act.front_end.vnnlib_loader.onnx_converter.convert_onnx_to_pytorch + TorchToACT"),
-    Capability("events.bab_nodes", "unsupported", "no BaB observer hook in baseline (plan ACT-03)"),
+    Capability("events.bab_nodes", "available", "act.pipeline.gui.bab_gui BaBWave/BaBTerminal records of each committed BaB wave during verify_bab_batched (ACT-03)"),
     Capability("events.bab_summary", "available", "VerifyResult.metadata after completion"),
     Capability("control.pause_step_split", "unsupported", "no safe control boundary in baseline (plan ACT-05)"),
     Capability("geometry.projection", "unsupported", "no projection export in baseline (plan ACT-04)"),

@@ -31,6 +31,7 @@ import { Empty } from "./shared/ui/Empty";
 import { usePropagation } from "./analysis/hooks";
 import { PropagationProvider } from "./analysis/PropagationContext";
 import { PropagationInspector } from "./analysis/PropagationView";
+import { useBabTree } from "./bab/hooks";
 
 const TABS = ["Neuron", "Engine", "Records", "Assistant"] as const;
 type Tab = (typeof TABS)[number];
@@ -49,7 +50,10 @@ export function App() {
   const tabs = TABS.filter((t) => t !== "Neuron" || (mode !== "Fuzzing" && sel.runId !== null));
   const shownTab: Tab = tabs.includes(tab) ? tab : "Engine";
   const propagation = usePropagation(mode === "Verification" ? sel.runId : null);
-  const inspecting = mode === "Verification" && (propagation.data?.availability === "available" || propagation.data?.availability === "pending");
+  const babTree = useBabTree(mode === "BaB" ? sel.runId : null, 0);
+  // A recorded BaB tree, like a propagation inspection, takes the wide center column instead of the network graph.
+  const inspecting = (mode === "Verification" && (propagation.data?.availability === "available" || propagation.data?.availability === "pending"))
+    || (mode === "BaB" && babTree.data?.availability === "available");
   const lacks = useCapabilities();
   // After an ACT switch, leave a mode the new checkout cannot run.
   const fallbackMode = lacks(activeMode.capability) ? modes.find((m) => !lacks(m.capability))?.id : undefined;

@@ -12,7 +12,7 @@ Only this scope directly imports ACT. It adapts the pinned engine into neutral r
 | **model_spec**: source discovery, ACT net building, graph/spec description | [Loading and description guide](model_spec/README.md#change-guide) | ModelDescription, BuiltNet, source/sample descriptions → visual_bench/model_spec. |
 | **execution**: verification/BaB invocation, fuzz options/observations, method eligibility | [Invocation guide](execution/README.md#change-guide) | RunOutcome / FuzzOutcome → run worker; supported methods → ModelService. |
 | **inspection**: layer-bound collection | [Interval analysis guide](inspection/README.md#change-guide) | LayerStates → worker output → sealed layers.json → visual_bench/analysis. |
-| **events**: BaB observation coverage and summary filtering | [Summary guide](events/README.md#change-guide) | Coverage and final metadata dictionaries → visual_bench/bab and verification worker. No ACT import or live event transport here. |
+| **events**: committed BaB waves, observation coverage and summary filtering | [Events guide](events/README.md#change-guide) | BabWave / BabTerminal and the final summary → verification worker; coverage → visual_bench/bab. No transport, storage or throttling here. |
 
 ## Flow Diagram
 
@@ -42,8 +42,9 @@ flowchart TB
   ES -->|"EngineInfo / SolverStatus"| Engine
   Worker["Run worker"] -->|"Read layers"| IN["inspection"]
   IN -->|"LayerStates"| Worker
-  Readers["Worker / BaB service"] -->|"Query"| EV["events"]
-  EV -->|"Summary / coverage"| Readers
+  Worker -->|"Observe BaB"| EV["events"]
+  EV -->|"Committed waves, summary"| Worker
+  Bab["BaB service"] -->|"Coverage"| EV
 
 ```
 
@@ -53,7 +54,7 @@ flowchart TB
 | execution | [verify.py](execution/verify.py): run_verification; [fuzz.py](execution/fuzz.py): run_fuzzing; [methods.py](execution/methods.py): verify_methods | [Local flow](execution/README.md#flow-diagram) → [verification](../visual_bench/verification/README.md#flow-diagram) / [fuzzing](../visual_bench/fuzzing/README.md#flow-diagram) |
 | inspection | [layers.py](inspection/layers.py): interval_layer_states; a fresh interval analysis, not a saved BaB/node state | [Local flow](inspection/README.md#flow-diagram) → [analysis](../visual_bench/analysis/README.md#flow-diagram) |
 | engine_session | [session.py](engine_session/session.py): probe, probe_isolated, probe_gurobi, act_root, act_code_root, act_imports; [checkouts.py](engine_session/checkouts.py): branch staging; [parity.py](engine_session/parity.py): API checks | [Local flow](engine_session/README.md#flow-diagram) → [engine](../visual_bench/engine/README.md#flow-diagram) |
-| events | [coverage.py](events/coverage.py): observation_coverage, bab_summary | [Local flow](events/README.md#flow-diagram) → [bab](../visual_bench/bab/README.md#flow-diagram) |
+| events | [bab.py](events/bab.py): run_observed_bab, BabTreeSink; [coverage.py](events/coverage.py): observation_coverage, bab_summary | [Local flow](events/README.md#flow-diagram) → [verification](../visual_bench/verification/README.md#flow-diagram) / [bab](../visual_bench/bab/README.md#flow-diagram) |
 
 ## Decide the Edit Scope
 
@@ -88,7 +89,7 @@ Bridge numbers remain Python numbers, including non-finite values; workbench wir
 
 The bridge has no service routes. Module packages export their public operations through __init__.py; each module README lists current files and its tests. Model loading and ACT imports are reused internally across execution/inspection; this reuse alone is not a reason to edit model_spec or engine_session for every execution feature.
 
-Current coverage is narrower than the long-term contract: engine_session has probes/import setup, not session/run handles; inspection provides interval after-states, not arbitrary geometry or historical node snapshots; events exposes final BaB summaries, not committed node/wave hooks. Controls and committed event interfaces remain dependent on ACT work in the [plan](../docs/plan.md).
+Current coverage is narrower than the long-term contract: engine_session has probes/import setup, not session/run handles; inspection provides interval after-states, not arbitrary geometry or historical node snapshots; events copies ACT's committed BaB waves (on ACT with `act.pipeline.gui.bab_gui`) and final summaries, but there are no BaB controls. Controls remain dependent on ACT work in the [plan](../docs/plan.md).
 
 B owns engine_session, model_spec, execution and contract integration. A owns inspection/events and reviews scientific semantics. Detailed task IDs, prerequisites and evidence live in module READMEs. Extract a separate package only when a real second consumer or independent lifecycle justifies it, not merely because the bridge has five modules.
 

@@ -23,6 +23,8 @@ export const keys = {
     fields: string | null = null, neuron: number | null = null) =>
     [...run(id), "propagation-layer", layer, scope, pass, stage, version, fields, neuron] as const,
   coverage: (id: string | null) => [...run(id), "coverage"] as const,
+  babTree: (id: string | null, root: number) => [...run(id), "bab", root] as const,
+  babNode: (id: string | null, node: number | null) => [...run(id), "bab-node", node] as const,
   fuzzing: (id: string | null) => [...run(id), "fuzzing"] as const,
   fuzzDefaults: () => ["fuzz", "defaults"] as const,
   fuzzOptions: () => ["fuzz", "options"] as const,

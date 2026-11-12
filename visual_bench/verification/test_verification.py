@@ -30,7 +30,11 @@ def test_bab_run_lifecycle_matches_native_and_is_persisted(client: TestClient, t
 
     events = follow_to_end(client, run_id)
     assert [e["seq"] for e in events] == list(range(1, len(events) + 1))
-    assert [e["kind"] for e in events] == ["run.queued", "run.started", "bab.summary", "run.completed"]
+    kinds = [e["kind"] for e in events]
+    assert [k for k in kinds if k != "verify.bab"] == ["run.queued", "run.started", "bab.summary", "run.completed"]
+    caps = {c["name"]: c["availability"] for c in client.get("/api/engine").json()["capabilities"]}
+    tree = caps["events.bab_nodes"] == "available"  # ACT checkouts with BaB wave records also log the tree
+    assert ("verify.bab" in kinds) == tree
 
     run = client.get(f"/api/runs/{run_id}").json()
     assert run["result"]["act_status"] == "CERTIFIED" and run["matches_native"] is True
@@ -39,7 +43,7 @@ def test_bab_run_lifecycle_matches_native_and_is_persisted(client: TestClient, t
 
     record = tmp_path / "records" / run_id
     hashes = json.loads((record / "artifacts.json").read_text())
-    assert set(hashes) == {"manifest.json", "result.json", "layers.json"}
+    assert set(hashes) == {"manifest.json", "result.json", "layers.json", *(["bab.jsonl"] if tree else [])}
     bundle = zipfile.ZipFile(io.BytesIO(client.get(f"/api/runs/{run_id}/export").content))
     assert all(not n.startswith("/") and ".." not in n for n in bundle.namelist())
     assert str(tmp_path) not in bundle.read(f"{run_id}/manifest.json").decode()

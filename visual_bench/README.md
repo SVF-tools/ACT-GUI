@@ -16,7 +16,7 @@ Choose the owner of the behavior, then follow the linked module guide for files 
 | **fuzzing** | [Options, live images, saved counterexamples and export](fuzzing/README.md#change-guide) | Uses verification lifecycle; provides runner.py and FuzzLive; serves FuzzingOut. |
 | **engine** | [ACT status and Gurobi license management](engine/README.md#change-guide) | Model loading/runs use its engine gate; workers inherit license environment. |
 | **analysis** | [Recorded layer bounds and interval-box views](analysis/README.md#change-guide) | Reads run status and sealed layers.json; new scientific data requires bridge inspection. |
-| **bab** | [Observation coverage and final BaB summary](bab/README.md#change-guide) | Reads RunOut and bridge events coverage; no node tree/control path exists yet. |
+| **bab** | [Live BaB search tree, wave replay, node detail, coverage and final summary](bab/README.md#change-guide) | Projects the run's recorded BaB waves (bab.jsonl) and reads RunOut; no node control path exists. |
 | **assistant** | [Frozen context, typed evidence, fake-provider answers](assistant/README.md#change-guide) | Reads the same model/run/analysis/BaB services as HTTP; navigates through workspace. |
 | **records** | [Artifacts, event log, integrity, annotations, zip export](records/README.md#change-guide) | Feature modules supply content; RecordStore persists it without deciding scientific meaning. |
 
@@ -120,7 +120,7 @@ Views obtain server data through hooks, not direct fetch calls. Services receive
 
 ### Ownership and Future Work
 
-C owns interaction/product consistency; B owns application services and AI orchestration; D, when available, owns analysis/visualization and test integration. A reviews scientific semantics. Module task tables retain detailed acceptance evidence and future interfaces; [plan.md](../docs/plan.md) owns cross-module integration order. Node-level BaB, advanced geometry, real providers and authorized AI plans remain future work, not current service capabilities.
+C owns interaction/product consistency; B owns application services and AI orchestration; D, when available, owns analysis/visualization and test integration. A reviews scientific semantics. Module task tables retain detailed acceptance evidence and future interfaces; [plan.md](../docs/plan.md) owns cross-module integration order. BaB node controls, advanced geometry, real providers and authorized AI plans remain future work, not current service capabilities.
 
 Extract deeper modules only when ownership or implementation complexity requires it. Keep cross-module decisions in [design.md](../docs/design.md), and feature-specific details in the owning README.
 

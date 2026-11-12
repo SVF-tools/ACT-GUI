@@ -73,6 +73,7 @@ Full-suite commands/counts are recorded in [execution validation](../../engine_b
 | --- | --- |
 | [store.py](store.py) | `RecordStore`: per-run directories, atomic writes, ordered `events.jsonl`, sealed artifact hashes, mutable annotations, event waiting, and zip export. |
 | [propagation.py](propagation.py) | `PropagationWriter`: full propagation index, deduplicated float32 blobs, atomic live publication, and progress coalescing at 10 notifications/s plus the final flush. |
+| [bab.py](bab.py) | `BabWriter`: append-only BaB tree log (`bab.jsonl`), each line flushed before its notification; notifications coalesced to 2/s plus the terminal; a closing `end` line. `RecordStore.bab_log` reads complete lines from a byte offset. |
 | [../analysis/test_propagation.py](../analysis/test_propagation.py) | Synthetic storage/index/API tests: deduplication, throttling without history loss, seal/blob corruption, export and explicit size limits. |
 | [routes.py](routes.py) | `GET /api/runs/{run_id}/export`, owned by records. Returns a zip only for a sealed run. |
 | [api.ts](api.ts) | Export URL helper. Run metadata query is imported from verification's client path. |
@@ -89,6 +90,7 @@ events.jsonl                  ordered lifecycle events
 result.json                   final ACT result
 layers.json                   recorded interval layer states
 propagation.json              full observation index, live atomic snapshots then sealed on completion
+bab.jsonl                     BaB runs: one line per committed ACT wave, the terminal and an end line; sealed on completion
 blobs/<sha256>.f32             propagation tensor envelopes, deduplicated within this run and sealed
 fuzzing.json                  fuzzing result when applicable
 artifacts.json                sha256 seal for available artifacts
@@ -127,6 +129,7 @@ Focused storage and API check: `.venv/bin/python -m pytest visual_bench/analysis
 | REC-03 | Implement replay, coverage, and resync reads | REC-02 | Snapshot S plus following events reproduces recorded state; missing/expired history is explicitly represented. |
 | REC-04 | Export fixed research data and figure configuration | REC-03, ANA-02 | Export/import preserves numerical data, selected coordinates, guarantees, revision, and plot configuration; invalid bundle paths are rejected. |
 | REC-05 | Persist fuzz control idempotency receipts | REC-01, VER-16 | The annotation allowlist includes `fuzz_control_requests.json`; `fuzzing/test_control.py` verifies that a duplicate after completion returns the original receipt without another pipe write. Receipt semantics remain fuzzing-owned. |
+| REC-06 | Store the BaB tree log | REC-01, EVT-02 | `bab.jsonl`: one JSON line per committed ACT wave or terminal record, flushed by the worker before its notification; readers return complete lines from a byte offset and leave a torn final line; the completed log is sealed and exported with the record. Tree meaning stays bab-owned. |
 
 Current status: REC-01 is implemented. REC-02 and REC-03 are partial through lifecycle events, recovery, and replay. REC-04 has sealed export only, not import. User annotations are written atomically, are not hashed into `artifacts.json`, and are included in exports.
 

@@ -119,7 +119,7 @@ class RunList(Wire):
     runs: list[RunOut]
 
 RunEventKind = Literal["run.queued", "run.started", "run.stop_requested", "run.completed", "run.failed", "bab.summary",
-                       "fuzz.progress", "fuzz.control", "fuzz.paused", "fuzz.resumed", "verify.propagation"]
+                       "fuzz.progress", "fuzz.control", "fuzz.paused", "fuzz.resumed", "verify.propagation", "verify.bab"]
 
 class RunEvent(Wire):
     run_id: str

@@ -328,6 +328,99 @@ class FuzzOutcome:
     stop_reason: str = "max_iterations"
 
 
+# BaB search tree (EVT-02): ACT's committed BaB waves (act.pipeline.gui.bab_gui BaBWave / BaBTerminal), copied out
+# of ACT. Node identity is ACT's node_id (the root is 0, its parent -1); a wave is ACT's commit point, so records of
+# work ACT rolled back never arrive.
+@dataclass(frozen=True)
+class BabPhase:
+    """A ReLU phase a split fixed: `neuron` of RELU layer `layer_id` is active (sign 1) or inactive (sign -1)."""
+    layer_id: int
+    neuron: int
+    sign: int
+    spec_rows: tuple[int, ...] = (0,)  # property rows the phase applies to (ACT keeps split signs per spec row)
+
+
+@dataclass(frozen=True)
+class BabInterval:
+    """An input split: the child's new bounds on input `axis` (None when not finite)."""
+    axis: int
+    lb: float | None
+    ub: float | None
+
+
+@dataclass(frozen=True)
+class BabBranch:
+    """What distinguishes a child from its parent: ReLU phases (kind "neuron"), input intervals ("input_axis"),
+    or "unknown" when ACT saw neither change."""
+    kind: str
+    phases: tuple[BabPhase, ...] = ()
+    intervals: tuple[BabInterval, ...] = ()
+
+
+@dataclass(frozen=True)
+class BabLayerBounds:
+    """One layer's bounds at a node, reduced from ACT's per-neuron bounds: their range and, for a RELU layer, how many
+    of its inputs are stably active (lb >= 0), stably inactive (ub <= 0) or unstable (lb < 0 < ub)."""
+    layer_id: int
+    kind: str | None  # ACT layer kind, None when the model description lacks the layer
+    neurons: int
+    lb_min: float | None  # None when not finite
+    ub_max: float | None
+    active: int | None = None  # RELU layers only, from the bounds of the layer's input
+    inactive: int | None = None
+    unstable: int | None = None
+
+
+@dataclass(frozen=True)
+class BabNodeResult:
+    """A node ACT solved in a wave and what ACT decided for it."""
+    node_id: int
+    parent_id: int  # -1 for the root
+    depth: int
+    solve_status: str  # ACT SolveStatus of the node's bound problem
+    # ACT's outcome: proved_main | proved_terminal | branched | retired_max_depth | retired_terminal | unresolved
+    outcome: str
+    bound: float | None  # ACT's node bound (see bound_kind); None when not finite
+    bound_kind: str
+    layers: tuple[BabLayerBounds, ...] = ()  # empty when ACT reported no per-layer bounds (e.g. solver tier lp)
+
+
+@dataclass(frozen=True)
+class BabChild:
+    """A subproblem ACT created in a wave by splitting `parent_id`."""
+    node_id: int
+    parent_id: int
+    depth: int
+    branch: BabBranch
+    frontier_state: str  # "pending" (queued) or "evicted" (dropped by the frontier cap)
+
+
+@dataclass(frozen=True)
+class BabWave:
+    """One committed BaB wave: the nodes ACT solved and the children it queued."""
+    seq: int
+    wave: int
+    t_ms: float  # since the observed run started
+    nodes: tuple[BabNodeResult, ...]
+    children: tuple[BabChild, ...]
+    frontier_size: int  # pending subproblems after the wave
+    evicted_node_ids: tuple[int, ...]  # pending nodes the frontier cap dropped during the wave
+
+
+@dataclass(frozen=True)
+class BabTerminal:
+    """ACT's end of the search: its verdict and reason, and the node that decided it when one did."""
+    seq: int
+    wave: int  # 0 when the root presolve decided
+    t_ms: float
+    status: str  # ACT VerifyStatus name
+    reason: str
+    frontier_size: int
+    node_id: int | None = None  # e.g. the node whose counterexample falsified the property
+    parent_id: int | None = None
+    depth: int | None = None
+
+
 LicenseState = Literal["licensed", "restricted", "invalid", "not_installed"]
 
 

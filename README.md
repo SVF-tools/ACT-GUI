@@ -8,7 +8,7 @@ ACT-GUI is the visualization and interaction workbench for [ACT](https://github.
 
 **Online (v0.1):** the website and user guide are at [act-online.au](https://act-online.au); the hosted workbench is at [app.act-online.au](https://app.act-online.au).
 
-**Available:** real model loading, verification, BaB final summaries, live fuzzing, recorded interval-layer views, and record export. **Not available:** node-level BaB history/controls, geometry beyond interval boxes, and a real AI provider. The assistant currently uses a deterministic fake provider.
+**Available:** real model loading, verification, the live BaB search tree with wave replay (on ACT with `act.pipeline.gui.bab_gui`; final summaries otherwise), live fuzzing, recorded interval-layer views, and record export. **Not available:** BaB node controls, per-neuron bounds of BaB nodes, geometry beyond interval boxes, and a real AI provider. The assistant currently uses a deterministic fake provider.
 
 ## Choose a Development Task
 
@@ -22,7 +22,7 @@ Start with the row matching your intended behavior. Follow its module guide for 
 | Captured ACT errors/warnings or the reproduction snapshot | [verification diagnostics](visual_bench/verification/README.md#diagnostics-and-reproduction-snapshot) | Storage guarantees change: [records](visual_bench/records/README.md#change-guide). |
 | Fuzz settings, live mutations, or saved counterexamples | [fuzzing](visual_bench/fuzzing/README.md#change-guide) | New ACT data/options are needed, or the shared run lifecycle changes. |
 | Layer bounds or propagation views | [analysis](visual_bench/analysis/README.md#change-guide) | Recorded data is insufficient: [inspection](engine_bridge/inspection/README.md#change-guide). |
-| BaB coverage or final summaries | [bab](visual_bench/bab/README.md#change-guide) | Summary mapping changes: [events](engine_bridge/events/README.md#change-guide). Node history requires new ACT support first. |
+| BaB search tree, coverage or final summaries | [bab](visual_bench/bab/README.md#change-guide) | New ACT record fields: [events](engine_bridge/events/README.md#change-guide). Node controls require new ACT support first. |
 | Explanations and evidence navigation | [assistant](visual_bench/assistant/README.md#change-guide) | An evidence source needs a new application query; do not bypass its service. |
 | Persistence, integrity, replay, or export | [records](visual_bench/records/README.md#change-guide) | A feature needs a new artifact or annotation; keep its meaning in the producing module. |
 | Engine diagnostics or Gurobi licensing | [engine](visual_bench/engine/README.md#change-guide) | The actual engine/license probe changes: [engine_session](engine_bridge/engine_session/README.md#change-guide). |

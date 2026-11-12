@@ -33,4 +33,4 @@ class Workbench:
         self.engine.active_runs = self.runs.active_count
         self.fuzzing = FuzzingService(self.runs, self.records, self.models, live)
         self.analysis = AnalysisService(self.runs, self.records)
-        self.bab = BabService(self.runs)
+        self.bab = BabService(self.runs, self.records)

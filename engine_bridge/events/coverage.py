@@ -1,8 +1,8 @@
-"""ACT observation coverage for the pinned baseline (EVT-01, first version).
+"""ACT BaB observation coverage (EVT-01) and the final summary filter.
 
-The baseline exposes no BaB observer, so node-level committed events are
-unsupported. The only BaB observation is the final summary ACT puts in
-VerifyResult.metadata; it is labeled summary-only and never expanded into nodes.
+ACT checkouts with act.pipeline.gui.bab_gui (capability events.bab_nodes) report every committed BaB wave; older
+ones, including the pinned baseline, only put a final summary in VerifyResult.metadata. The summary is labeled
+summary-only and never expanded into nodes.
 """
 from __future__ import annotations
 
@@ -14,12 +14,22 @@ BAB_SUMMARY_KEYS = (
 )
 
 
-def observation_coverage() -> dict[str, str]:
+def observation_coverage(waves: bool) -> dict[str, str]:
+    """Coverage of a BaB run whose ACT checkout did (waves) or did not report committed waves."""
+    if waves:
+        return {
+            "node_events": "available",
+            "wave_events": "available",
+            "final_summary": "available",
+            "reason": "ACT reports every committed BaB wave (solved nodes, queued children, frontier) and the end of "
+                      "the search (act.pipeline.gui.bab_gui).",
+        }
     return {
         "node_events": "unsupported",
         "wave_events": "unsupported",
         "final_summary": "available",
-        "reason": "ACT baseline has no BaB observer/commit hook (plan ACT-03); only post-run metadata is observable.",
+        "reason": "This ACT checkout reports no BaB waves (act.pipeline.gui.bab_gui, events.bab_nodes); only post-run "
+                  "metadata is observable.",
     }
 
 
