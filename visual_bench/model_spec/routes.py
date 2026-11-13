@@ -25,7 +25,8 @@ def router(models: ModelService) -> APIRouter:
         summary, created = models.rebuild(model_id)
         return JSONResponse(summary.model_dump(), status_code=201 if created else 200)
 
-    @r.get("/sources", response_model=S.SourcesOut)
+    # Instances without recorded text omit `text`, so a listed instance can still be sent back as a load source.
+    @r.get("/sources", response_model=S.SourcesOut, response_model_exclude_none=True)
     def sources() -> S.SourcesOut:
         return models.sources()
 
@@ -36,5 +37,13 @@ def router(models: ModelService) -> APIRouter:
     @r.get("/models/{model_id}", response_model=S.ModelDescriptionOut)
     def describe(model_id: str) -> S.ModelDescriptionOut:
         return models.describe(model_id)
+
+    @r.get("/models/{model_id}/provenance", response_model=S.ProvenanceOut)
+    def provenance(model_id: str) -> S.ProvenanceOut:
+        return models.provenance(model_id)
+
+    @r.post("/models/{model_id}/provenance/nearest", response_model=S.NearestOut)
+    def nearest(model_id: str, body: S.NearestRequest) -> S.NearestOut:
+        return models.nearest(model_id, body)
 
     return r

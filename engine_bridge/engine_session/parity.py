@@ -90,6 +90,20 @@ def requirements() -> dict[str, tuple[Requirement, ...]]:
         ),
         "verify.bab": bab,
         "events.bab_summary": bab,
+        # verify_bab_batched is checked first: on ACT 22693fb, importing bab_gui before act.back_end.bab is circular.
+        "verify.bab.options": (
+            *bab,
+            Requirement("act.pipeline.gui.bab_gui:bab_options"),
+            Requirement("act.pipeline.gui.bab_gui:bab_run_config", positional=1),
+            Requirement("act.pipeline.gui.act_gui:validate_changes", positional=2),
+        ),
+        "events.bab_nodes": (
+            *bab,
+            Requirement("act.back_end.bab.bab:verify_bab_batched", ("on_progress",)),
+            Requirement("act.pipeline.gui.act_gui:observe", positional=1),
+            Requirement("act.pipeline.gui.bab_gui:BaBWave"),
+            Requirement("act.pipeline.gui.bab_gui:BaBTerminal"),
+        ),
         "fuzz.control": (
             Requirement("act.pipeline.gui.act_gui:observe", positional=1),
             *(Requirement(f"act.pipeline.gui.fuzzer_gui:{name}") for name in
@@ -127,6 +141,12 @@ def requirements() -> dict[str, tuple[Requirement, ...]]:
             Requirement(f"{_VERIFIER}:get_input_ids", positional=1),
         ),
         "source.vnnlib": (
+            Requirement("act.front_end.vnnlib_loader.create_specs:create_specs_from_paths", ("category",), positional=2),
+            *_WRAP,
+        ),
+        # create_specs_from_paths takes one ONNX file per network of a multi-network property.
+        "source.vnnlib.multi_network": (
+            Requirement("act.front_end.vnnlib_loader.data_model_loader:build_multi_network_model", positional=2),
             Requirement("act.front_end.vnnlib_loader.create_specs:create_specs_from_paths", ("category",), positional=2),
             *_WRAP,
         ),

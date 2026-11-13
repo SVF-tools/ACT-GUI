@@ -24,7 +24,7 @@ function VerificationMode(props: ModeProps) {
 function BabMode({ sel, model }: ModeProps) {
   return createElement(Fragment, null,
     createElement(VerdictBanner, { runId: sel.runId, model }),
-    createElement(BabView, { runId: sel.runId }));
+    createElement(BabView, { runId: sel.runId, model }));
 }
 
 function FuzzMode({ sel, model }: ModeProps) {

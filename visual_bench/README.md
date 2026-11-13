@@ -1,6 +1,6 @@
 # Visual Bench: Developer Map
 
-[Project task chooser](../README.md#choose-a-development-task) → **workbench collaboration** → a module's Change Guide.
+[Project task chooser](../docs/README.md#choose-a-development-task) → **workbench collaboration** → a module's Change Guide.
 
 This scope owns interaction, application services, run workers, and records. ACT-specific loading, computation, and result adaptation belong to [engine_bridge](../engine_bridge/README.md). The browser and service are parts of the same product, not separate feature owners.
 
@@ -14,9 +14,9 @@ Choose the owner of the behavior, then follow the linked module guide for files 
 | **model_spec** | [Load models and inspect graph/spec/input images](model_spec/README.md#change-guide) | Provides model ID, verified path, supported methods to verification; source adaptation goes through bridge model_spec. |
 | **verification** | [Start/stop runs, supervise workers, expose lifecycle/SSE](verification/README.md#change-guide) | Accepts RunRequest; returns run_id/RunOut; persists results through records. |
 | **fuzzing** | [Options, live images, saved counterexamples and export](fuzzing/README.md#change-guide) | Uses verification lifecycle; provides runner.py and FuzzLive; serves FuzzingOut. |
-| **engine** | [ACT status and Gurobi license management](engine/README.md#change-guide) | Model loading/runs use its engine gate; workers inherit license environment. |
-| **analysis** | [Recorded layer bounds and interval-box views](analysis/README.md#change-guide) | Reads run status and sealed layers.json; new scientific data requires bridge inspection. |
-| **bab** | [Observation coverage and final BaB summary](bab/README.md#change-guide) | Reads RunOut and bridge events coverage; no node tree/control path exists yet. |
+| **engine** | [ACT status, branch switching and Gurobi licenses](engine/README.md#change-guide) | Model loading and runs use its engine and capability gates; workers inherit the license environment. |
+| **analysis** | [Propagation drill-down from network to neuron, legacy layer bounds and interval box](analysis/README.md#change-guide) | Reads the run's propagation records (live or sealed) or sealed layers.json; new scientific data requires bridge inspection. |
+| **bab** | [Live BaB search tree, wave replay, node detail, coverage and final summary](bab/README.md#change-guide) | Projects the run's recorded BaB waves (bab.jsonl) and reads RunOut; no node control path exists. |
 | **assistant** | [Frozen context, typed evidence, fake-provider answers](assistant/README.md#change-guide) | Reads the same model/run/analysis/BaB services as HTTP; navigates through workspace. |
 | **records** | [Artifacts, event log, integrity, annotations, zip export](records/README.md#change-guide) | Feature modules supply content; RecordStore persists it without deciding scientific meaning. |
 
@@ -103,14 +103,14 @@ These are commands to run, not a claim that a new test run occurred. ACT-backed 
 | [server.py](server.py) | FastAPI app, error rendering, /api/health, router inclusion, production assets. |
 | [workbench.py](workbench.py) | Constructs module services and injects collaborators; HTTP and assistant share instances. |
 | [schemas.py](schemas.py) | Re-exports module schemas and lists WIRE_MODELS for generation. |
-| [wire.py](wire.py), [errors.py](errors.py), [config.py](config.py) | Wire primitives, application errors, paths/settings. |
+| [wire.py](wire.py), [errors.py](errors.py), [config.py](config.py) | Wire primitives, application errors, paths/settings. Input-sized vectors above `engine_bridge.contracts.DISPLAY_VALUES` (3x224x224 values) are omitted from browser responses; records and model files keep them for save and export. |
 | [app.tsx](app.tsx), [main.tsx](main.tsx) | Browser composition, shared selection, QueryClientProvider. |
 | [generated/wire.ts](generated/wire.ts) | Generated browser wire types. |
 | [conftest.py](conftest.py), [testing.py](testing.py) | Shared service test fixtures and helpers. |
 
 ### Shared Browser Layer
 
-[shared/http.ts](shared/http.ts) owns HTTP and SSE transport. [shared/queryClient.ts](shared/queryClient.ts) owns the QueryClient and key factory: run projections sit under the run key so committed events invalidate related data. [shared/wire.ts](shared/wire.ts) contains formatting helpers; shared/ui contains reusable UI primitives. Shared code imports no feature module.
+[shared/http.ts](shared/http.ts) owns HTTP and SSE transport. [shared/queryClient.ts](shared/queryClient.ts) owns the QueryClient and key factory: run projections sit under the run key so committed events invalidate related data. [shared/wire.ts](shared/wire.ts) contains formatting helpers; shared/ui contains reusable UI primitives (pixels, the vector box chart `BandChart`, the provenance `Neighbours` list). Shared code imports no feature module.
 
 ### Module Slice and Boundaries
 
@@ -120,7 +120,7 @@ Views obtain server data through hooks, not direct fetch calls. Services receive
 
 ### Ownership and Future Work
 
-C owns interaction/product consistency; B owns application services and AI orchestration; D, when available, owns analysis/visualization and test integration. A reviews scientific semantics. Module task tables retain detailed acceptance evidence and future interfaces; [plan.md](../docs/plan.md) owns cross-module integration order. Node-level BaB, advanced geometry, real providers and authorized AI plans remain future work, not current service capabilities.
+C owns interaction/product consistency; B owns application services and AI orchestration; D, when available, owns analysis/visualization and test integration. A reviews scientific semantics. Module task tables retain detailed acceptance evidence and future interfaces; [plan.md](../docs/plan.md) owns cross-module integration order. BaB node controls, advanced geometry, real providers and authorized AI plans remain future work, not current service capabilities.
 
 Extract deeper modules only when ownership or implementation complexity requires it. Keep cross-module decisions in [design.md](../docs/design.md), and feature-specific details in the owning README.
 

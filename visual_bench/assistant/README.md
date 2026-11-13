@@ -1,6 +1,6 @@
 # AI Assistant
 
-Current responsibility: freeze the browser selection, collect typed evidence through existing workbench services, compose a cited answer, and navigate back to cited layers or values. The first version uses a deterministic `FakeProvider`. No real provider or tool execution is wired. The assistant does not import ACT, override ACT verdicts, or execute arbitrary tools. See the [parent scope](../README.md), [repository rules](../../AGENTS.md), and the [development task guide](../../README.md#choose-a-development-task).
+Current responsibility: freeze the browser selection, collect typed evidence through existing workbench services, compose a cited answer, and navigate back to cited layers or values. The first version uses a deterministic `FakeProvider`. No real provider or tool execution is wired. The assistant does not import ACT, override ACT verdicts, or execute arbitrary tools. See the [parent scope](../README.md), [repository rules](../../AGENTS.md), and the [development task guide](../../docs/README.md#choose-a-development-task).
 
 ## Change Guide
 

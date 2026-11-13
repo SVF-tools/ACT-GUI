@@ -64,6 +64,7 @@ def collect_evidence(wb: "Workbench", ctx: S.SelectionContext) -> tuple[dict[str
                             f"node events {cov.node_events}; final summary {cov.final_summary}; {cov.reason}")
     if cov.summary:
         facts["bab_nodes"] = cov.summary.get("nodes")
+    facts["bab_tree"] = cov.node_events == "available"
     states = wb.analysis.layer_states(ctx.run_id)
     facts["layers_availability"] = states.availability
     if ctx.layer_id is None or states.availability != "available":
@@ -153,10 +154,12 @@ class FakeProvider:
                 "refinement (BaB) is needed to decide the property.", "margin", "spec")
             if not ok and facts.get("verdict") == "certified" and facts.get("method") == "bab":
                 sec("hypothesis", f"BaB closed the gap by splitting ({facts.get('bab_nodes')} node(s) per ACT's summary); "
-                    "which splits were made is not observable in this ACT baseline.", "coverage", "result")
-        sec("missing" if "coverage" in facts else "observation",
-            "Node-level BaB history is unsupported by the pinned ACT baseline; only the final summary is shown.",
-            "coverage")
+                    + ("the BaB tab shows the split ACT made at each node." if facts.get("bab_tree") else
+                       "which splits were made is not observable on this ACT checkout."), "coverage", "result")
+        if not facts.get("bab_tree"):
+            sec("missing" if "coverage" in facts else "observation",
+                "Node-level BaB history is unsupported by this ACT checkout; only the final summary is shown.",
+                "coverage")
         return out
 
 

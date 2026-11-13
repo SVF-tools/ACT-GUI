@@ -130,6 +130,26 @@ def test_vnnlib_batch_merges_properties_of_one_network_through_act_synthesis(tmp
     assert err.value.code == "incompatible_batch"
     assert not (tmp_path / "u.json").exists()
 
+def test_multi_network_property_builds_one_net_over_the_combined_input(tmp_path):
+    from engine_bridge.engine_session.parity import capability_available
+    from engine_bridge.model_spec import sources
+
+    require_sources()
+    if not capability_available("source.vnnlib.multi_network"):
+        pytest.skip("the active ACT cannot combine the networks of a multi-network property")
+    inst = next((i for i in sources.vnnlib_instances()
+                 if i.benchmark == "monotonic_acasxu_2026" and i.vnnlib == "vnnlib/instance_0.vnnlib"), None)
+    if inst is None:
+        pytest.skip("ACT checkout has no monotonic_acasxu_2026 benchmark")
+    # instances.csv names one ACAS Xu network for f and g; the listing keeps both, in network order.
+    assert inst.onnx.count(",") == 1 and len(set(inst.onnx.split(","))) == 1
+    sources.build_vnnlib_net(inst, tmp_path / "m.json")
+    d = describe_model(tmp_path / "m.json")
+    # X_f and X_g share the four inputs the property ties with ==; X_g[0] <= X_f[0] stays a relation.
+    assert (d.input_dim, d.output_dim) == (6, 10)
+    assert [s.kind for s in d.input_specs] == ["BOX"]
+    assert [l.kind for l in d.layers].count("INPUT_SPEC") == 2
+
 def test_model_sources_reject_bad_instances(tmp_path):
     from engine_bridge.contracts import VnnlibInstance
     from engine_bridge.model_spec import sources

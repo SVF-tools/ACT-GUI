@@ -1,6 +1,6 @@
 # Model sources for the "Load model" panel (VNN-LIB benchmarks, ONNX classifiers, MNIST/CIFAR-10 test sets).
 # These ACT directories are git-ignored, so the image does not contain them; mount them read-only:
-#   docker compose -f compose.yaml -f compose.actdata.yaml up -d        (add -f compose.gpu.yaml for GPUs)
+#   docker compose -f compose.yaml -f deploy/compose.actdata.yaml up -d        (add -f deploy/compose.gpu.yaml for GPUs)
 # ACT_DATA_FROM defaults to $ACT_ROOT or /data1/guanqin/ACT.
 services:
   workbench:

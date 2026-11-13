@@ -1,9 +1,10 @@
-// Queries/commands for /api/verification/defaults, /api/runs, /api/runs/{id}, /stop, /saved-counterexample; SSE at /api/runs/{id}/events.
+// Queries/commands for /api/verification/defaults, /api/verification/bab-options, /api/runs, /api/runs/{id}, /stop, /saved-counterexample; SSE at /api/runs/{id}/events.
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { followRun } from "../shared/http";
 import { keys } from "../shared/queryClient";
 import * as api from "./api";
+import { babDefaults, type BabValues } from "./babSettings";
 import type { VerifySettingsValue } from "./VerifySettings";
 
 export const useRuns = () => useQuery({ queryKey: keys.runs(), queryFn: api.runs });
@@ -69,4 +70,15 @@ export function useVerifyConfiguration() {
   const defaults = query.isSuccess ? query.data as VerifySettingsValue : null;
   const [draft, setValue] = useState<VerifySettingsValue | null>(null);
   return { query, defaults, value: draft ?? defaults, setValue };
+}
+
+export const useBabOptions = () => useQuery({ queryKey: keys.babOptions(), queryFn: api.babOptions });
+
+/** BaB settings edited in the run form; options null when the active ACT has no bab_options (verify.bab.options). */
+export function useBabConfiguration() {
+  const query = useBabOptions();
+  const options = query.isSuccess && query.data.available ? query.data.options : null;
+  const defaults = options ? babDefaults(options) : null;
+  const [draft, setValue] = useState<BabValues | null>(null);
+  return { query, options, defaults, value: draft ?? defaults, setValue };
 }

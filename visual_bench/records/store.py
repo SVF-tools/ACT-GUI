@@ -5,6 +5,7 @@ Layout per run (var/records/<run_id>/):
   events.jsonl    append-only ordered lifecycle events (seq starts at 1)
   result.json     final ACT result (written once, then hashed)
   layers.json     interval layer states computed by the worker for the run snapshot
+  bab.jsonl       BaB runs: one line per committed ACT wave and the terminal record, appended by the worker
   artifacts.json  sha256 of each artifact; written last, so its presence marks a complete record
   saved_counterexamples.json  user annotation: counterexamples the user saved (mutable, not sealed)
   diagnostics.json, act_stdout.log, worker_stderr.log
@@ -29,7 +30,7 @@ from pathlib import Path
 from typing import Any
 
 _RUN_ID = re.compile(r"^run-[0-9a-f]{12}$")
-ARTIFACTS = ("manifest.json", "result.json", "layers.json", "fuzzing.json", "propagation.json")
+ARTIFACTS = ("manifest.json", "result.json", "layers.json", "fuzzing.json", "propagation.json", "bab.jsonl")
 # User annotations may be written before or after sealing; they never change a sealed artifact.
 ANNOTATIONS = ("saved_counterexamples.json", "fuzz_control_requests.json")
 DIAGNOSTICS = ("diagnostics.json", "act_stdout.log", "worker_stderr.log")
@@ -196,6 +197,24 @@ class RecordStore:
         if meta["dtype"] != "float32" or len(raw) != count * 4:
             raise ValueError(f"{name} has invalid float32 data")
         return list(struct.unpack(f"<{count}f", raw))
+
+    def bab_log(self, run_id: str, offset: int = 0, sealed: bool = False) -> tuple[list[dict[str, Any]], int] | None:
+        """The complete lines of bab.jsonl after byte `offset`, and the offset after the last one; None when the run
+        has no log. A torn final line (no newline yet) is left for a later read. A sealed log must match its hash."""
+        path = self.run_dir(run_id) / "bab.jsonl"
+        if not path.is_file():
+            return None
+        if sealed:
+            data = path.read_bytes()
+            if (self.hashes(run_id) or {}).get("bab.jsonl") != _sha256(data):
+                raise ValueError("bab.jsonl failed its seal check")
+            data = data[offset:]
+        else:
+            with open(path, "rb") as f:
+                f.seek(offset)
+                data = f.read()
+        complete = data[:data.rfind(b"\n") + 1]
+        return [json.loads(line) for line in complete.splitlines() if line.strip()], offset + len(complete)
 
     def diagnostics(self, run_id: str) -> Any | None:
         p = self.run_dir(run_id) / "diagnostics.json"

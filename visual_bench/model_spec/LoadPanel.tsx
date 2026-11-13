@@ -3,11 +3,12 @@ import { useEffect, useState } from "react";
 import { fmt, indexRanges } from "../shared/wire";
 import type { ModelSummary, SourcesOut } from "../generated/wire";
 import { classLabel, Pixels } from "../shared/ui/pixels";
-import { fileStem, useSources, useSample, useLoadModel } from "./hooks";
+import { fileStem, netStem, useSources, useSample, useLoadModel } from "./hooks";
 import type { LoadModelBody } from "../generated/wire";
 import { useCapabilities } from "../engine/hooks";
 
 type Mode = "vnnlib" | "torch";
+const snippet = (text: string) => (text.length > 48 ? `${text.slice(0, 47)}…` : text);
 const MODE_CAPABILITY: Record<Mode, string> = { torch: "source.onnx_classifier", vnnlib: "source.vnnlib" };
 const BATCH_LIMIT = 64; // engine_bridge.model_spec.sources.BATCH_LIMIT
 
@@ -156,6 +157,7 @@ function VnnlibForm({ s, current, onLoaded }: { s: SourcesOut; current: ModelSum
   // Instance positions in the benchmark, one per batch slot; every slot uses the first slot's network (ONNX file).
   const [picks, setPicks] = useState<number[]>([0]);
   const [slot, setSlot] = useState(0);
+  const [find, setFind] = useState("");
   useEffect(() => {
     if (!current) return;
     const p = current.params ?? {};
@@ -191,15 +193,20 @@ function VnnlibForm({ s, current, onLoaded }: { s: SourcesOut; current: ModelSum
   const pick = (k: number) => setPicks(batched ? ks.map((x, j) => (j === at ? k : x)) : [k]);
   const duplicate = ks.some((x, j) => ks.indexOf(x) !== j);
   const props = ks.map((k) => b.instances[k]!.vnnlib);
+  const texts = b.instances.some((x) => x.text);
+  const needle = find.trim().toLowerCase();
+  const shown = (batched ? sameNet : b.instances.map((_, k) => k))
+    .filter((k) => !needle || k === ks[at] || (b.instances[k]!.text ?? "").toLowerCase().includes(needle));
+  const sentence = b.instances[ks[at]!]?.text ?? null;
   return (
     <div className="loadform">
       <label>Benchmark
-        <select value={b.benchmark} onChange={(e) => { setBench(e.target.value); setPicks([0]); setSlot(0); }}>
+        <select value={b.benchmark} onChange={(e) => { setBench(e.target.value); setPicks([0]); setSlot(0); setFind(""); }}>
           {s.vnnlib.map((x) => <option key={x.benchmark} value={x.benchmark}>{x.benchmark} ({x.instances.length})</option>)}
         </select>
       </label>
       <div className="batchrow">
-        <label title={`properties on ${fileStem(net)}: ${sameNet.length}`}>Batch size
+        <label title={`properties on ${netStem(net)}: ${sameNet.length}`}>Batch size
           <input type="number" min={1} max={limit} value={ks.length} onChange={(e) => resize(Number(e.target.value))} />
         </label>
         {batched && (
@@ -210,15 +217,23 @@ function VnnlibForm({ s, current, onLoaded }: { s: SourcesOut; current: ModelSum
           </label>
         )}
       </div>
-      <label>{batched ? `Property ${at + 1} of ${ks.length} (network ${fileStem(net)})` : "Instance (ONNX model · VNN-LIB property)"}
+      {texts && (
+        <label>Find sentence
+          <input type="search" value={find} onChange={(e) => setFind(e.target.value)} placeholder="words in the source sentence" />
+        </label>
+      )}
+      <label>{batched ? `Property ${at + 1} of ${ks.length} (network ${netStem(net)})` : "Instance (ONNX model · VNN-LIB property)"}
+        {needle && <small className="muted"> · {shown.length} shown</small>}
         <select value={ks[at]} onChange={(e) => pick(Number(e.target.value))}>
-          {(batched ? sameNet : b.instances.map((_, k) => k)).map((k) => (
-            <option key={k} value={k}>{batched ? "" : `${fileStem(b.instances[k]!.onnx)} · `}{fileStem(b.instances[k]!.vnnlib)}</option>))}
+          {shown.map((k) => (
+            <option key={k} value={k}>{batched ? "" : `${netStem(b.instances[k]!.onnx)} · `}{fileStem(b.instances[k]!.vnnlib)}
+              {b.instances[k]!.text ? ` · ${snippet(b.instances[k]!.text!)}` : ""}</option>))}
         </select>
       </label>
+      {sentence && <div className="sentence clamp" title={sentence}>{sentence}</div>}
       {batched && (
         <details className="batchchips">
-          <summary title={props.map(fileStem).join(", ")}>{ks.length} properties on {fileStem(net)}</summary>
+          <summary title={props.map(fileStem).join(", ")}>{ks.length} properties on {netStem(net)}</summary>
           <div className="chips" aria-label="batch properties">
             {ks.map((k, j) => (
               <button key={j} className={j === at ? "chip active" : ks.indexOf(k) !== j ? "chip warn" : "chip"}

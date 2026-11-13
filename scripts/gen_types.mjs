@@ -15,12 +15,12 @@ const schema = JSON.parse(execFileSync(python, ["-m", "visual_bench.wire_schema"
 schema.type = "object";
 schema.properties = Object.fromEntries(Object.keys(schema.$defs).map((k) => [k, { $ref: `#/$defs/${k}` }]));
 schema.additionalProperties = false;
-const ts = await compile(schema, "ActGuiWire", {
+const ts = (await compile(schema, "ActGuiWire", {
   bannerComment: "/* Generated from visual_bench/schemas.py by scripts/gen_types.mjs. Do not edit. */",
   additionalProperties: false,
   unreachableDefinitions: true,
   format: false,
-});
+})).replace(/[ \t]+$/gm, "");
 if (process.argv.includes("--check")) {
   const current = existsSync(out) ? readFileSync(out, "utf8") : "";
   if (current !== ts) {

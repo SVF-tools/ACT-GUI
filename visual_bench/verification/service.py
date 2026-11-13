@@ -26,8 +26,8 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Protocol
 
-from engine_bridge.contracts import DISPLAY_VALUES
-from engine_bridge.execution import fuzzing_options, required_capability
+from engine_bridge.contracts import DISPLAY_VALUES, BridgeError
+from engine_bridge.execution import bab_options, bab_settings, fuzzing_options, required_capability
 from visual_bench.config import REPO_ROOT, requested_device
 from visual_bench.engine.service import EngineService
 from visual_bench.errors import AppError
@@ -99,6 +99,11 @@ class RunService:
     def defaults() -> S.VerifyDefaults:
         return S.VerifyDefaults(dual=S.DualOptions(), hybridz=S.HybridzOptions())
 
+    def bab_options(self) -> S.BabOptionsOut:
+        if not self.engine.capability_available("verify.bab.options"):
+            return S.BabOptionsOut(available=False, options=[])
+        return S.BabOptionsOut(available=True, options=[S.BabOptionOut(**asdict(o)) for o in bab_options()])
+
     # -- commands ------------------------------------------------------------
     def start(self, req: S.RunRequest) -> tuple[S.RunOut, bool]:
         """Return (run, created). Never waits for ACT."""
@@ -117,6 +122,12 @@ class RunService:
         self.engine.require_capability(required_capability(req.method, req.domain))
         if req.dual is not None and req.dual != S.DualOptions():
             self.engine.require_capability("verify.dual.options")
+        if req.method == "bab" and (req.bab is not None or self.engine.capability_available("verify.bab.options")):
+            self.engine.require_capability("verify.bab.options")
+            try:  # the run records every setting, so it stays reproducible when ACT's defaults change
+                req = req.model_copy(update={"bab": bab_settings(req.bab or {})})
+            except BridgeError as err:
+                raise AppError(422, err.code, err.message) from err
         with self._lock:
             if req.client_request_id:
                 existing = self._find_by_request_id(req.client_request_id)
@@ -133,13 +144,14 @@ class RunService:
                 values = {**req.fuzz.model_dump(), "timeout_seconds": req.time_budget_s,
                           "stop_on_first_violation": req.fuzz.stop_on_first}
                 fuzz_live = {o.name: values.get(o.name, o.default) for o in fuzzing_options() if o.live}
+            bab_tree = req.method == "bab" and self.engine.capability_available("events.bab_nodes")
             self.records.create(run_id, {
                 "run_id": run_id, "created_at": now_iso(), "request": req.model_dump(),
                 "model": {"act_path": entry["act_path"], "sha256": entry["sha256"]},
                 "act": {"commit": self.engine.info.commit, "expected_commit": self.engine.expected_commit,
                         "source": self.engine.source.model_dump()},
                 "execution": {"requested_device": requested_device(), "gurobi_license": license_source,
-                              "fuzz_live": fuzz_live},
+                              "fuzz_live": fuzz_live, "bab_tree": bab_tree},
             })
             self.records.append_event(run_id, "run.queued", "queued", {"method": req.method})
             context = {"engine": self._engine_snapshot(),
@@ -222,8 +234,10 @@ class RunService:
                               "time_budget_s": req.time_budget_s, "domain": req.domain,
                               "dual": req.dual.model_dump() if req.dual else None,
                               "hybridz": req.hybridz.model_dump() if req.hybridz else None,
+                              "bab": req.bab,
                               "record_layers": self.engine.capability_available("inspect.layer_bounds.interval"),
                               "record_propagation": self.engine.capability_available("observe.propagation"),
+                              "record_bab": bool(self.records.manifest(run_id)["execution"].get("bab_tree")),
                               "record_directory": str(self.records.run_dir(run_id).resolve()),
                               "fuzz": req.fuzz.model_dump() if req.fuzz else None}
                 req_file.write_text(json.dumps(worker_req))
@@ -294,6 +308,7 @@ class RunService:
                                     budget = float(msg["control"]["applied"]["timeout_seconds"])
                                     deadline()
                                 event = (("verify.propagation", msg["propagation"]) if "propagation" in msg
+                                         else ("verify.bab", msg["bab"]) if "bab" in msg
                                          else self.live.observe(run_id, msg))
                                 if event is not None:
                                     self.records.append_event(run_id, event[0], "running", event[1])
@@ -419,7 +434,7 @@ class RunService:
         diagnostics = S.RunDiagnosticsOut.model_validate(diag["summary"]) if diag and "summary" in diag else None
         saved = [] if req.method == "fuzz" else self.records.annotation(run_id, SAVED) or []
         return S.RunOut(run_id=run_id, model_id=req.model_id, method=req.method, domain=domain, diagnostics=diagnostics,
-                        dual=req.dual, hybridz=req.hybridz,
+                        dual=req.dual, hybridz=req.hybridz, bab=req.bab,
                         time_budget_s=req.time_budget_s,
                         client_request_id=req.client_request_id, status=status, created_at=m["created_at"],
                         started_at=started, finished_at=last["at"] if status in ("completed", "failed") and last else None,

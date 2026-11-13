@@ -297,3 +297,18 @@ button.badge { background: transparent; color: inherit; }
 .tourstep { font-size: 11px; color: var(--muted); }
 .touractions { display: flex; gap: 6px; align-items: center; margin-top: 10px; } .tourgrow { flex: 1; }
 .tourskip { background: transparent; border: 0; color: var(--muted); padding: 3px 0; font-size: 12px; cursor: pointer; } .tourskip:hover { color: var(--text); text-decoration: underline; }
+.pin.anchor, .sw.anchor { background: var(--good); }
+.provenance { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin: 4px 0 10px; background: var(--panel2); }
+.sentence { overflow-wrap: anywhere; }
+.sentence::before { content: "\201C"; } .sentence::after { content: "\201D"; }
+.sentence.big { display: block; font-size: 15px; line-height: 1.45; margin: 6px 0; }
+.sentence.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; margin: -2px 0 6px; }
+.variants, .neighbours { list-style: none; padding: 0; margin: 6px 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.variants li, .neighbours li { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; }
+.variants li.filtered { opacity: .55; }
+.variants .kind { color: var(--muted); font-size: 11px; min-width: 84px; }
+.diff-add { background: var(--box-fill); border-radius: 2px; }
+.diff-del { color: var(--bad); text-decoration: line-through; }
+.neighbourbox { margin-top: 10px; }
+.verdictce .band, .verdictce .neighbourbox, .verdictce .cetop { flex-basis: 100%; width: 100%; }
+.band .barrow { grid-template-columns: 24px 1fr 116px; }

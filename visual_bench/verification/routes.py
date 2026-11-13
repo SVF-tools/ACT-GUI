@@ -17,6 +17,10 @@ def router(runs: RunService) -> APIRouter:
     def verification_defaults() -> S.VerifyDefaults:
         return runs.defaults()
 
+    @r.get("/verification/bab-options", response_model=S.BabOptionsOut)
+    def bab_options() -> S.BabOptionsOut:
+        return runs.bab_options()
+
     @r.post("/runs", response_model=S.RunOut, status_code=202)
     def start_run(req: S.RunRequest) -> JSONResponse:
         run, created = runs.start(req)

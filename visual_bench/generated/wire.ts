@@ -7,15 +7,100 @@ export type Capability = string
 export type Detail = string
 export type Ok = boolean
 export type Symbol = string
+export type Axis = number
+export type Lb = (number | ("Infinity" | "-Infinity" | "NaN") | null)
+export type Ub = (number | ("Infinity" | "-Infinity" | "NaN") | null)
+export type Intervals = BabIntervalOut[]
+export type Kind1 = string
+export type LayerId = number
+export type Neuron = number
+export type Sign = number
+export type SpecRows = number[]
+export type Phases = BabPhaseOut[]
+export type Active = (number | null)
+export type Inactive = (number | null)
+export type Kind2 = (string | null)
+export type LayerId1 = number
+export type LbMin = (number | ("Infinity" | "-Infinity" | "NaN") | null)
+export type Neurons = number
+export type UbMax = (number | ("Infinity" | "-Infinity" | "NaN") | null)
+export type Unstable = (number | null)
+export type BoundKind = (string | null)
+export type Bound = (number | ("Infinity" | "-Infinity" | "NaN") | null)
+export type Children1 = number
+export type CreatedWave = number
+export type Depth = number
+export type Descendants = number
+export type EvictedWave = (number | null)
+export type HiddenChildren = number
+export type NodeId = number
+export type Outcome = (string | null)
+export type ParentId = number
+export type SolvedWave = (number | null)
+export type State = ("pending" | "branched" | "proved" | "falsified" | "retired" | "evicted" | "unresolved")
+export type Children = BabNodeOut[]
+export type Layers = BabLayerOut[]
+export type Path = BabNodeOut[]
+export type RunId = string
+export type SolveStatus = (string | null)
+export type Choices = string[]
+export type Default = (boolean | number | string)
+export type Description = string
+export type ExclusiveMinimum = boolean
+export type Group = string
+export type Kind3 = ("int" | "float" | "bool" | "choice")
+export type Maximum = (number | null)
+export type Minimum = (number | null)
+export type Name = string
+export type Available = boolean
+export type Options = BabOptionOut[]
+export type Evicted = number
+export type Falsified = number
+export type Pending = number
+export type Proved = number
+export type Retired = number
+export type Unresolved = number
+export type FrontierSize = number
+export type NodeId1 = (number | null)
+export type Reason = string
+export type Seq = number
+export type Status = string
+export type TMs = number
+export type Wave = number
+export type Availability = ("available" | "pending" | "not_recorded" | "unsupported")
+export type Complete = boolean
+export type IgnoredRecords = number
+export type Limit = number
+export type Nodes = BabNodeOut[]
+export type Path1 = BabNodeOut[]
+export type Reason1 = string
+export type RecordingError = (string | null)
+export type Root = number
+export type RunId1 = string
+export type Status1 = ("queued" | "running" | "completed" | "failed")
+export type Truncated = boolean
+export type Branched = number
+export type Created = number
+export type Evicted1 = number
+export type FrontierSize1 = number
+export type MinBound = (number | ("Infinity" | "-Infinity" | "NaN") | null)
+export type Proved1 = number
+export type Retired1 = number
+export type Seq1 = number
+export type Solved = number
+export type TMs1 = number
+export type Unresolved1 = number
+export type Wave1 = number
+export type Waves = BabWaveOut[]
 export type Branch = (string | null)
 export type Commit = (string | null)
-export type Kind1 = ("baseline" | "branch")
+export type Kind4 = ("baseline" | "branch")
 export type Remote = (string | null)
-export type Availability = ("available" | "pending" | "not_recorded" | "unsupported")
-export type Name = string
+export type Availability1 = ("available" | "pending" | "not_recorded" | "unsupported")
+export type Name1 = string
 export type Source = string
 export type Dataset = string
-export type Description = string
+export type Description1 = string
 export type Onnx = string
 export type SourceId = string
 export type Count = number
@@ -25,8 +110,8 @@ export type Count = number
 export type Country = (string | null)
 export type FinalSummary = ("available" | "pending" | "not_recorded" | "unsupported")
 export type NodeEvents = ("available" | "pending" | "not_recorded" | "unsupported")
-export type Reason = string
-export type RunId = string
+export type Reason2 = string
+export type RunId2 = string
 export type Summary = ({
 [k: string]: string | number | boolean | null
 } | null)
@@ -56,7 +141,7 @@ export type ExpectedCommit = (string | null)
 export type Python = string
 export type Branch1 = (string | null)
 export type Commit2 = (string | null)
-export type Kind2 = ("baseline" | "branch")
+export type Kind5 = ("baseline" | "branch")
 export type Remote2 = (string | null)
 export type SwitchedAt = (string | null)
 export type Url1 = (string | null)
@@ -64,7 +149,7 @@ export type Torch = (string | null)
 export type TrackedChanges = (boolean | null)
 export type Usable = boolean
 export type Custom = boolean
-export type Name1 = string
+export type Name2 = string
 export type Url2 = string
 export type CustomAllowed = boolean
 export type Remotes = EngineRemoteOut[]
@@ -74,17 +159,17 @@ export type Url3 = (string | null)
 export type Code1 = string
 export type Message1 = string
 export type Retryable = boolean
-export type Kind3 = ("layer_state" | "run_result" | "spec" | "coverage")
+export type Kind6 = ("layer_state" | "run_result" | "spec" | "coverage")
 export type Label = string
-export type LayerId = (number | null)
-export type Neuron = (number | null)
-export type RefId = string
-export type RunId1 = (string | null)
-export type Value = string
-export type LayerId1 = (number | null)
-export type ModelId = string
+export type LayerId2 = (number | null)
 export type Neuron1 = (number | null)
-export type RunId2 = (string | null)
+export type RefId = string
+export type RunId3 = (string | null)
+export type Value = string
+export type LayerId3 = (number | null)
+export type ModelId = string
+export type Neuron2 = (number | null)
+export type RunId4 = (string | null)
 export type Question = string
 export type AnswerId = string
 export type Evidence1 = EvidenceRef[]
@@ -101,8 +186,8 @@ export type Changes = ({
 } | null
 } | null)
 export type RequestId = string
-export type RunId3 = string
-export type Status = ("queued" | "duplicate")
+export type RunId5 = string
+export type Status2 = ("queued" | "duplicate")
 export type Action1 = ("pause" | "resume" | "stop" | "update")
 export type Changes1 = ({
 [k: string]: number | boolean | string | {
@@ -116,7 +201,7 @@ export type ElapsedS = number
 export type Index = number
 export type Input = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type Iteration1 = number
-export type Kind4 = string
+export type Kind7 = string
 export type Output = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type SeedInput = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type SeedOutput = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
@@ -124,7 +209,7 @@ export type Severity1 = (number | ("Infinity" | "-Infinity" | "NaN"))
 export type SpecRow = number
 export type Strategy = (string | null)
 export type TrueClass = (number | null)
-export type Depth = number
+export type Depth1 = number
 export type ElapsedS1 = number
 export type Input1 = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type Iteration2 = number
@@ -137,17 +222,17 @@ export type Boundary = number
 export type Gradient = number
 export type Pgd = number
 export type Random = number
-export type Choices = string[]
-export type Default = (number | boolean | string | {
+export type Choices1 = string[]
+export type Default1 = (number | boolean | string | {
 [k: string]: number
 } | null)
-export type Description1 = string
-export type ExclusiveMinimum = boolean
-export type Kind5 = ("int" | "float" | "bool" | "choice" | "weights")
+export type Description2 = string
+export type ExclusiveMinimum1 = boolean
+export type Kind8 = ("int" | "float" | "bool" | "choice" | "weights")
 export type Live1 = boolean
-export type Maximum = (number | null)
-export type Minimum = (number | null)
-export type Name2 = string
+export type Maximum1 = (number | null)
+export type Minimum1 = (number | null)
+export type Name3 = string
 export type ActivationThreshold = number
 export type CoverageStrategy = ("GlobalCov" | "BestInputCov")
 export type MaxIterations = number
@@ -159,7 +244,7 @@ export type RngSeed = number
 export type SeedSelectionStrategy = ("energy" | "random")
 export type StopOnFirst = boolean
 export type LiveControl = boolean
-export type Options = FuzzOptionOut[]
+export type Options1 = FuzzOptionOut[]
 export type Corpus = number
 export type Counterexamples = number
 export type Coverage = number
@@ -168,7 +253,7 @@ export type Iteration3 = number
 export type Input2 = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type Output1 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type Row = number
-export type Name3 = string
+export type Name4 = string
 export type Selected = number
 export type Violations = number
 export type Weight = number
@@ -186,85 +271,130 @@ export type SeedsExplored = number
 export type StopReason = (string | null)
 export type Stopped = boolean
 export type TotalMutations = number
-export type Availability1 = ("available" | "pending" | "not_recorded" | "unsupported")
+export type Availability2 = ("available" | "pending" | "not_recorded" | "unsupported")
 export type Counterexamples1 = FuzzCounterexampleOut[]
 export type Frames = FuzzFrameOut[]
-export type RunId4 = string
+export type RunId6 = string
 export type SavedAt = string
 export type Saved = SavedCounterexampleOut[]
 export type Seeds = FuzzSeedOut[]
-export type Status1 = ("queued" | "running" | "completed" | "failed")
+export type Status3 = ("queued" | "running" | "completed" | "failed")
 export type Strategies = FuzzStrategyOut[]
 export type Timeline = FuzzPointOut[]
 export type Instance = string
 export type Service = string
-export type Status2 = "ok"
+export type Status4 = "ok"
 export type Version = string
 export type Tolerance = number
+export type Distance = number
+export type ExampleId = string
+export type Label1 = (number | null)
+export type Split = (string | null)
+export type Text1 = string
+export type Anchor = (number[] | null)
+export type Benchmark = string
+export type ExampleId1 = (string | null)
+export type Family = string
+export type FamilyIndex = number
+export type FamilyTitle = string
+export type Key = string
+export type Label2 = (number | null)
+export type MatchDetail = string
+export type MatchStatus = ("verified" | "aligned" | "unmatched")
+export type Modality = "text"
+export type Representation = string
+export type Row1 = number
+export type Sources = {
+[k: string]: string
+}[]
+export type Split1 = (string | null)
+export type ClassNames = string[]
+export type Dataset1 = string
+export type DatasetUrl = (string | null)
+export type Description3 = string
+export type Name5 = string
+export type Title = string
+export type Text2 = (string | null)
+export type Cosine = (number | null)
+export type Kept = boolean
+export type Kind9 = string
+export type Text3 = string
+export type Variants = TextVariantOut[]
+export type VariantsStatus = ("replayed" | "partial" | "not_published" | "not_reproduced")
 export type Center = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
-export type Dataset1 = (string | null)
-export type Kind6 = string
-export type LayerId2 = number
-export type Lb = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
+export type Dataset2 = (string | null)
+export type Kind10 = string
+export type LayerId4 = number
+export type Lb1 = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type Shape = number[]
-export type Ub = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
+export type Ub1 = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type InVars = number
-export type Kind7 = string
-export type LayerId3 = number
+export type Kind11 = string
+export type LayerId5 = number
 export type OutVars = number
 export type OutputShape = (number[] | null)
-export type Name4 = string
+export type Name6 = string
 export type Shape1 = (number[] | null)
 export type Value1 = (string | null)
 export type Params = ParamOut[]
 export type Preds = number[]
 export type Succs = number[]
 export type BeforeLayerIds = number[]
-export type Kind8 = string
-export type LayerId4 = number
-export type Lb1 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
+export type Kind12 = string
+export type LayerId6 = number
+export type Lb2 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type Shape2 = number[]
 export type Stage = ("after" | "pre")
-export type Ub1 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
-export type Availability2 = ("available" | "pending" | "not_recorded" | "unsupported")
-export type Layers = LayerStateOut[]
+export type Ub2 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
+export type Availability3 = ("available" | "pending" | "not_recorded" | "unsupported")
+export type Layers1 = LayerStateOut[]
 export type Method = (("interval" | "dual" | "hybridz") | null)
-export type RunId5 = string
+export type RunId7 = string
 export type Source1 = (LoadVnnlibRequest | LoadTorchRequest)
-export type Benchmark = string
-export type Kind9 = "vnnlib"
+export type Benchmark1 = string
+export type Kind13 = "vnnlib"
 export type Onnx1 = string
 export type Vnnlib = string
 export type Vnnlibs = ([string, ...(string)[]] | null)
 export type Eps = number
 export type Index1 = number
 export type Indices = ([number, ...(number)[]] | null)
-export type Kind10 = "torch"
+export type Kind14 = "torch"
 export type SourceId1 = string
 export type ActCommit = (string | null)
 export type InputDim = number
 export type InputSpecs = InputSpecOut[]
-export type Layers1 = LayerOut[]
+export type Layers2 = LayerOut[]
 export type ModelId1 = string
 export type OutputDim = number
-export type Kind11 = string
-export type LayerId5 = number
+export type Kind15 = string
+export type LayerId7 = number
 export type Matrix = (number[][] | null)
 export type Rows = number
-export type Text1 = string
+export type Text4 = string
 export type Thresholds = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type TrueClass1 = (number | null)
 export type Sha256 = string
 export type ActPath = string
-export type Description2 = string
+export type Description4 = string
 export type EngineCheck = (("same_commit" | "loads" | "load_failed" | "unchecked") | null)
 export type Methods = ("interval" | "bab" | "fuzz")[]
 export type ModelId2 = string
 export type ElapsedS4 = number
-export type Nodes = (number | null)
-export type Status3 = string
+export type Nodes1 = (number | null)
+export type Status5 = string
 export type Sha2561 = string
 export type Source2 = ("catalog" | "vnnlib" | "torch")
+export type ModelId3 = string
+export type Neighbours = InputNeighbourOut[]
+export type Row2 = number
+export type K = number
+/**
+ * @minItems 1
+ * @maxItems 4096
+ */
+export type Point = [number, ...(number)[]]
+export type Row3 = number
 export type ClientId = string
 /**
  * Online browsers per country, largest first
@@ -278,12 +408,12 @@ export type Online = number
  * Seconds a heartbeat keeps a browser counted
  */
 export type WindowS = number
-export type Availability3 = ("available" | "pending" | "unavailable" | "not_recorded")
-export type Complete = boolean
+export type Availability4 = ("available" | "pending" | "unavailable" | "not_recorded")
+export type Complete1 = boolean
 export type Domain = (("interval" | "dual" | "hybridz") | null)
-export type IgnoredRecords = number
+export type IgnoredRecords1 = number
 export type Domain1 = ("interval" | "dual" | "hybridz")
-export type LayerId6 = number
+export type LayerId8 = number
 export type Origin = string
 export type Parent = (string | null)
 export type Pass = string
@@ -294,44 +424,48 @@ export type LatestRecordId = number
 export type LayerKind = (string | null)
 export type OutputShape1 = number[]
 export type RecordCount = number
-export type Layers2 = PropagationLayerSummaryOut[]
-export type Kind12 = ("PhaseEvent" | "LayerBounds" | "Relaxation" | "DualBackward" | "SpecBound")
+export type Layers3 = PropagationLayerSummaryOut[]
+export type Kind16 = ("PhaseEvent" | "LayerBounds" | "Relaxation" | "DualBackward" | "SpecBound")
 export type LayerKind1 = (string | null)
 export type OutputShape2 = number[]
 export type RecordId = number
 export type Shape3 = number[]
-export type TMs = number
+export type TMs2 = number
 export type Dtype = "float32"
 export type Sha2562 = string
 export type Shape4 = number[]
-export type Phases = PropagationRecordOut[]
+export type Phases1 = PropagationRecordOut[]
 export type Records = PropagationRecordOut[]
-export type RunId6 = string
+export type RunId8 = string
 export type ValueLimit = number
-export type Availability4 = ("available" | "pending" | "unavailable" | "not_recorded")
+export type Availability5 = ("available" | "pending" | "unavailable" | "not_recorded")
 export type Domain2 = (("interval" | "dual" | "hybridz") | null)
-export type LayerId7 = number
-export type Neuron2 = (number | null)
+export type LayerId9 = number
+export type Neuron3 = (number | null)
 export type OutputShape3 = number[]
-export type Kind13 = ("PhaseEvent" | "LayerBounds" | "Relaxation" | "DualBackward" | "SpecBound")
+export type Kind17 = ("PhaseEvent" | "LayerBounds" | "Relaxation" | "DualBackward" | "SpecBound")
 export type LayerKind2 = (string | null)
 export type OutputShape4 = number[]
 export type RecordId1 = number
 export type Shape5 = number[]
-export type TMs1 = number
+export type TMs3 = number
 export type Records1 = PropagationLayerRecordOut[]
-export type RunId7 = string
+export type RunId9 = string
 export type ValueLimit1 = number
-export type Availability5 = ("available" | "not_configured")
-export type Kind14 = ("fake" | "real")
-export type Name5 = string
+export type ModelId4 = string
+export type Reason3 = (string | null)
+export type Rows1 = (InputProvenanceOut | null)[]
+export type Status6 = ("available" | "none")
+export type Availability6 = ("available" | "not_configured")
+export type Kind18 = ("fake" | "real")
+export type Name7 = string
 export type Note = string
 export type Providers = ProviderOut[]
 export type ActStatus1 = string
 export type Counterexample = (number[] | null)
 export type CounterexampleOutput = (number[] | null)
 export type CounterexampleOutputError = (string | null)
-export type Row1 = number
+export type Row4 = number
 export type Verdict = ("certified" | "falsified" | "unknown" | "timeout" | "error")
 export type Errors = number
 export type Exception = (string | null)
@@ -339,14 +473,17 @@ export type Location = (string | null)
 export type Messages = string[]
 export type Warnings = number
 export type At = string
-export type Kind15 = ("run.queued" | "run.started" | "run.stop_requested" | "run.completed" | "run.failed" | "bab.summary" | "fuzz.progress" | "fuzz.control" | "fuzz.paused" | "fuzz.resumed" | "verify.propagation")
+export type Kind19 = ("run.queued" | "run.started" | "run.stop_requested" | "run.completed" | "run.failed" | "bab.summary" | "fuzz.progress" | "fuzz.control" | "fuzz.paused" | "fuzz.resumed" | "verify.propagation" | "verify.bab")
 export type Payload = ({
 [k: string]: string | number | boolean | null
 } | PropagationRecordOut | FuzzConfigChangeOut)
-export type RunId8 = string
-export type Seq = number
-export type Status4 = ("queued" | "running" | "completed" | "failed")
+export type RunId10 = string
+export type Seq2 = number
+export type Status7 = ("queued" | "running" | "completed" | "failed")
 export type ActCommit1 = (string | null)
+export type Bab = ({
+[k: string]: boolean | number | string
+} | null)
 export type ClientRequestId = (string | null)
 export type CounterexampleSavedAt = (string | null)
 export type CreatedAt = string
@@ -355,7 +492,7 @@ export type FinishedAt = (string | null)
 export type LastSeq = number
 export type MatchesNative = (boolean | null)
 export type Method1 = ("interval" | "bab" | "fuzz")
-export type ModelId3 = string
+export type ModelId5 = string
 export type ModelSha256 = string
 export type ActStatus2 = string
 export type BabSummary = ({
@@ -367,22 +504,25 @@ export type CounterexampleOutputError1 = (string | null)
 export type CounterexampleRow = (number | null)
 export type Device1 = (string | null)
 export type ElapsedS5 = number
-export type Rows1 = RowVerdictOut[]
+export type Rows2 = RowVerdictOut[]
 export type Verdict1 = ("certified" | "falsified" | "unknown" | "timeout" | "error")
-export type RunId9 = string
+export type RunId11 = string
 export type SavedCounterexampleRows = number[]
 export type StartedAt = (string | null)
-export type Status5 = ("queued" | "running" | "completed" | "failed")
+export type Status8 = ("queued" | "running" | "completed" | "failed")
 export type TimeBudgetS = number
 export type Runs = RunOut[]
+export type Bab1 = ({
+[k: string]: boolean | number | string
+} | null)
 export type ClientRequestId1 = (string | null)
 export type Domain4 = (("interval" | "dual" | "hybridz") | null)
 export type Method2 = ("interval" | "bab" | "fuzz")
-export type ModelId4 = string
+export type ModelId6 = string
 export type TimeBudgetS1 = number
-export type Dataset2 = string
+export type Dataset3 = string
 export type Index2 = number
-export type Label1 = number
+export type Label3 = number
 export type Pixels = number[]
 export type Shape6 = number[]
 export type Size = number
@@ -397,8 +537,9 @@ export type Solver = "gurobi"
 export type UsedByMethods = ("interval" | "bab" | "fuzz")[]
 export type Version2 = (string | null)
 export type Classifiers = ClassifierSourceOut[]
-export type Benchmark1 = string
+export type Benchmark2 = string
 export type Onnx2 = string
+export type Text5 = (string | null)
 export type Vnnlib2 = string
 export type Instances = VnnlibInstanceOut[]
 export type Vnnlib1 = VnnlibBenchmarkOut[]
@@ -407,6 +548,18 @@ export type VnnlibRoot = string
 export interface ActGuiWire {
 AnswerSection?: AnswerSection
 ApiCheckOut?: ApiCheckOut
+BabBranchOut?: BabBranchOut
+BabIntervalOut?: BabIntervalOut
+BabLayerOut?: BabLayerOut
+BabNodeDetailOut?: BabNodeDetailOut
+BabNodeOut?: BabNodeOut
+BabOptionOut?: BabOptionOut
+BabOptionsOut?: BabOptionsOut
+BabPhaseOut?: BabPhaseOut
+BabSharesOut?: BabSharesOut
+BabTerminalOut?: BabTerminalOut
+BabTreeOut?: BabTreeOut
+BabWaveOut?: BabWaveOut
 BuiltWithOut?: BuiltWithOut
 CapabilityOut?: CapabilityOut
 ClassifierSourceOut?: ClassifierSourceOut
@@ -442,6 +595,8 @@ FuzzSummaryOut?: FuzzSummaryOut
 FuzzingOut?: FuzzingOut
 HealthOut?: HealthOut
 HybridzOptions?: HybridzOptions
+InputNeighbourOut?: InputNeighbourOut
+InputProvenanceOut?: InputProvenanceOut
 InputSpecOut?: InputSpecOut
 LayerOut?: LayerOut
 LayerStateOut?: LayerStateOut
@@ -452,6 +607,8 @@ LoadVnnlibRequest?: LoadVnnlibRequest
 ModelDescriptionOut?: ModelDescriptionOut
 ModelSummary?: ModelSummary
 NativeResult?: NativeResult
+NearestOut?: NearestOut
+NearestRequest?: NearestRequest
 OutputSpecOut?: OutputSpecOut
 ParamOut?: ParamOut
 PresenceHeartbeat?: PresenceHeartbeat
@@ -463,6 +620,8 @@ PropagationLayerRecordOut?: PropagationLayerRecordOut
 PropagationLayerSummaryOut?: PropagationLayerSummaryOut
 PropagationRecordOut?: PropagationRecordOut
 PropagationTensorOut?: PropagationTensorOut
+ProvenanceOut?: ProvenanceOut
+ProvenanceTaskOut?: ProvenanceTaskOut
 ProviderList?: ProviderList
 ProviderOut?: ProviderOut
 RowVerdictOut?: RowVerdictOut
@@ -479,6 +638,7 @@ SelectionContext?: SelectionContext
 SolverLicenseUpload?: SolverLicenseUpload
 SolverStatusOut?: SolverStatusOut
 SourcesOut?: SourcesOut
+TextVariantOut?: TextVariantOut
 VerifyDefaults?: VerifyDefaults
 VnnlibBenchmarkOut?: VnnlibBenchmarkOut
 VnnlibInstanceOut?: VnnlibInstanceOut
@@ -494,7 +654,7 @@ text: Text
 }
 /**
  * One ACT symbol a capability's bridge adapter calls, checked on the active checkout.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "ApiCheckOut".
  */
@@ -505,15 +665,187 @@ ok: Ok
 symbol: Symbol
 }
 /**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "BabBranchOut".
+ */
+export interface BabBranchOut {
+intervals?: Intervals
+kind: Kind1
+phases?: Phases
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "BabIntervalOut".
+ */
+export interface BabIntervalOut {
+axis: Axis
+lb: Lb
+ub: Ub
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "BabPhaseOut".
+ */
+export interface BabPhaseOut {
+layer_id: LayerId
+neuron: Neuron
+sign: Sign
+spec_rows: SpecRows
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "BabLayerOut".
+ */
+export interface BabLayerOut {
+active?: Active
+inactive?: Inactive
+kind: Kind2
+layer_id: LayerId1
+lb_min: LbMin
+neurons: Neurons
+ub_max: UbMax
+unstable?: Unstable
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "BabNodeDetailOut".
+ */
+export interface BabNodeDetailOut {
+bound_kind: BoundKind
+children: Children
+layers: Layers
+node: BabNodeOut
+path: Path
+run_id: RunId
+solve_status: SolveStatus
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "BabNodeOut".
+ */
+export interface BabNodeOut {
+bound: Bound
+branch: (BabBranchOut | null)
+children: Children1
+created_wave: CreatedWave
+depth: Depth
+descendants: Descendants
+evicted_wave: EvictedWave
+hidden_children?: HiddenChildren
+node_id: NodeId
+outcome: Outcome
+parent_id: ParentId
+solved_wave: SolvedWave
+state: State
+}
+/**
+ * One verify_bab_batched setting from ACT's bab_gui.bab_options; kinds, limits and defaults are ACT's.
+ *
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "BabOptionOut".
+ */
+export interface BabOptionOut {
+choices: Choices
+default: Default
+description: Description
+exclusive_minimum: ExclusiveMinimum
+group: Group
+kind: Kind3
+maximum: Maximum
+minimum: Minimum
+name: Name
+}
+/**
+ * GET /api/verification/bab-options: every BaB setting of the active ACT (capability verify.bab.options).
+ *
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "BabOptionsOut".
+ */
+export interface BabOptionsOut {
+available: Available
+options: Options
+}
+/**
+ * The focused subtree as fractions per leaf state (they sum to 1), each node's share split equally among its
+ * children: a measure of the split tree, not of input volume, and never a verdict.
+ *
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "BabSharesOut".
+ */
+export interface BabSharesOut {
+evicted: Evicted
+falsified: Falsified
+pending: Pending
+proved: Proved
+retired: Retired
+unresolved: Unresolved
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "BabTerminalOut".
+ */
+export interface BabTerminalOut {
+frontier_size: FrontierSize
+node_id: NodeId1
+reason: Reason
+seq: Seq
+status: Status
+t_ms: TMs
+wave: Wave
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "BabTreeOut".
+ */
+export interface BabTreeOut {
+availability: Availability
+complete: Complete
+counts: Counts
+ignored_records?: IgnoredRecords
+limit: Limit
+nodes: Nodes
+path: Path1
+reason: Reason1
+recording_error?: RecordingError
+root: Root
+run_id: RunId1
+shares: (BabSharesOut | null)
+status: Status1
+terminal: (BabTerminalOut | null)
+truncated: Truncated
+waves: Waves
+}
+export interface Counts {
+[k: string]: number
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "BabWaveOut".
+ */
+export interface BabWaveOut {
+branched: Branched
+created: Created
+evicted: Evicted1
+frontier_size: FrontierSize1
+min_bound: MinBound
+proved: Proved1
+retired: Retired1
+seq: Seq1
+solved: Solved
+t_ms: TMs1
+unresolved: Unresolved1
+wave: Wave1
+}
+/**
  * The ACT engine a model was built on: its commit and where that code came from.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "BuiltWithOut".
  */
 export interface BuiltWithOut {
 branch?: Branch
 commit: Commit
-kind: Kind1
+kind: Kind4
 remote?: Remote
 }
 /**
@@ -521,8 +853,8 @@ remote?: Remote
  * via the `definition` "CapabilityOut".
  */
 export interface CapabilityOut {
-availability: Availability
-name: Name
+availability: Availability1
+name: Name1
 source: Source
 }
 /**
@@ -531,7 +863,7 @@ source: Source
  */
 export interface ClassifierSourceOut {
 dataset: Dataset
-description: Description
+description: Description1
 onnx: Onnx
 source_id: SourceId
 }
@@ -550,8 +882,8 @@ country: Country
 export interface CoverageOut {
 final_summary: FinalSummary
 node_events: NodeEvents
-reason: Reason
-run_id: RunId
+reason: Reason2
+run_id: RunId2
 summary: Summary
 wave_events: WaveEvents
 }
@@ -567,7 +899,7 @@ severity: Severity
 /**
  * DualSolver settings of a dual-domain verify_once run. Defaults equal ACT's DualConfig (drift-checked in
  * test_verification.py); with every default the run calls verify_once exactly as without options.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "DualOptions".
  */
@@ -611,14 +943,14 @@ usable: Usable
 }
 /**
  * Where the imported ACT code comes from: the pinned baseline checkout or a staged branch head.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "EngineSourceOut".
  */
 export interface EngineSourceOut {
 branch?: Branch1
 commit?: Commit2
-kind: Kind2
+kind: Kind5
 remote?: Remote2
 switched_at?: SwitchedAt
 url?: Url1
@@ -629,7 +961,7 @@ url?: Url1
  */
 export interface EngineRemoteOut {
 custom: Custom
-name: Name1
+name: Name2
 url: Url2
 }
 /**
@@ -644,7 +976,7 @@ remotes: Remotes
 /**
  * Neither remote nor url: the pinned baseline. Otherwise the branch head of a listed remote (by name)
  * or of a user-entered https git URL.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "EngineSwitchRequest".
  */
@@ -674,12 +1006,12 @@ error: ErrorBody
  * via the `definition` "EvidenceRef".
  */
 export interface EvidenceRef {
-kind: Kind3
+kind: Kind6
 label: Label
-layer_id: LayerId
-neuron: Neuron
+layer_id: LayerId2
+neuron: Neuron1
 ref_id: RefId
-run_id: RunId1
+run_id: RunId3
 value: Value
 }
 /**
@@ -695,10 +1027,10 @@ question: Question
  * via the `definition` "SelectionContext".
  */
 export interface SelectionContext {
-layer_id?: LayerId1
+layer_id?: LayerId3
 model_id: ModelId
-neuron?: Neuron1
-run_id?: RunId2
+neuron?: Neuron2
+run_id?: RunId4
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -741,8 +1073,8 @@ export interface FuzzControlOut {
 action: Action
 changes: Changes
 request_id: RequestId
-run_id: RunId3
-status: Status
+run_id: RunId5
+status: Status2
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -776,7 +1108,7 @@ elapsed_s: ElapsedS
 index: Index
 input: Input
 iteration: Iteration1
-kind: Kind4
+kind: Kind7
 output: Output
 seed_input: SeedInput
 seed_output?: SeedOutput
@@ -787,13 +1119,13 @@ true_class: TrueClass
 }
 /**
  * Lane 0 of the batch ACTFuzzer mutated in one iteration. Display only; not a counterexample unless violation.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "FuzzFrameOut".
  */
 export interface FuzzFrameOut {
 counterexample?: (FuzzCounterexampleOut | null)
-depth: Depth
+depth: Depth1
 elapsed_s: ElapsedS1
 input: Input1
 iteration: Iteration2
@@ -804,7 +1136,7 @@ violation: Violation
 }
 /**
  * Relative selection weights of ACT's mutation operators (ACT normalizes them; 0 disables one).
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "FuzzMutationWeights".
  */
@@ -820,21 +1152,21 @@ random?: Random
  * via the `definition` "FuzzOptionOut".
  */
 export interface FuzzOptionOut {
-choices: Choices
-default: Default
-description: Description1
-exclusive_minimum: ExclusiveMinimum
-kind: Kind5
+choices: Choices1
+default: Default1
+description: Description2
+exclusive_minimum: ExclusiveMinimum1
+kind: Kind8
 live: Live1
-maximum: Maximum
-minimum: Minimum
-name: Name2
+maximum: Maximum1
+minimum: Minimum1
+name: Name3
 }
 /**
  * ACTFuzzer settings for method "fuzz". Defaults other than max_iterations equal the fuzzing section of
  * the pinned ACT act/config/pipeline.yaml (drift-checked in fuzzing/test_fuzzing.py); the browser reads them from
  * GET /api/fuzz/defaults. Output, tracing and reporting stay owned by engine_bridge.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "FuzzOptions".
  */
@@ -857,7 +1189,7 @@ stop_on_first?: StopOnFirst
  */
 export interface FuzzOptionsSchemaOut {
 live_control: LiveControl
-options: Options
+options: Options1
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -884,7 +1216,7 @@ row: Row
  * via the `definition` "FuzzStrategyOut".
  */
 export interface FuzzStrategyOut {
-name: Name3
+name: Name4
 selected: Selected
 violations: Violations
 weight: Weight
@@ -912,22 +1244,22 @@ total_mutations: TotalMutations
 /**
  * ACTFuzzer record of a run. While running, timeline comes from committed fuzz.progress events
  * and frames holds only the latest mutated input the worker reported (kept in memory, not recorded).
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "FuzzingOut".
  */
 export interface FuzzingOut {
-availability: Availability1
+availability: Availability2
 config: Config
 control?: (FuzzControlStateOut | null)
 counterexamples: Counterexamples1
 frames?: Frames
 options: (FuzzOptions | null)
 provenance: Provenance
-run_id: RunId4
+run_id: RunId6
 saved?: Saved
 seeds?: Seeds
-status: Status1
+status: Status3
 strategies: Strategies
 summary: (FuzzSummaryOut | null)
 timeline: Timeline
@@ -940,7 +1272,7 @@ export interface Provenance {
 }
 /**
  * An ACT counterexample the user saved on its run record (user annotation; ACT decided the violation).
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "SavedCounterexampleOut".
  */
@@ -955,12 +1287,12 @@ saved_at: SavedAt
 export interface HealthOut {
 instance: Instance
 service: Service
-status: Status2
+status: Status4
 version: Version
 }
 /**
  * HybridZ verdict-solver settings of a hybridz-domain verify_once run; its time limit is the run budget.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "HybridzOptions".
  */
@@ -969,16 +1301,76 @@ tolerance?: Tolerance
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "InputNeighbourOut".
+ */
+export interface InputNeighbourOut {
+distance: Distance
+example_id: ExampleId
+label: Label1
+split: Split
+text: Text1
+}
+/**
+ * What one input row's VNN-LIB property was built from, as its dataset sidecar records it.
+ *
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "InputProvenanceOut".
+ */
+export interface InputProvenanceOut {
+anchor: Anchor
+benchmark: Benchmark
+example_id: ExampleId1
+family: Family
+family_index: FamilyIndex
+family_title: FamilyTitle
+key: Key
+label: Label2
+match_detail: MatchDetail
+match_status: MatchStatus
+modality: Modality
+representation: Representation
+row: Row1
+sources: Sources
+split: Split1
+task: ProvenanceTaskOut
+text: Text2
+variants: Variants
+variants_status: VariantsStatus
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "ProvenanceTaskOut".
+ */
+export interface ProvenanceTaskOut {
+class_names: ClassNames
+dataset: Dataset1
+dataset_url: DatasetUrl
+description: Description3
+name: Name5
+title: Title
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "TextVariantOut".
+ */
+export interface TextVariantOut {
+cosine: Cosine
+kept: Kept
+kind: Kind9
+text: Text3
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "InputSpecOut".
  */
 export interface InputSpecOut {
 center: Center
-dataset: Dataset1
-kind: Kind6
-layer_id: LayerId2
-lb: Lb
+dataset: Dataset2
+kind: Kind10
+layer_id: LayerId4
+lb: Lb1
 shape: Shape
-ub: Ub
+ub: Ub1
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -986,8 +1378,8 @@ ub: Ub
  */
 export interface LayerOut {
 in_vars: InVars
-kind: Kind7
-layer_id: LayerId3
+kind: Kind11
+layer_id: LayerId5
 out_vars: OutVars
 output_shape: OutputShape
 params: Params
@@ -999,7 +1391,7 @@ succs: Succs
  * via the `definition` "ParamOut".
  */
 export interface ParamOut {
-name: Name4
+name: Name6
 shape: Shape1
 value: Value1
 }
@@ -1009,23 +1401,23 @@ value: Value1
  */
 export interface LayerStateOut {
 before_layer_ids: BeforeLayerIds
-kind: Kind8
-layer_id: LayerId4
-lb: Lb1
+kind: Kind12
+layer_id: LayerId6
+lb: Lb2
 shape: Shape2
 stage: Stage
-ub: Ub1
+ub: Ub2
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "LayerStatesOut".
  */
 export interface LayerStatesOut {
-availability: Availability2
-layers: Layers
+availability: Availability3
+layers: Layers1
 method: Method
 provenance: Provenance1
-run_id: RunId5
+run_id: RunId7
 }
 export interface Provenance1 {
 [k: string]: string
@@ -1042,8 +1434,8 @@ source: Source1
  * via the `definition` "LoadVnnlibRequest".
  */
 export interface LoadVnnlibRequest {
-benchmark: Benchmark
-kind: Kind9
+benchmark: Benchmark1
+kind: Kind13
 onnx: Onnx1
 vnnlib: Vnnlib
 vnnlibs?: Vnnlibs
@@ -1056,7 +1448,7 @@ export interface LoadTorchRequest {
 eps: Eps
 index: Index1
 indices?: Indices
-kind: Kind10
+kind: Kind14
 source_id: SourceId1
 }
 /**
@@ -1067,7 +1459,7 @@ export interface ModelDescriptionOut {
 act_commit: ActCommit
 input_dim: InputDim
 input_specs: InputSpecs
-layers: Layers1
+layers: Layers2
 model_id: ModelId1
 output_dim: OutputDim
 output_spec: (OutputSpecOut | null)
@@ -1078,11 +1470,11 @@ sha256: Sha256
  * via the `definition` "OutputSpecOut".
  */
 export interface OutputSpecOut {
-kind: Kind11
-layer_id: LayerId5
+kind: Kind15
+layer_id: LayerId7
 matrix: Matrix
 rows: Rows
-text: Text1
+text: Text4
 thresholds: Thresholds
 true_class: TrueClass1
 }
@@ -1093,7 +1485,7 @@ true_class: TrueClass1
 export interface ModelSummary {
 act_path: ActPath
 built_with?: (BuiltWithOut | null)
-description: Description2
+description: Description4
 engine_check?: EngineCheck
 methods: Methods
 model_id: ModelId2
@@ -1111,15 +1503,33 @@ export interface Native {
  */
 export interface NativeResult {
 elapsed_s: ElapsedS4
-nodes: Nodes
-status: Status3
+nodes: Nodes1
+status: Status5
 }
 export interface Params1 {
 [k: string]: string | number | boolean | null
 }
 /**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "NearestOut".
+ */
+export interface NearestOut {
+model_id: ModelId3
+neighbours: Neighbours
+row: Row2
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "NearestRequest".
+ */
+export interface NearestRequest {
+k?: K
+point: Point
+row: Row3
+}
+/**
  * One browser's heartbeat; client_id is a random id kept in that browser's localStorage.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "PresenceHeartbeat".
  */
@@ -1140,14 +1550,14 @@ window_s: WindowS
  * via the `definition` "PropagationIndexOut".
  */
 export interface PropagationIndexOut {
-availability: Availability3
-complete: Complete
+availability: Availability4
+complete: Complete1
 domain: Domain
-ignored_records: IgnoredRecords
-layers: Layers2
-phases: Phases
+ignored_records: IgnoredRecords1
+layers: Layers3
+phases: Phases1
 records: Records
-run_id: RunId6
+run_id: RunId8
 value_limit: ValueLimit
 }
 /**
@@ -1155,14 +1565,14 @@ value_limit: ValueLimit
  * via the `definition` "PropagationLayerSummaryOut".
  */
 export interface PropagationLayerSummaryOut {
-counts: Counts
+counts: Counts1
 key: PropagationKeyOut
 latest_record_id: LatestRecordId
 layer_kind: LayerKind
 output_shape: OutputShape1
 record_count: RecordCount
 }
-export interface Counts {
+export interface Counts1 {
 [k: string]: number
 }
 /**
@@ -1171,7 +1581,7 @@ export interface Counts {
  */
 export interface PropagationKeyOut {
 domain: Domain1
-layer_id: LayerId6
+layer_id: LayerId8
 origin: Origin
 parent: Parent
 pass_: Pass
@@ -1184,18 +1594,18 @@ version: Version1
  * via the `definition` "PropagationRecordOut".
  */
 export interface PropagationRecordOut {
-counts: Counts1
+counts: Counts2
 key: (PropagationKeyOut | null)
-kind: Kind12
+kind: Kind16
 layer_kind: LayerKind1
 metadata: Metadata
 output_shape: OutputShape2
 record_id: RecordId
 shape: Shape3
-t_ms: TMs
+t_ms: TMs2
 tensors: Tensors
 }
-export interface Counts1 {
+export interface Counts2 {
 [k: string]: number
 }
 export interface Metadata {
@@ -1218,13 +1628,13 @@ shape: Shape4
  * via the `definition` "PropagationLayerOut".
  */
 export interface PropagationLayerOut {
-availability: Availability4
+availability: Availability5
 domain: Domain2
-layer_id: LayerId7
-neuron?: Neuron2
+layer_id: LayerId9
+neuron?: Neuron3
 output_shape: OutputShape3
 records: Records1
-run_id: RunId7
+run_id: RunId9
 value_limit: ValueLimit1
 }
 /**
@@ -1232,19 +1642,19 @@ value_limit: ValueLimit1
  * via the `definition` "PropagationLayerRecordOut".
  */
 export interface PropagationLayerRecordOut {
-counts: Counts2
+counts: Counts3
 key: (PropagationKeyOut | null)
-kind: Kind13
+kind: Kind17
 layer_kind: LayerKind2
 metadata: Metadata1
 output_shape: OutputShape4
 record_id: RecordId1
 shape: Shape5
-t_ms: TMs1
+t_ms: TMs3
 tensors: Tensors1
 values: Values
 }
-export interface Counts2 {
+export interface Counts3 {
 [k: string]: number
 }
 export interface Metadata1 {
@@ -1258,6 +1668,16 @@ export interface Values {
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "ProvenanceOut".
+ */
+export interface ProvenanceOut {
+model_id: ModelId4
+reason: Reason3
+rows: Rows1
+status: Status6
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "ProviderList".
  */
 export interface ProviderList {
@@ -1268,9 +1688,9 @@ providers: Providers
  * via the `definition` "ProviderOut".
  */
 export interface ProviderOut {
-availability: Availability5
-kind: Kind14
-name: Name5
+availability: Availability6
+kind: Kind18
+name: Name7
 note: Note
 }
 /**
@@ -1282,12 +1702,12 @@ act_status: ActStatus1
 counterexample?: Counterexample
 counterexample_output?: CounterexampleOutput
 counterexample_output_error?: CounterexampleOutputError
-row: Row1
+row: Row4
 verdict: Verdict
 }
 /**
  * What the worker captured while driving ACT; its presence means GET /api/runs/{id}/snapshot has diagnostics.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "RunDiagnosticsOut".
  */
@@ -1304,11 +1724,11 @@ warnings: Warnings
  */
 export interface RunEvent {
 at: At
-kind: Kind15
+kind: Kind19
 payload: Payload
-run_id: RunId8
-seq: Seq
-status: Status4
+run_id: RunId10
+seq: Seq2
+status: Status7
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -1323,6 +1743,7 @@ runs: Runs
  */
 export interface RunOut {
 act_commit: ActCommit1
+bab?: Bab
 client_request_id: ClientRequestId
 counterexample_saved_at?: CounterexampleSavedAt
 created_at: CreatedAt
@@ -1335,14 +1756,14 @@ hybridz?: (HybridzOptions | null)
 last_seq: LastSeq
 matches_native: MatchesNative
 method: Method1
-model_id: ModelId3
+model_id: ModelId5
 model_sha256: ModelSha256
 native_reference: (NativeResult | null)
 result: (RunResultOut | null)
-run_id: RunId9
+run_id: RunId11
 saved_counterexample_rows?: SavedCounterexampleRows
 started_at: StartedAt
-status: Status5
+status: Status8
 time_budget_s: TimeBudgetS
 }
 /**
@@ -1359,7 +1780,7 @@ counterexample_row?: CounterexampleRow
 device?: Device1
 elapsed_s: ElapsedS5
 metadata: Metadata2
-rows?: Rows1
+rows?: Rows2
 verdict: Verdict1
 }
 export interface Metadata2 {
@@ -1370,13 +1791,14 @@ export interface Metadata2 {
  * via the `definition` "RunRequest".
  */
 export interface RunRequest {
+bab?: Bab1
 client_request_id?: ClientRequestId1
 domain?: Domain4
 dual?: (DualOptions | null)
 fuzz?: (FuzzOptions | null)
 hybridz?: (HybridzOptions | null)
 method: Method2
-model_id: ModelId4
+model_id: ModelId6
 time_budget_s?: TimeBudgetS1
 }
 /**
@@ -1384,9 +1806,9 @@ time_budget_s?: TimeBudgetS1
  * via the `definition` "SampleOut".
  */
 export interface SampleOut {
-dataset: Dataset2
+dataset: Dataset3
 index: Index2
-label: Label1
+label: Label3
 pixels: Pixels
 shape: Shape6
 size: Size
@@ -1400,7 +1822,7 @@ index: Index3
 }
 /**
  * Text of a solver license file (e.g. gurobi.lic). Stored server-side; never returned.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "SolverLicenseUpload".
  */
@@ -1435,7 +1857,7 @@ vnnlib_root: VnnlibRoot
  * via the `definition` "VnnlibBenchmarkOut".
  */
 export interface VnnlibBenchmarkOut {
-benchmark: Benchmark1
+benchmark: Benchmark2
 instances: Instances
 }
 /**
@@ -1444,11 +1866,12 @@ instances: Instances
  */
 export interface VnnlibInstanceOut {
 onnx: Onnx2
+text?: Text5
 vnnlib: Vnnlib2
 }
 /**
  * GET /api/verification/defaults: the settings a verify_once run uses when the request leaves them out.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "VerifyDefaults".
  */

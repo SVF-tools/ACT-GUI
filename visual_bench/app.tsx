@@ -18,7 +18,7 @@ import { useCapabilities } from "./engine/hooks";
 import { GurobiBadge } from "./engine/GurobiBadge";
 import { FuzzSettings } from "./fuzzing/FuzzSettings";
 import { useFuzzConfiguration } from "./fuzzing/hooks";
-import { useVerifyConfiguration } from "./verification/hooks";
+import { useBabConfiguration, useVerifyConfiguration } from "./verification/hooks";
 import type { Domain } from "./verification/RunsPanel";
 import { initialSelection, selectionReducer } from "./workspace/selection";
 import { modes, defaultMode, modeForId, modeForMethod, type ModeId } from "./workspace/modes";
@@ -31,6 +31,7 @@ import { Empty } from "./shared/ui/Empty";
 import { usePropagation } from "./analysis/hooks";
 import { PropagationProvider } from "./analysis/PropagationContext";
 import { PropagationInspector } from "./analysis/PropagationView";
+import { useBabTree } from "./bab/hooks";
 
 const TABS = ["Neuron", "Engine", "Records", "Assistant"] as const;
 type Tab = (typeof TABS)[number];
@@ -43,13 +44,17 @@ export function App() {
   const model = useModel(sel.modelId);
   const fuzz = useFuzzConfiguration();
   const verify = useVerifyConfiguration();
+  const bab = useBabConfiguration();
   const [domain, setDomain] = useState<Domain>("interval");
   const activeMode = modeForId(mode);
   // Neuron inspection belongs to a selected verification or BaB run: hidden for fuzzing and before any run.
   const tabs = TABS.filter((t) => t !== "Neuron" || (mode !== "Fuzzing" && sel.runId !== null));
   const shownTab: Tab = tabs.includes(tab) ? tab : "Engine";
   const propagation = usePropagation(mode === "Verification" ? sel.runId : null);
-  const inspecting = mode === "Verification" && (propagation.data?.availability === "available" || propagation.data?.availability === "pending");
+  const babTree = useBabTree(mode === "BaB" ? sel.runId : null, 0);
+  // A recorded BaB tree, like a propagation inspection, takes the wide center column instead of the network graph.
+  const inspecting = (mode === "Verification" && (propagation.data?.availability === "available" || propagation.data?.availability === "pending"))
+    || (mode === "BaB" && babTree.data?.availability === "available");
   const lacks = useCapabilities();
   // After an ACT switch, leave a mode the new checkout cannot run.
   const fallbackMode = lacks(activeMode.capability) ? modes.find((m) => !lacks(m.capability))?.id : undefined;
@@ -102,7 +107,7 @@ export function App() {
               modelId={model.data.model_id}
               method={activeMode.method}
               fuzzOptions={fuzz.value}
-              domain={domain} onDomain={setDomain} verify={verify}
+              domain={domain} onDomain={setDomain} verify={verify} bab={bab}
               fuzzSettings={<>
                 {fuzz.query.isError && <div className="error">Fuzz defaults unavailable: {fuzz.query.error.message}</div>}
                 {fuzz.value && fuzz.defaults && <FuzzSettings value={fuzz.value} defaults={fuzz.defaults} onChange={fuzz.setValue} />}

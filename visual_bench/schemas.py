@@ -25,12 +25,13 @@ from visual_bench.assistant.schemas import *  # noqa: F403
 from visual_bench.workspace.schemas import *  # noqa: F403
 from visual_bench.engine.schemas import (EngineBranchesOut, EngineInfoOut, EngineSourcesOut, EngineSwitchRequest,
                                          SolverLicenseUpload, SolverStatusOut)
-from visual_bench.model_spec.schemas import LoadModelBody, ModelDescriptionOut, ModelSummary, SampleOut, SourcesOut
+from visual_bench.model_spec.schemas import (LoadModelBody, ModelDescriptionOut, ModelSummary, NearestOut, NearestRequest,
+                                             ProvenanceOut, SampleOut, SourcesOut)
 from visual_bench.fuzzing.schemas import (FuzzingOut, SaveCounterexampleRequest, SavedCounterexampleOut,
                                           FuzzOptionsSchemaOut, FuzzControlRequest, FuzzControlOut)
-from visual_bench.verification.schemas import RunEvent, RunList, RunOut, RunRequest, VerifyDefaults
+from visual_bench.verification.schemas import BabOptionsOut, RunEvent, RunList, RunOut, RunRequest, VerifyDefaults
 from visual_bench.analysis.schemas import LayerStatesOut, PropagationIndexOut, PropagationLayerOut
-from visual_bench.bab.schemas import CoverageOut
+from visual_bench.bab.schemas import BabNodeDetailOut, BabTreeOut, CoverageOut
 from visual_bench.assistant.schemas import ExplainRequest, ExplainResponse, ProviderList
 from visual_bench.workspace.schemas import PresenceHeartbeat, PresenceOut
 
@@ -40,5 +41,6 @@ WIRE_MODELS: tuple[type[BaseModel], ...] = (
     SolverStatusOut, SourcesOut, SampleOut, LoadModelBody, SaveCounterexampleRequest, SavedCounterexampleOut,
     EngineSourcesOut, EngineBranchesOut, EngineSwitchRequest, PresenceHeartbeat, PresenceOut,
     PropagationIndexOut, PropagationLayerOut,
-    FuzzOptionsSchemaOut, FuzzControlRequest, FuzzControlOut,
+    FuzzOptionsSchemaOut, FuzzControlRequest, FuzzControlOut, BabTreeOut, BabNodeDetailOut, BabOptionsOut,
+    ProvenanceOut, NearestRequest, NearestOut,
 )

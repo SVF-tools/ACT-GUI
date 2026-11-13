@@ -32,7 +32,7 @@ type DeveloperLabels = {
   docs: string;
   task: string;
   rules: string;
-  docsGuide: string;
+  setup: string;
   architecture: string;
   plan: string;
   website: string;
@@ -43,7 +43,7 @@ const ENGLISH_DEVELOPER: DeveloperLabels = {
   docs: "ACT-GUI developer docs",
   task: "Choose a development task",
   rules: "Contributor rules",
-  docsGuide: "Documentation guide",
+  setup: "Development and deployment",
   architecture: "Architecture",
   plan: "Development plan",
   website: "Website",
@@ -57,9 +57,10 @@ function developerSidebar(l: DeveloperLabels): DefaultTheme.SidebarItem[] {
       text: l.docs,
       collapsed: true,
       items: [
-        { text: l.task, link: "/README" },
+        { text: l.overview, link: "/README" },
+        { text: l.task, link: "/docs/README" },
+        { text: l.setup, link: "/docs/development" },
         { text: l.rules, link: "/AGENTS" },
-        { text: l.docsGuide, link: "/docs/README" },
         { text: l.architecture, link: "/docs/design" },
         { text: l.plan, link: "/docs/plan" },
         { text: l.website, link: "/site/README" },
@@ -168,7 +169,7 @@ export default withMermaid(
           docs: "ACT-GUI 开发者文档（英文）",
           task: "选择开发任务",
           rules: "贡献者规则",
-          docsGuide: "文档指南",
+          setup: "开发与部署",
           architecture: "架构",
           plan: "开发计划",
           website: "网站",

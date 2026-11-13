@@ -1,6 +1,6 @@
 # Contributor and Agent Rules
 
-Read the root README, docs/design.md, docs/plan.md, and the README of each affected module before making changes. The primary scopes are visual_bench, engine_bridge, and docs.
+Read the root README, the developer guide (docs/README.md), docs/design.md, docs/plan.md, and the README of each affected module before making changes. The primary scopes are visual_bench, engine_bridge, and docs.
 
 - Maintain technical documentation in English, including module READMEs, architecture, development plans, and contributor rules.
 - ACT-GUI is the complete visualization and interaction interface to ACT. Organize product boundaries by responsibility, rather than programming language or deployment process.

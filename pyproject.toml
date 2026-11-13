@@ -1,0 +1,12 @@
+# Tool settings only: nothing is built or installed from this file. Python pins are in requirements/.
+
+[tool.pytest.ini_options]
+testpaths = ["engine_bridge", "visual_bench"]
+python_files = ["test_*.py"]
+addopts = "-q"
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+extraPaths = ["/data1/guanqin/ACT"]
+include = ["engine_bridge", "visual_bench", "scripts"]

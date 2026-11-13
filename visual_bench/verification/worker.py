@@ -8,7 +8,8 @@ or {"frame": FuzzFrame} (the latest mutated input, shown live and not recorded a
 Fuzz workers read {"action": "pause"|"resume"|"stop"|"update", "changes": {...}} on control_fd
 and emit {"control": FuzzControlChange} / {"control_state": {"paused": bool}} on progress_fd.
 Observer-capable verification sends {"propagation": index_entry}; complete tensors and history
-are stored in the run directory before a throttled notification is sent.
+are stored in the run directory before a throttled notification is sent. BaB on an ACT checkout
+with committed wave records (record_bab) appends them to bab.jsonl and sends {"bab": counters}.
 SIGTERM is a stop request: a fuzz run ends after its current iteration and reports what it found;
 other methods are killed by the supervisor instead.
 The output always carries "diagnostics" (diagnostics.Capture): warnings, WARNING+ log records, and the
@@ -70,8 +71,28 @@ def _run(req: dict[str, Any], progress: IO[str], stop: threading.Event,
             layers["layer_states"] = dataclasses.asdict(sink.layer_states(domain))
         except BridgeError as err:
             layers["layer_states_error"] = {"code": err.code, "message": err.message}
+    elif req["method"] == "bab" and req.get("record_bab", False):
+        from engine_bridge.events import run_observed_bab
+        from visual_bench.records.bab import BabWriter
+
+        def send_bab(counters: dict[str, Any]) -> None:
+            progress.write(json.dumps({"bab": counters}) + "\n")
+            progress.flush()
+
+        writer = BabWriter(Path(req["record_directory"]), send_bab)
+        try:
+            outcome, sink = run_observed_bab(model, float(req["time_budget_s"]), writer, time.perf_counter_ns(),
+                                             bab=req.get("bab"))
+        except BaseException:
+            writer.close()
+            raise
+        error = None if sink.callback_error is None else f"{type(sink.callback_error).__name__}: {sink.callback_error}"
+        writer.finish(sink.ignored_records, error)
+        if error is not None:  # ACT's outcome stands; the tree simply stops at the last recorded wave
+            layers["bab_tree_error"] = {"code": "bab_recording_failed", "message": error}
     else:
         outcome = run_verification(model, req["method"], float(req["time_budget_s"]), domain=domain, dual=dual,
+                                   bab=req.get("bab"),
                                    hybridz_tolerance=tolerance)
         if req["method"] == "interval":
             layers["propagation"] = {"domain": domain, "availability": "unavailable", "complete": True,
@@ -124,6 +145,8 @@ def main(request_path: str, output_path: str, progress_fd: int, control_fd: int 
                     out["layer_states_error"] = {"code": "unexpected_exception", "message": f"{type(exc).__name__}: {exc}"}
             if "layer_states_error" in out:
                 capture.note("layer_states_" + out["layer_states_error"]["code"], out["layer_states_error"]["message"])
+            if "bab_tree_error" in out:
+                capture.note(out["bab_tree_error"]["code"], out["bab_tree_error"]["message"])
         except BridgeError as err:
             capture.exception(err)
             out = {"error": {"code": err.code, "message": err.message, "retryable": err.retryable}}
