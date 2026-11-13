@@ -2,7 +2,10 @@ import { useState } from "react";
 import { fmt, num, tooLarge, type WireNumber } from "../shared/wire";
 import type { InputSpecOut, ModelDescriptionOut, OutputSpecOut } from "../generated/wire";
 import { classLabel, specImageShape } from "../shared/ui/pixels";
+import { BandChart, BAND_MAX_DIMS } from "../shared/ui/BandChart";
+import { useProvenance } from "./hooks";
 import { InputDomain } from "./InputDomain";
+import { TextProvenance } from "./TextProvenance";
 
 export function SpecPanel({ model, selectedLayer }: { model: ModelDescriptionOut; selectedLayer: number | null }) {
   const layer = model.layers.find((l) => l.layer_id === selectedLayer) ?? null;
@@ -11,7 +14,7 @@ export function SpecPanel({ model, selectedLayer }: { model: ModelDescriptionOut
     <div className={images ? "split stack" : "split"}>
       <section className="panel">
         <h2>Specification</h2>
-        {model.input_specs.map((s) => <InputSpecView key={s.layer_id} s={s} />)}
+        {model.input_specs.map((s) => <InputSpecView key={s.layer_id} s={s} modelId={model.model_id} />)}
         {model.output_spec ? (
           <div className="spec">
             <div className="label">Output property · {model.output_spec.kind} (layer {model.output_spec.layer_id})</div>
@@ -51,8 +54,12 @@ export function SpecPanel({ model, selectedLayer }: { model: ModelDescriptionOut
 export type ShownSpec = InputSpecOut & { lb: WireNumber[]; ub: WireNumber[] };
 
 // A spec with several rows (a batch) is shown one row at a time; each row is one input of the batch.
-function InputSpecView({ s }: { s: InputSpecOut }) {
-  const rows = s.shape.length === 4 && s.shape[0]! > 1 ? s.shape[0]! : 1;
+// Rows of a VNN-LIB property batch are ACT's provenance rows when ACT records them.
+function InputSpecView({ s, modelId }: { s: InputSpecOut; modelId: string }) {
+  const provenance = useProvenance(modelId);
+  const known = provenance.status === "success" && provenance.data.status === "available" ? provenance.data.rows : null;
+  const rows = s.shape.length === 4 && s.shape[0]! > 1 ? s.shape[0]!
+    : known && known.length > 1 && s.lb !== null && s.lb.length % known.length === 0 ? known.length : 1;
   const [row, setRow] = useState(0);
   const title = <>Input domain · {s.kind} (layer {s.layer_id}){s.dataset ? ` · ${s.dataset}` : ""}</>;
   if (s.lb === null || s.ub === null) {
@@ -64,6 +71,8 @@ function InputSpecView({ s }: { s: InputSpecOut }) {
   const spec: ShownSpec = rows === 1 ? { ...s, lb: s.lb, ub: s.ub }
     : { ...s, lb: cut(s.lb), ub: cut(s.ub), center: s.center ? cut(s.center) : null, shape: [1, ...s.shape.slice(1)] };
   const shape = specImageShape(spec.shape, spec.dataset);
+  const p = known?.[r] ?? null;
+  const anchor = p?.anchor && p.anchor.length === spec.lb.length ? p.anchor : null;
   return (
     <div className="spec">
       <div className="label">{title}
@@ -75,6 +84,13 @@ function InputSpecView({ s }: { s: InputSpecOut }) {
       {shape ? (
         <>
           <InputDomain spec={spec} shape={shape} />
+          <details><summary className="note">numeric bounds</summary><BoundsTable s={spec} /></details>
+        </>
+      ) : spec.lb.length <= BAND_MAX_DIMS ? (
+        <>
+          {p && <TextProvenance p={p} />}
+          <BandChart lb={spec.lb.map(num)} ub={spec.ub.map(num)} label={rows > 1 ? `input box of row ${r}` : "input box"}
+            markers={anchor ? [{ label: "source sentence", cls: "anchor", values: anchor }] : []} />
           <details><summary className="note">numeric bounds</summary><BoundsTable s={spec} /></details>
         </>
       ) : <BoundsTable s={spec} />}

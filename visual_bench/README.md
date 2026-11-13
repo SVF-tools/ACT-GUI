@@ -110,7 +110,7 @@ These are commands to run, not a claim that a new test run occurred. ACT-backed 
 
 ### Shared Browser Layer
 
-[shared/http.ts](shared/http.ts) owns HTTP and SSE transport. [shared/queryClient.ts](shared/queryClient.ts) owns the QueryClient and key factory: run projections sit under the run key so committed events invalidate related data. [shared/wire.ts](shared/wire.ts) contains formatting helpers; shared/ui contains reusable UI primitives. Shared code imports no feature module.
+[shared/http.ts](shared/http.ts) owns HTTP and SSE transport. [shared/queryClient.ts](shared/queryClient.ts) owns the QueryClient and key factory: run projections sit under the run key so committed events invalidate related data. [shared/wire.ts](shared/wire.ts) contains formatting helpers; shared/ui contains reusable UI primitives (pixels, the vector box chart `BandChart`, the provenance `Neighbours` list). Shared code imports no feature module.
 
 ### Module Slice and Boundaries
 

@@ -70,6 +70,7 @@ _BASELINE_CAPABILITIES = (
     Capability("source.vnnlib", "available", "act.front_end.vnnlib_loader.create_specs.create_specs_from_paths + TorchToACT"),
     Capability("source.vnnlib.multi_network", "available", "create_specs_from_paths with one ONNX file per network of a multi-network VNN-LIB 2.0 property (data_model_loader.build_multi_network_model)"),
     Capability("source.onnx_classifier", "available", "act.front_end.vnnlib_loader.onnx_converter.convert_onnx_to_pytorch + TorchToACT"),
+    Capability("source.provenance", "available", "act.pipeline.gui.provenance_gui input_provenance / nearest_inputs: what a VNN-LIB property was built from, per the benchmark's provenance sidecar (ACT-10)"),
     Capability("events.bab_nodes", "available", "act.pipeline.gui.bab_gui BaBWave/BaBTerminal records of each committed BaB wave during verify_bab_batched (ACT-03)"),
     Capability("events.bab_summary", "available", "VerifyResult.metadata after completion"),
     Capability("control.pause_step_split", "unsupported", "no safe control boundary in baseline (plan ACT-05)"),

@@ -286,26 +286,61 @@ export type Service = string
 export type Status4 = "ok"
 export type Version = string
 export type Tolerance = number
-export type Center = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
-export type Dataset1 = (string | null)
+export type Distance = number
+export type ExampleId = string
+export type Label1 = (number | null)
+export type Split = (string | null)
+export type Text1 = string
+export type Anchor = (number[] | null)
+export type Benchmark = string
+export type ExampleId1 = (string | null)
+export type Family = string
+export type FamilyIndex = number
+export type FamilyTitle = string
+export type Key = string
+export type Label2 = (number | null)
+export type MatchDetail = string
+export type MatchStatus = ("verified" | "aligned" | "unmatched")
+export type Modality = "text"
+export type Representation = string
+export type Row1 = number
+export type Sources = {
+[k: string]: string
+}[]
+export type Split1 = (string | null)
+export type ClassNames = string[]
+export type Dataset1 = string
+export type DatasetUrl = (string | null)
+export type Description3 = string
+export type Name5 = string
+export type Title = string
+export type Text2 = (string | null)
+export type Cosine = (number | null)
+export type Kept = boolean
 export type Kind9 = string
+export type Text3 = string
+export type Variants = TextVariantOut[]
+export type VariantsStatus = ("replayed" | "partial" | "not_published" | "not_reproduced")
+export type Center = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
+export type Dataset2 = (string | null)
+export type Kind10 = string
 export type LayerId4 = number
 export type Lb1 = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type Shape = number[]
 export type Ub1 = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type InVars = number
-export type Kind10 = string
+export type Kind11 = string
 export type LayerId5 = number
 export type OutVars = number
 export type OutputShape = (number[] | null)
-export type Name5 = string
+export type Name6 = string
 export type Shape1 = (number[] | null)
 export type Value1 = (string | null)
 export type Params = ParamOut[]
 export type Preds = number[]
 export type Succs = number[]
 export type BeforeLayerIds = number[]
-export type Kind11 = string
+export type Kind12 = string
 export type LayerId6 = number
 export type Lb2 = (number | ("Infinity" | "-Infinity" | "NaN"))[]
 export type Shape2 = number[]
@@ -316,15 +351,15 @@ export type Layers1 = LayerStateOut[]
 export type Method = (("interval" | "dual" | "hybridz") | null)
 export type RunId7 = string
 export type Source1 = (LoadVnnlibRequest | LoadTorchRequest)
-export type Benchmark = string
-export type Kind12 = "vnnlib"
+export type Benchmark1 = string
+export type Kind13 = "vnnlib"
 export type Onnx1 = string
 export type Vnnlib = string
 export type Vnnlibs = ([string, ...(string)[]] | null)
 export type Eps = number
 export type Index1 = number
 export type Indices = ([number, ...(number)[]] | null)
-export type Kind13 = "torch"
+export type Kind14 = "torch"
 export type SourceId1 = string
 export type ActCommit = (string | null)
 export type InputDim = number
@@ -332,16 +367,16 @@ export type InputSpecs = InputSpecOut[]
 export type Layers2 = LayerOut[]
 export type ModelId1 = string
 export type OutputDim = number
-export type Kind14 = string
+export type Kind15 = string
 export type LayerId7 = number
 export type Matrix = (number[][] | null)
 export type Rows = number
-export type Text1 = string
+export type Text4 = string
 export type Thresholds = ((number | ("Infinity" | "-Infinity" | "NaN"))[] | null)
 export type TrueClass1 = (number | null)
 export type Sha256 = string
 export type ActPath = string
-export type Description3 = string
+export type Description4 = string
 export type EngineCheck = (("same_commit" | "loads" | "load_failed" | "unchecked") | null)
 export type Methods = ("interval" | "bab" | "fuzz")[]
 export type ModelId2 = string
@@ -350,6 +385,16 @@ export type Nodes1 = (number | null)
 export type Status5 = string
 export type Sha2561 = string
 export type Source2 = ("catalog" | "vnnlib" | "torch")
+export type ModelId3 = string
+export type Neighbours = InputNeighbourOut[]
+export type Row2 = number
+export type K = number
+/**
+ * @minItems 1
+ * @maxItems 4096
+ */
+export type Point = [number, ...(number)[]]
+export type Row3 = number
 export type ClientId = string
 /**
  * Online browsers per country, largest first
@@ -380,7 +425,7 @@ export type LayerKind = (string | null)
 export type OutputShape1 = number[]
 export type RecordCount = number
 export type Layers3 = PropagationLayerSummaryOut[]
-export type Kind15 = ("PhaseEvent" | "LayerBounds" | "Relaxation" | "DualBackward" | "SpecBound")
+export type Kind16 = ("PhaseEvent" | "LayerBounds" | "Relaxation" | "DualBackward" | "SpecBound")
 export type LayerKind1 = (string | null)
 export type OutputShape2 = number[]
 export type RecordId = number
@@ -398,7 +443,7 @@ export type Domain2 = (("interval" | "dual" | "hybridz") | null)
 export type LayerId9 = number
 export type Neuron3 = (number | null)
 export type OutputShape3 = number[]
-export type Kind16 = ("PhaseEvent" | "LayerBounds" | "Relaxation" | "DualBackward" | "SpecBound")
+export type Kind17 = ("PhaseEvent" | "LayerBounds" | "Relaxation" | "DualBackward" | "SpecBound")
 export type LayerKind2 = (string | null)
 export type OutputShape4 = number[]
 export type RecordId1 = number
@@ -407,16 +452,20 @@ export type TMs3 = number
 export type Records1 = PropagationLayerRecordOut[]
 export type RunId9 = string
 export type ValueLimit1 = number
+export type ModelId4 = string
+export type Reason3 = (string | null)
+export type Rows1 = (InputProvenanceOut | null)[]
+export type Status6 = ("available" | "none" | "unsupported")
 export type Availability6 = ("available" | "not_configured")
-export type Kind17 = ("fake" | "real")
-export type Name6 = string
+export type Kind18 = ("fake" | "real")
+export type Name7 = string
 export type Note = string
 export type Providers = ProviderOut[]
 export type ActStatus1 = string
 export type Counterexample = (number[] | null)
 export type CounterexampleOutput = (number[] | null)
 export type CounterexampleOutputError = (string | null)
-export type Row1 = number
+export type Row4 = number
 export type Verdict = ("certified" | "falsified" | "unknown" | "timeout" | "error")
 export type Errors = number
 export type Exception = (string | null)
@@ -424,13 +473,13 @@ export type Location = (string | null)
 export type Messages = string[]
 export type Warnings = number
 export type At = string
-export type Kind18 = ("run.queued" | "run.started" | "run.stop_requested" | "run.completed" | "run.failed" | "bab.summary" | "fuzz.progress" | "fuzz.control" | "fuzz.paused" | "fuzz.resumed" | "verify.propagation" | "verify.bab")
+export type Kind19 = ("run.queued" | "run.started" | "run.stop_requested" | "run.completed" | "run.failed" | "bab.summary" | "fuzz.progress" | "fuzz.control" | "fuzz.paused" | "fuzz.resumed" | "verify.propagation" | "verify.bab")
 export type Payload = ({
 [k: string]: string | number | boolean | null
 } | PropagationRecordOut | FuzzConfigChangeOut)
 export type RunId10 = string
 export type Seq2 = number
-export type Status6 = ("queued" | "running" | "completed" | "failed")
+export type Status7 = ("queued" | "running" | "completed" | "failed")
 export type ActCommit1 = (string | null)
 export type Bab = ({
 [k: string]: boolean | number | string
@@ -443,7 +492,7 @@ export type FinishedAt = (string | null)
 export type LastSeq = number
 export type MatchesNative = (boolean | null)
 export type Method1 = ("interval" | "bab" | "fuzz")
-export type ModelId3 = string
+export type ModelId5 = string
 export type ModelSha256 = string
 export type ActStatus2 = string
 export type BabSummary = ({
@@ -455,12 +504,12 @@ export type CounterexampleOutputError1 = (string | null)
 export type CounterexampleRow = (number | null)
 export type Device1 = (string | null)
 export type ElapsedS5 = number
-export type Rows1 = RowVerdictOut[]
+export type Rows2 = RowVerdictOut[]
 export type Verdict1 = ("certified" | "falsified" | "unknown" | "timeout" | "error")
 export type RunId11 = string
 export type SavedCounterexampleRows = number[]
 export type StartedAt = (string | null)
-export type Status7 = ("queued" | "running" | "completed" | "failed")
+export type Status8 = ("queued" | "running" | "completed" | "failed")
 export type TimeBudgetS = number
 export type Runs = RunOut[]
 export type Bab1 = ({
@@ -469,11 +518,11 @@ export type Bab1 = ({
 export type ClientRequestId1 = (string | null)
 export type Domain4 = (("interval" | "dual" | "hybridz") | null)
 export type Method2 = ("interval" | "bab" | "fuzz")
-export type ModelId4 = string
+export type ModelId6 = string
 export type TimeBudgetS1 = number
-export type Dataset2 = string
+export type Dataset3 = string
 export type Index2 = number
-export type Label1 = number
+export type Label3 = number
 export type Pixels = number[]
 export type Shape6 = number[]
 export type Size = number
@@ -488,8 +537,9 @@ export type Solver = "gurobi"
 export type UsedByMethods = ("interval" | "bab" | "fuzz")[]
 export type Version2 = (string | null)
 export type Classifiers = ClassifierSourceOut[]
-export type Benchmark1 = string
+export type Benchmark2 = string
 export type Onnx2 = string
+export type Text5 = (string | null)
 export type Vnnlib2 = string
 export type Instances = VnnlibInstanceOut[]
 export type Vnnlib1 = VnnlibBenchmarkOut[]
@@ -545,6 +595,8 @@ FuzzSummaryOut?: FuzzSummaryOut
 FuzzingOut?: FuzzingOut
 HealthOut?: HealthOut
 HybridzOptions?: HybridzOptions
+InputNeighbourOut?: InputNeighbourOut
+InputProvenanceOut?: InputProvenanceOut
 InputSpecOut?: InputSpecOut
 LayerOut?: LayerOut
 LayerStateOut?: LayerStateOut
@@ -555,6 +607,8 @@ LoadVnnlibRequest?: LoadVnnlibRequest
 ModelDescriptionOut?: ModelDescriptionOut
 ModelSummary?: ModelSummary
 NativeResult?: NativeResult
+NearestOut?: NearestOut
+NearestRequest?: NearestRequest
 OutputSpecOut?: OutputSpecOut
 ParamOut?: ParamOut
 PresenceHeartbeat?: PresenceHeartbeat
@@ -566,6 +620,8 @@ PropagationLayerRecordOut?: PropagationLayerRecordOut
 PropagationLayerSummaryOut?: PropagationLayerSummaryOut
 PropagationRecordOut?: PropagationRecordOut
 PropagationTensorOut?: PropagationTensorOut
+ProvenanceOut?: ProvenanceOut
+ProvenanceTaskOut?: ProvenanceTaskOut
 ProviderList?: ProviderList
 ProviderOut?: ProviderOut
 RowVerdictOut?: RowVerdictOut
@@ -582,6 +638,7 @@ SelectionContext?: SelectionContext
 SolverLicenseUpload?: SolverLicenseUpload
 SolverStatusOut?: SolverStatusOut
 SourcesOut?: SourcesOut
+TextVariantOut?: TextVariantOut
 VerifyDefaults?: VerifyDefaults
 VnnlibBenchmarkOut?: VnnlibBenchmarkOut
 VnnlibInstanceOut?: VnnlibInstanceOut
@@ -597,7 +654,7 @@ text: Text
 }
 /**
  * One ACT symbol a capability's bridge adapter calls, checked on the active checkout.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "ApiCheckOut".
  */
@@ -683,7 +740,7 @@ state: State
 }
 /**
  * One verify_bab_batched setting from ACT's bab_gui.bab_options; kinds, limits and defaults are ACT's.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "BabOptionOut".
  */
@@ -700,7 +757,7 @@ name: Name
 }
 /**
  * GET /api/verification/bab-options: every BaB setting of the active ACT (capability verify.bab.options).
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "BabOptionsOut".
  */
@@ -711,7 +768,7 @@ options: Options
 /**
  * The focused subtree as fractions per leaf state (they sum to 1), each node's share split equally among its
  * children: a measure of the split tree, not of input volume, and never a verdict.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "BabSharesOut".
  */
@@ -781,7 +838,7 @@ wave: Wave1
 }
 /**
  * The ACT engine a model was built on: its commit and where that code came from.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "BuiltWithOut".
  */
@@ -842,7 +899,7 @@ severity: Severity
 /**
  * DualSolver settings of a dual-domain verify_once run. Defaults equal ACT's DualConfig (drift-checked in
  * test_verification.py); with every default the run calls verify_once exactly as without options.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "DualOptions".
  */
@@ -886,7 +943,7 @@ usable: Usable
 }
 /**
  * Where the imported ACT code comes from: the pinned baseline checkout or a staged branch head.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "EngineSourceOut".
  */
@@ -919,7 +976,7 @@ remotes: Remotes
 /**
  * Neither remote nor url: the pinned baseline. Otherwise the branch head of a listed remote (by name)
  * or of a user-entered https git URL.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "EngineSwitchRequest".
  */
@@ -1062,7 +1119,7 @@ true_class: TrueClass
 }
 /**
  * Lane 0 of the batch ACTFuzzer mutated in one iteration. Display only; not a counterexample unless violation.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "FuzzFrameOut".
  */
@@ -1079,7 +1136,7 @@ violation: Violation
 }
 /**
  * Relative selection weights of ACT's mutation operators (ACT normalizes them; 0 disables one).
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "FuzzMutationWeights".
  */
@@ -1109,7 +1166,7 @@ name: Name3
  * ACTFuzzer settings for method "fuzz". Defaults other than max_iterations equal the fuzzing section of
  * the pinned ACT act/config/pipeline.yaml (drift-checked in fuzzing/test_fuzzing.py); the browser reads them from
  * GET /api/fuzz/defaults. Output, tracing and reporting stay owned by engine_bridge.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "FuzzOptions".
  */
@@ -1187,7 +1244,7 @@ total_mutations: TotalMutations
 /**
  * ACTFuzzer record of a run. While running, timeline comes from committed fuzz.progress events
  * and frames holds only the latest mutated input the worker reported (kept in memory, not recorded).
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "FuzzingOut".
  */
@@ -1215,7 +1272,7 @@ export interface Provenance {
 }
 /**
  * An ACT counterexample the user saved on its run record (user annotation; ACT decided the violation).
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "SavedCounterexampleOut".
  */
@@ -1235,7 +1292,7 @@ version: Version
 }
 /**
  * HybridZ verdict-solver settings of a hybridz-domain verify_once run; its time limit is the run budget.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "HybridzOptions".
  */
@@ -1244,12 +1301,72 @@ tolerance?: Tolerance
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "InputNeighbourOut".
+ */
+export interface InputNeighbourOut {
+distance: Distance
+example_id: ExampleId
+label: Label1
+split: Split
+text: Text1
+}
+/**
+ * What one ACT input row's VNN-LIB property was built from, as ACT's provenance sidecar records it.
+ *
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "InputProvenanceOut".
+ */
+export interface InputProvenanceOut {
+anchor: Anchor
+benchmark: Benchmark
+example_id: ExampleId1
+family: Family
+family_index: FamilyIndex
+family_title: FamilyTitle
+key: Key
+label: Label2
+match_detail: MatchDetail
+match_status: MatchStatus
+modality: Modality
+representation: Representation
+row: Row1
+sources: Sources
+split: Split1
+task: ProvenanceTaskOut
+text: Text2
+variants: Variants
+variants_status: VariantsStatus
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "ProvenanceTaskOut".
+ */
+export interface ProvenanceTaskOut {
+class_names: ClassNames
+dataset: Dataset1
+dataset_url: DatasetUrl
+description: Description3
+name: Name5
+title: Title
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "TextVariantOut".
+ */
+export interface TextVariantOut {
+cosine: Cosine
+kept: Kept
+kind: Kind9
+text: Text3
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "InputSpecOut".
  */
 export interface InputSpecOut {
 center: Center
-dataset: Dataset1
-kind: Kind9
+dataset: Dataset2
+kind: Kind10
 layer_id: LayerId4
 lb: Lb1
 shape: Shape
@@ -1261,7 +1378,7 @@ ub: Ub1
  */
 export interface LayerOut {
 in_vars: InVars
-kind: Kind10
+kind: Kind11
 layer_id: LayerId5
 out_vars: OutVars
 output_shape: OutputShape
@@ -1274,7 +1391,7 @@ succs: Succs
  * via the `definition` "ParamOut".
  */
 export interface ParamOut {
-name: Name5
+name: Name6
 shape: Shape1
 value: Value1
 }
@@ -1284,7 +1401,7 @@ value: Value1
  */
 export interface LayerStateOut {
 before_layer_ids: BeforeLayerIds
-kind: Kind11
+kind: Kind12
 layer_id: LayerId6
 lb: Lb2
 shape: Shape2
@@ -1317,8 +1434,8 @@ source: Source1
  * via the `definition` "LoadVnnlibRequest".
  */
 export interface LoadVnnlibRequest {
-benchmark: Benchmark
-kind: Kind12
+benchmark: Benchmark1
+kind: Kind13
 onnx: Onnx1
 vnnlib: Vnnlib
 vnnlibs?: Vnnlibs
@@ -1331,7 +1448,7 @@ export interface LoadTorchRequest {
 eps: Eps
 index: Index1
 indices?: Indices
-kind: Kind13
+kind: Kind14
 source_id: SourceId1
 }
 /**
@@ -1353,11 +1470,11 @@ sha256: Sha256
  * via the `definition` "OutputSpecOut".
  */
 export interface OutputSpecOut {
-kind: Kind14
+kind: Kind15
 layer_id: LayerId7
 matrix: Matrix
 rows: Rows
-text: Text1
+text: Text4
 thresholds: Thresholds
 true_class: TrueClass1
 }
@@ -1368,7 +1485,7 @@ true_class: TrueClass1
 export interface ModelSummary {
 act_path: ActPath
 built_with?: (BuiltWithOut | null)
-description: Description3
+description: Description4
 engine_check?: EngineCheck
 methods: Methods
 model_id: ModelId2
@@ -1393,8 +1510,26 @@ export interface Params1 {
 [k: string]: string | number | boolean | null
 }
 /**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "NearestOut".
+ */
+export interface NearestOut {
+model_id: ModelId3
+neighbours: Neighbours
+row: Row2
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "NearestRequest".
+ */
+export interface NearestRequest {
+k?: K
+point: Point
+row: Row3
+}
+/**
  * One browser's heartbeat; client_id is a random id kept in that browser's localStorage.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "PresenceHeartbeat".
  */
@@ -1461,7 +1596,7 @@ version: Version1
 export interface PropagationRecordOut {
 counts: Counts2
 key: (PropagationKeyOut | null)
-kind: Kind15
+kind: Kind16
 layer_kind: LayerKind1
 metadata: Metadata
 output_shape: OutputShape2
@@ -1509,7 +1644,7 @@ value_limit: ValueLimit1
 export interface PropagationLayerRecordOut {
 counts: Counts3
 key: (PropagationKeyOut | null)
-kind: Kind16
+kind: Kind17
 layer_kind: LayerKind2
 metadata: Metadata1
 output_shape: OutputShape4
@@ -1533,6 +1668,16 @@ export interface Values {
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
+ * via the `definition` "ProvenanceOut".
+ */
+export interface ProvenanceOut {
+model_id: ModelId4
+reason: Reason3
+rows: Rows1
+status: Status6
+}
+/**
+ * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "ProviderList".
  */
 export interface ProviderList {
@@ -1544,8 +1689,8 @@ providers: Providers
  */
 export interface ProviderOut {
 availability: Availability6
-kind: Kind17
-name: Name6
+kind: Kind18
+name: Name7
 note: Note
 }
 /**
@@ -1557,12 +1702,12 @@ act_status: ActStatus1
 counterexample?: Counterexample
 counterexample_output?: CounterexampleOutput
 counterexample_output_error?: CounterexampleOutputError
-row: Row1
+row: Row4
 verdict: Verdict
 }
 /**
  * What the worker captured while driving ACT; its presence means GET /api/runs/{id}/snapshot has diagnostics.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "RunDiagnosticsOut".
  */
@@ -1579,11 +1724,11 @@ warnings: Warnings
  */
 export interface RunEvent {
 at: At
-kind: Kind18
+kind: Kind19
 payload: Payload
 run_id: RunId10
 seq: Seq2
-status: Status6
+status: Status7
 }
 /**
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
@@ -1611,14 +1756,14 @@ hybridz?: (HybridzOptions | null)
 last_seq: LastSeq
 matches_native: MatchesNative
 method: Method1
-model_id: ModelId3
+model_id: ModelId5
 model_sha256: ModelSha256
 native_reference: (NativeResult | null)
 result: (RunResultOut | null)
 run_id: RunId11
 saved_counterexample_rows?: SavedCounterexampleRows
 started_at: StartedAt
-status: Status7
+status: Status8
 time_budget_s: TimeBudgetS
 }
 /**
@@ -1635,7 +1780,7 @@ counterexample_row?: CounterexampleRow
 device?: Device1
 elapsed_s: ElapsedS5
 metadata: Metadata2
-rows?: Rows1
+rows?: Rows2
 verdict: Verdict1
 }
 export interface Metadata2 {
@@ -1653,7 +1798,7 @@ dual?: (DualOptions | null)
 fuzz?: (FuzzOptions | null)
 hybridz?: (HybridzOptions | null)
 method: Method2
-model_id: ModelId4
+model_id: ModelId6
 time_budget_s?: TimeBudgetS1
 }
 /**
@@ -1661,9 +1806,9 @@ time_budget_s?: TimeBudgetS1
  * via the `definition` "SampleOut".
  */
 export interface SampleOut {
-dataset: Dataset2
+dataset: Dataset3
 index: Index2
-label: Label1
+label: Label3
 pixels: Pixels
 shape: Shape6
 size: Size
@@ -1677,7 +1822,7 @@ index: Index3
 }
 /**
  * Text of a solver license file (e.g. gurobi.lic). Stored server-side; never returned.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "SolverLicenseUpload".
  */
@@ -1712,7 +1857,7 @@ vnnlib_root: VnnlibRoot
  * via the `definition` "VnnlibBenchmarkOut".
  */
 export interface VnnlibBenchmarkOut {
-benchmark: Benchmark1
+benchmark: Benchmark2
 instances: Instances
 }
 /**
@@ -1721,11 +1866,12 @@ instances: Instances
  */
 export interface VnnlibInstanceOut {
 onnx: Onnx2
+text?: Text5
 vnnlib: Vnnlib2
 }
 /**
  * GET /api/verification/defaults: the settings a verify_once run uses when the request leaves them out.
- * 
+ *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "VerifyDefaults".
  */

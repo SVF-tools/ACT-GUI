@@ -15,6 +15,8 @@ export const keys = {
   model: (id: string | null) => ["models", id] as const,
   sources: () => ["sources"] as const,
   sample: (dataset: string | null, index: number) => ["sources", "sample", dataset, index] as const,
+  provenance: (id: string | null) => ["models", id, "provenance"] as const,
+  nearest: (id: string | null, row: number, point: string) => ["models", id, "provenance", "nearest", row, point] as const,
   runs: () => ["runs", "list"] as const,
   run,
   layers: (id: string | null) => [...run(id), "layers"] as const,

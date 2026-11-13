@@ -18,6 +18,7 @@ from engine_bridge.contracts import DISPLAY_VALUES, BridgeError, VnnlibInstance
 from engine_bridge.engine_session import act_root
 from engine_bridge.execution import UNIVERSAL_METHODS, required_capability, verify_methods
 from engine_bridge.model_spec import describe_model, file_sha256
+from engine_bridge.model_spec import provenance as model_provenance
 from engine_bridge.model_spec import sources as model_sources
 from visual_bench.engine.service import EngineService
 from visual_bench.errors import AppError, bridge_error
@@ -90,10 +91,15 @@ class ModelService:
         self.engine.require_engine()
         groups: dict[str, list[S.VnnlibInstanceOut]] = {}
         multi_network = self.engine.capability_available("source.vnnlib.multi_network")
-        for inst in model_sources.vnnlib_instances():
+        instances = model_sources.vnnlib_instances()
+        described = ({b for b in {i.benchmark for i in instances} if model_provenance.has_provenance(b)}
+                     if self.engine.capability_available("source.provenance") else set())
+        for inst in instances:
             if "," in inst.onnx and not multi_network:
                 continue  # the active ACT cannot combine the networks of a multi-network property
-            groups.setdefault(inst.benchmark, []).append(S.VnnlibInstanceOut(onnx=inst.onnx, vnnlib=inst.vnnlib))
+            p = model_provenance.input_provenance(inst) if inst.benchmark in described else None
+            groups.setdefault(inst.benchmark, []).append(
+                S.VnnlibInstanceOut(onnx=inst.onnx, vnnlib=inst.vnnlib, text=p.text if p is not None else None))
         return S.SourcesOut(
             vnnlib=[S.VnnlibBenchmarkOut(benchmark=b, instances=i) for b, i in groups.items()],
             classifiers=[S.ClassifierSourceOut(source_id=c.source_id, dataset=c.dataset, onnx=c.onnx,
@@ -192,3 +198,44 @@ class ModelService:
             raw["output_spec"]["thresholds"] = wire_numbers(raw["output_spec"]["thresholds"])
         raw.pop("source_path")
         return S.ModelDescriptionOut(model_id=model_id, act_commit=act_commit, **raw)
+
+    # -- input provenance (MSV-08) ---------------------------------------------
+    def _vnnlib_rows(self, entry: dict[str, Any]) -> list[VnnlibInstance] | None:
+        """The VNN-LIB property behind each ACT input row of a model built from VNN-LIB sources, else None."""
+        if entry.get("source") != "vnnlib":
+            return None
+        p = entry["params"]
+        vnnlibs = str(p["vnnlibs"]).split(",") if "vnnlibs" in p else [str(p["vnnlib"])]
+        return [VnnlibInstance(str(p["benchmark"]), str(p["onnx"]), v) for v in vnnlibs]
+
+    def provenance(self, model_id: str) -> S.ProvenanceOut:
+        rows = self._vnnlib_rows(self.entry(model_id))
+        if rows is None:
+            return S.ProvenanceOut(model_id=model_id, status="none", rows=[],
+                                   reason="only models built from VNN-LIB properties have input provenance")
+        if not self.engine.capability_available("source.provenance"):
+            return S.ProvenanceOut(model_id=model_id, status="unsupported", rows=[None] * len(rows),
+                                   reason="the active ACT engine has no input provenance API (source.provenance)")
+        out: list[S.InputProvenanceOut | None] = []
+        for row, inst in enumerate(rows):
+            p = model_provenance.input_provenance(inst) if model_provenance.has_provenance(inst.benchmark) else None
+            out.append(None if p is None else S.InputProvenanceOut(row=row, **asdict(p)))
+        found = any(p is not None for p in out)
+        return S.ProvenanceOut(model_id=model_id, status="available" if found else "none", rows=out,
+                               reason=None if found else "ACT records no provenance for these VNN-LIB properties")
+
+    def nearest(self, model_id: str, req: S.NearestRequest) -> S.NearestOut:
+        rows = self._vnnlib_rows(self.entry(model_id))
+        if rows is None:
+            raise AppError(404, "no_provenance", f"{model_id} is not built from VNN-LIB properties")
+        self.engine.require_capability("source.provenance")
+        if req.row >= len(rows):
+            raise AppError(422, "invalid_row", f"{model_id} has {len(rows)} input row(s)")
+        inst = rows[req.row]
+        if not model_provenance.has_provenance(inst.benchmark) or model_provenance.input_provenance(inst) is None:
+            raise AppError(404, "no_provenance", f"ACT records no provenance for {inst.benchmark}/{inst.vnnlib}")
+        try:
+            found = model_provenance.nearest_inputs(inst, req.point, req.k)
+        except BridgeError as err:
+            raise bridge_error(err) from err
+        return S.NearestOut(model_id=model_id, row=req.row, neighbours=[S.InputNeighbourOut(**asdict(n)) for n in found])

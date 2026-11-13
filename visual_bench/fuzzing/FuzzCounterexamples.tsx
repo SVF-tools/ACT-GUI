@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { fmt, num, tooLarge } from "../shared/wire";
 import type { FuzzCounterexampleOut, ModelDescriptionOut } from "../generated/wire";
 import { classLabel, Pixels, PerturbCompare, type Shape } from "../shared/ui/pixels";
+import { Neighbours } from "../shared/ui/Neighbours";
+import { useNearest, useRowProvenance } from "../model_spec/hooks";
 import { analyze, inputBox, modelShape, finiteRange, MAX_DIMS, type Box, type Ce } from "./presentation";
 import { DeltaBars } from "./DeltaBars";
 import { SaveButton } from "./SaveButton";
@@ -69,6 +71,9 @@ function CounterexampleDetail({ a, model, box, shape, lo, hi, saved, onSave }: {
 }) {
   const { ce, x: xs, seed } = a;
   const ds = model?.input_specs[0]?.dataset ?? null;
+  const p = useRowProvenance(model?.model_id ?? null, ce.spec_row);
+  const anchor = p?.anchor && p.anchor.length === xs.length ? p.anchor : null;
+  const near = useNearest(model?.model_id ?? null, ce.spec_row, p && a.shown ? xs : null);
   const shown = Math.min(xs.length, MAX_DIMS);
   const top = a.delta.map((v, i) => [i, v] as const).filter(([, v]) => Math.abs(v) > 1e-9)
     .sort((p, q) => Math.abs(q[1]) - Math.abs(p[1])).slice(0, 5);
@@ -84,7 +89,8 @@ function CounterexampleDetail({ a, model, box, shape, lo, hi, saved, onSave }: {
         <b>
           {ce.true_class !== null
             ? <>expected {classLabel(ds, ce.true_class)}, seed predicts {a.seedPred === null ? "?" : classLabel(ds, a.seedPred)}, mutated predicts <span className={a.misclassified ? "state bad" : ""}>{classLabel(ds, a.pred)}</span></>
-            : <>{ce.kind} violated on spec row {ce.spec_row}</>}
+            : <>{ce.kind} violated on spec row {ce.spec_row}{p && <>; the mutated output ranks <b className={p.label !== null && a.pred !== p.label ? "state bad" : ""}>
+                {p.task.class_names[a.pred] ?? a.pred}</b> first{p.label !== null ? ` (source sentence labelled ${p.task.class_names[p.label] ?? p.label})` : ""}</>}</>}
         </b>
         <span>severity</span><b>{fmt(num(ce.severity))} <span className="muted">(ACT's signed violation margin)</span></b>
         {a.shown && <><span>perturbation</span><b>‖δ‖∞ {fmt(a.linf)} · ‖δ‖₂ {fmt(a.l2)} · {a.changed} of {xs.length} dims changed</b></>}
@@ -99,6 +105,7 @@ function CounterexampleDetail({ a, model, box, shape, lo, hi, saved, onSave }: {
             {box && <span><i className="sw before" /> input box (INPUT_SPEC)</span>}
             <span><i className="sw ce" /> counterexample input</span>
             <span><i className="sw seed" /> seed input</span>
+            {anchor && <span><i className="sw anchor" /> source sentence</span>}
           </div>
           <div className="bars">
             {Array.from({ length: shown }, (_, i) => {
@@ -112,6 +119,7 @@ function CounterexampleDetail({ a, model, box, shape, lo, hi, saved, onSave }: {
                     {box && <span className="bar before" style={{ left: 0, width: "100%" }} />}
                     <span className="pin seed" style={{ left: at(seed[i]!) }} />
                     <span className="pin ce" style={{ left: at(xs[i]!) }} />
+                    {anchor && <span className="pin anchor" style={{ left: at(anchor[i]!) }} />}
                   </span>
                   <span className="vals mono">{fmt(seed[i]!, 3)} → {fmt(xs[i]!, 3)}</span>
                 </div>
@@ -119,14 +127,16 @@ function CounterexampleDetail({ a, model, box, shape, lo, hi, saved, onSave }: {
             })}
           </div>
           {xs.length > shown && <div className="note">Showing {shown} of {xs.length} input values.</div>}
+          {p && <Neighbours items={near.data?.neighbours ?? []} classNames={p.task.class_names} pending={near.isFetching}
+            error={near.error?.message ?? null} />}
         </>
       )}
-      <OutputCompare a={a} />
+      <OutputCompare a={a} names={p?.task.class_names ?? null} />
     </div>
   );
 }
 
-function OutputCompare({ a }: { a: Ce }) {
+function OutputCompare({ a, names }: { a: Ce; names: string[] | null }) {
   const ys = a.y, ss = a.ySeed;
   const [vlo, vhi] = finiteRange([0, ...ys, ...(ss ?? [])]);
   const span = vhi - vlo || 1;
@@ -140,6 +150,7 @@ function OutputCompare({ a }: { a: Ce }) {
         {ss && <span><i className="sw seed" /> seed output</span>}
         <span><i className="sw ce" /> counterexample output</span>
         {exp !== null && <span><b>E</b> expected class · <b>P</b> argmax of the mutated output</span>}
+        {names && <span className="muted">{names.map((n, i) => `y[${i}] ${n}`).join(" · ")}</span>}
       </div>
       <div className="bars">
         {Array.from({ length: n }, (_, i) => {

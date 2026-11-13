@@ -7,7 +7,7 @@ from pydantic import Field, model_validator
 
 from visual_bench.wire import WireNumber, Scalar, Method, Wire
 
-__all__ = ['NativeResult', 'BuiltWithOut', 'EngineCheck', 'ModelSummary', 'VnnlibInstanceOut', 'VnnlibBenchmarkOut', 'ClassifierSourceOut', 'SourcesOut', 'SampleOut', 'LoadVnnlibRequest', 'LoadTorchRequest', 'LoadModelRequest', 'LoadModelBody', 'ParamOut', 'LayerOut', 'InputSpecOut', 'OutputSpecOut', 'ModelDescriptionOut']
+__all__ = ['NativeResult', 'BuiltWithOut', 'EngineCheck', 'ModelSummary', 'VnnlibInstanceOut', 'VnnlibBenchmarkOut', 'ClassifierSourceOut', 'SourcesOut', 'SampleOut', 'LoadVnnlibRequest', 'LoadTorchRequest', 'LoadModelRequest', 'LoadModelBody', 'ParamOut', 'LayerOut', 'InputSpecOut', 'OutputSpecOut', 'ModelDescriptionOut', 'ProvenanceTaskOut', 'TextVariantOut', 'InputProvenanceOut', 'ProvenanceStatus', 'ProvenanceOut', 'NearestRequest', 'InputNeighbourOut', 'NearestOut']
 
 
 class NativeResult(Wire):
@@ -41,6 +41,7 @@ class ModelSummary(Wire):
 class VnnlibInstanceOut(Wire):
     onnx: str  # one path, or one per network of a multi-network property, comma-separated in network order
     vnnlib: str
+    text: str | None = None  # source text of the property, when the active ACT engine records its provenance
 
 class VnnlibBenchmarkOut(Wire):
     benchmark: str
@@ -147,3 +148,66 @@ class ModelDescriptionOut(Wire):
     output_spec: OutputSpecOut | None
     input_dim: int
     output_dim: int
+
+class ProvenanceTaskOut(Wire):
+    name: str
+    title: str
+    description: str
+    class_names: list[str]  # index = model output class
+    dataset: str
+    dataset_url: str | None
+
+class TextVariantOut(Wire):
+    text: str
+    kind: str  # perturbation that produced it, e.g. "char_swapping"
+    kept: bool  # passed the benchmark's filter, so it helps span the property's box
+    cosine: float | None
+
+class InputProvenanceOut(Wire):
+    """What one ACT input row's VNN-LIB property was built from, as ACT's provenance sidecar records it."""
+    row: int
+    benchmark: str
+    key: str  # instance path relative to the benchmark directory
+    modality: Literal["text"]
+    representation: str  # how a source example becomes the model input
+    task: ProvenanceTaskOut
+    family: str
+    family_title: str
+    family_index: int
+    example_id: str | None
+    text: str | None  # None when ACT matched no source example
+    label: int | None
+    split: str | None
+    anchor: list[float] | None  # the source example's point in the model input space
+    variants: list[TextVariantOut]
+    variants_status: Literal["replayed", "partial", "not_published", "not_reproduced"]
+    match_status: Literal["verified", "aligned", "unmatched"]
+    match_detail: str
+    sources: list[dict[str, str]]
+
+# available: ACT records provenance for at least one row; none: not a VNN-LIB model, or no row has provenance;
+# unsupported: the active ACT engine lacks the provenance API (capability source.provenance).
+ProvenanceStatus = Literal["available", "none", "unsupported"]
+
+class ProvenanceOut(Wire):
+    model_id: str
+    status: ProvenanceStatus
+    reason: str | None
+    rows: list[InputProvenanceOut | None]  # one per ACT input row
+
+class NearestRequest(Wire):
+    row: int = Field(ge=0, lt=64)
+    point: list[float] = Field(min_length=1, max_length=4096)  # a point of the model input space, e.g. a counterexample
+    k: int = Field(default=3, ge=1, le=10)
+
+class InputNeighbourOut(Wire):
+    example_id: str
+    text: str
+    label: int | None
+    split: str | None
+    distance: float  # Euclidean, in the model input space
+
+class NearestOut(Wire):
+    model_id: str
+    row: int
+    neighbours: list[InputNeighbourOut]  # nearest first; known examples, never a decoding of the point

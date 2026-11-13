@@ -1,9 +1,11 @@
 // ACT verdict of the selected run, shown at the top of the Verification and BaB modes.
 // The verdict is ACT's (RunResultOut.verdict / act_status); this view only labels it.
-import { fmt, indexRanges } from "../shared/wire";
+import { fmt, indexRanges, num } from "../shared/wire";
 import { runDomainLabel } from "./labels";
-import type { ModelDescriptionOut, RowVerdictOut, RunOut, RunResultOut } from "../generated/wire";
-import { useBatchRows } from "../model_spec/hooks";
+import type { InputSpecOut, ModelDescriptionOut, RowVerdictOut, RunOut, RunResultOut } from "../generated/wire";
+import { useBatchRows, useNearest, useRowProvenance } from "../model_spec/hooks";
+import { BandChart } from "../shared/ui/BandChart";
+import { Neighbours } from "../shared/ui/Neighbours";
 import { useState } from "react";
 import { downloadBlob, imagePng, Pixels, specImageShape, type Shape } from "../shared/ui/pixels";
 import { savedCounterexampleUrl } from "./api";
@@ -119,9 +121,14 @@ function Counterexample({ ce, all, onPick, run, model }: {
 }) {
   const batch = useBatchRows(run.model_id);
   const xs = ce.xs, row = ce.row;
+  const p = useRowProvenance(run.model_id, row ?? 0);
+  const near = useNearest(run.model_id, row ?? 0, p ? xs : null);
   const spec = model.model_id === run.model_id ? model.input_specs[0] : undefined;
   const s = spec ? specImageShape(spec.shape, spec.dataset) : null;
   const shape = s && s.c * s.h * s.w === xs.length ? s : null;
+  const bounds = p && spec && !shape ? rowBounds(spec, row ?? 0, xs.length) : null;
+  const anchor = p?.anchor && p.anchor.length === xs.length ? p.anchor : null;
+  const top = p && ce.output ? ce.output.indexOf(Math.max(...ce.output)) : null;
   const lo = Math.min(...xs), hi = Math.max(...xs);
   const unit = lo >= 0 && hi <= 1;
   const name = (r: number) => `${batch?.noun === "image" ? "test image " : ""}${batch?.labels[r] ?? `row ${r + 1}`}`;
@@ -140,9 +147,24 @@ function Counterexample({ ce, all, onPick, run, model }: {
       <span className="mono muted">
         x = [{xs.slice(0, 8).map((v) => fmt(v, 3)).join(", ")}{xs.length > 8 ? `, … (${xs.length})` : ""}]
       </span>
+      {p && top !== null && <span className="note cetop">ACT's output at this counterexample ranks <b>{p.task.class_names[top] ?? top}</b> first
+        {p.label !== null ? ` (source sentence labelled ${p.task.class_names[p.label] ?? p.label})` : ""}.</span>}
+      {bounds && <BandChart lb={bounds.lb} ub={bounds.ub} label="counterexample in its input box"
+        markers={[{ label: "counterexample", cls: "ce", values: xs },
+          ...(anchor ? [{ label: "source sentence", cls: "anchor" as const, values: anchor }] : [])]} />}
+      {p && <Neighbours items={near.data?.neighbours ?? []} classNames={p.task.class_names} pending={near.isFetching}
+        error={near.error?.message ?? null} />}
       <SaveExport run={run} ce={ce} shape={shape} lo={unit ? 0 : lo} hi={unit ? 1 : hi} />
     </div>
   );
+}
+
+// The input box of one batch row, or of the whole spec when it holds a single row.
+function rowBounds(spec: InputSpecOut, row: number, d: number): { lb: number[]; ub: number[] } | null {
+  if (!spec.lb || !spec.ub) return null;
+  const start = spec.lb.length === d ? 0 : row * d;
+  if (start + d > spec.lb.length) return null;
+  return { lb: spec.lb.slice(start, start + d).map(num), ub: spec.ub.slice(start, start + d).map(num) };
 }
 
 // Save ACT's counterexample (of the selected batch row) on the run record, then export it as a VNN-COMP witness and,

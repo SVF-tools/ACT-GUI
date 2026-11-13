@@ -139,6 +139,58 @@ class VnnlibInstance:
     vnnlib: str
 
 
+# Input provenance (capability source.provenance): what a VNN-LIB property was built from, copied out of ACT's
+# provenance sidecar (act.pipeline.gui.provenance_gui). A point of the model input space (e.g. a counterexample)
+# is never turned into text; it is only ranked against known examples (InputNeighbour).
+@dataclass(frozen=True)
+class ProvenanceTask:
+    name: str
+    title: str
+    description: str
+    class_names: tuple[str, ...]  # index = model output class
+    dataset: str
+    dataset_url: str | None
+
+
+@dataclass(frozen=True)
+class TextVariant:
+    text: str
+    kind: str  # perturbation that produced it, e.g. "char_swapping"
+    kept: bool  # passed the benchmark's filter, so it helps span the property's box
+    cosine: float | None
+
+
+@dataclass(frozen=True)
+class InputProvenance:
+    benchmark: str
+    key: str  # instance path relative to the benchmark directory
+    modality: str
+    representation: str
+    task: ProvenanceTask
+    family: str
+    family_title: str
+    family_index: int
+    example_id: str | None
+    text: str | None  # None when ACT matched no source example
+    label: int | None
+    split: str | None
+    anchor: tuple[float, ...] | None  # the source example's point in the model input space
+    variants: tuple[TextVariant, ...]
+    variants_status: str  # replayed | partial | not_published | not_reproduced
+    match_status: str  # verified | aligned | unmatched
+    match_detail: str
+    sources: tuple[dict[str, str], ...]
+
+
+@dataclass(frozen=True)
+class InputNeighbour:
+    example_id: str
+    text: str
+    label: int | None
+    split: str | None
+    distance: float  # Euclidean, in the model input space
+
+
 @dataclass(frozen=True)
 class ClassifierSource:
     source_id: str

@@ -25,7 +25,8 @@ from visual_bench.assistant.schemas import *  # noqa: F403
 from visual_bench.workspace.schemas import *  # noqa: F403
 from visual_bench.engine.schemas import (EngineBranchesOut, EngineInfoOut, EngineSourcesOut, EngineSwitchRequest,
                                          SolverLicenseUpload, SolverStatusOut)
-from visual_bench.model_spec.schemas import LoadModelBody, ModelDescriptionOut, ModelSummary, SampleOut, SourcesOut
+from visual_bench.model_spec.schemas import (LoadModelBody, ModelDescriptionOut, ModelSummary, NearestOut, NearestRequest,
+                                             ProvenanceOut, SampleOut, SourcesOut)
 from visual_bench.fuzzing.schemas import (FuzzingOut, SaveCounterexampleRequest, SavedCounterexampleOut,
                                           FuzzOptionsSchemaOut, FuzzControlRequest, FuzzControlOut)
 from visual_bench.verification.schemas import BabOptionsOut, RunEvent, RunList, RunOut, RunRequest, VerifyDefaults
@@ -41,4 +42,5 @@ WIRE_MODELS: tuple[type[BaseModel], ...] = (
     EngineSourcesOut, EngineBranchesOut, EngineSwitchRequest, PresenceHeartbeat, PresenceOut,
     PropagationIndexOut, PropagationLayerOut,
     FuzzOptionsSchemaOut, FuzzControlRequest, FuzzControlOut, BabTreeOut, BabNodeDetailOut, BabOptionsOut,
+    ProvenanceOut, NearestRequest, NearestOut,
 )
