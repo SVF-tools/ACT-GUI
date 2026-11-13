@@ -77,7 +77,7 @@ def test_pinned_baseline_passes_every_api_check():
     # adapter check mandatory and assert the precise missing observation surface.
     assert info.api_checks
     optional = ("observe.propagation", "verify.dual.options", "fuzz.control", "events.bab_nodes", "verify.bab.options",
-                "source.vnnlib.multi_network", "source.provenance")
+                "source.vnnlib.multi_network")
     required = [c for c in info.api_checks if c.capability not in optional]
     assert required and [c for c in required if not c.ok] == []
     observation = [c for c in info.api_checks if c.capability == "observe.propagation"]
@@ -97,10 +97,6 @@ def test_pinned_baseline_passes_every_api_check():
     multi = [c for c in info.api_checks if c.capability == "source.vnnlib.multi_network"]
     assert {c.symbol for c in multi if not c.ok} == {"act.front_end.vnnlib_loader.data_model_loader:build_multi_network_model"}
     assert next(c for c in info.capabilities if c.name == "source.vnnlib.multi_network").availability == "unsupported"
-    provenance = [c for c in info.api_checks if c.capability == "source.provenance"]
-    assert {c.symbol for c in provenance if not c.ok} == {
-        f"act.pipeline.gui.provenance_gui:{name}" for name in ("input_provenance", "nearest_inputs")}
-    assert next(c for c in info.capabilities if c.name == "source.provenance").availability == "unsupported"
     assert {c.capability for c in info.api_checks} <= {c.name for c in info.capabilities}
 
 def test_api_check_reports_missing_symbols_and_signature_mismatches():

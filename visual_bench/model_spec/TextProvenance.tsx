@@ -1,12 +1,12 @@
-// Where an input row's VNN-LIB property comes from (ACT provenance): the source sentence, its replayed perturbations
-// and how ACT matched the box to the sentence.
+// The dataset metadata behind an input row's VNN-LIB property: its source sentence, replayed perturbations
+// and how the box was matched to the sentence.
 import type { InputProvenanceOut } from "../generated/wire";
 import { wordDiff } from "./textDiff";
 
 const MATCH = {
-  verified: { cls: "good", title: "The benchmark generator's own bookkeeping, replayed by ACT, fixes this sentence." },
+  verified: { cls: "good", title: "The benchmark generator's own bookkeeping, replayed by the workbench, fixes this sentence." },
   aligned: { cls: "warn", title: "Matched by order-preserving alignment of reconstructed embeddings; likely, not proven." },
-  unmatched: { cls: "bad", title: "ACT found no clear source sentence for this box." },
+  unmatched: { cls: "bad", title: "No clear source sentence was found for this box." },
 } as const;
 
 export function TextProvenance({ p }: { p: InputProvenanceOut }) {
@@ -29,7 +29,7 @@ export function TextProvenance({ p }: { p: InputProvenanceOut }) {
       </div>
       {p.text !== null && <Variants p={p} />}
       <details>
-        <summary className="note">How ACT matched this box</summary>
+        <summary className="note">How this box was matched</summary>
         <p className="note">{p.match_detail}.</p>
         <p className="note">Model input: {p.representation}.</p>
         <ul className="note">

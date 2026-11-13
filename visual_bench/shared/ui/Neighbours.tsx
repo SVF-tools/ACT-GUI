@@ -1,4 +1,4 @@
-// Dataset sentences whose reconstructed embeddings lie nearest to a point of the model input space (ACT provenance).
+// Dataset sentences whose reconstructed embeddings lie nearest to a point of the model input space.
 // The point is never decoded into text: these are known examples, listed with their distance.
 import type { InputNeighbourOut } from "../../generated/wire";
 import { fmt } from "../wire";
@@ -9,9 +9,9 @@ export function Neighbours({ items, classNames, pending, error }: {
   return (
     <div className="neighbourbox">
       <h4>Nearest known sentences</h4>
-      <p className="note">The counterexample is a point in embedding space, not a sentence. These are the dataset sentences ACT
-        knows nearest to it.</p>
-      {pending && <div className="note">Asking ACT…</div>}
+      <p className="note">The counterexample is a point in embedding space, not a sentence. These are the nearest dataset
+        sentences with recorded embeddings.</p>
+      {pending && <div className="note">Finding neighbours…</div>}
       {error && <div className="error">{error}</div>}
       <ol className="neighbours">
         {items.map((n) => (

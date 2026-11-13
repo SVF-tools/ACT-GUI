@@ -150,10 +150,6 @@ def requirements() -> dict[str, tuple[Requirement, ...]]:
             Requirement("act.front_end.vnnlib_loader.create_specs:create_specs_from_paths", ("category",), positional=2),
             *_WRAP,
         ),
-        "source.provenance": (
-            Requirement("act.pipeline.gui.provenance_gui:input_provenance", positional=1),
-            Requirement("act.pipeline.gui.provenance_gui:nearest_inputs", ("k",), positional=2),
-        ),
         "source.onnx_classifier": (
             Requirement("act.front_end.vnnlib_loader.onnx_converter:convert_onnx_to_pytorch", ("simplify",), positional=1),
             Requirement("act.front_end.vnnlib_loader.onnx_converter:get_onnx_input_shape", positional=1),

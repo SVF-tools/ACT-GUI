@@ -54,7 +54,7 @@ export function SpecPanel({ model, selectedLayer }: { model: ModelDescriptionOut
 export type ShownSpec = InputSpecOut & { lb: WireNumber[]; ub: WireNumber[] };
 
 // A spec with several rows (a batch) is shown one row at a time; each row is one input of the batch.
-// Rows of a VNN-LIB property batch are ACT's provenance rows when ACT records them.
+// Rows of a VNN-LIB property batch follow the recorded dataset metadata.
 function InputSpecView({ s, modelId }: { s: InputSpecOut; modelId: string }) {
   const provenance = useProvenance(modelId);
   const known = provenance.status === "success" && provenance.data.status === "available" ? provenance.data.rows : null;

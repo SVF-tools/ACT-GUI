@@ -1,15 +1,17 @@
 """Input provenance over HTTP (MSV-08): GET /api/models/{id}/provenance and POST .../provenance/nearest.
 
-Real ACT builds of a safenlp_2024 instance with ACT's provenance sidecar installed under ACT_ROOT/data/vnnlib. The
-available-path test runs only on an engine with source.provenance, the unsupported-path test only on one without.
+Real ACT builds of a safenlp_2024 instance with dataset metadata installed under ACT_ROOT/data/vnnlib.
+Text and neighbours are workbench data and require no provenance API in the active ACT engine.
 """
 from __future__ import annotations
 
 from typing import Any
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+from engine_bridge.model_spec import sources as model_sources
 from visual_bench.testing import sources_or_skip
 
 INSTANCE = {"kind": "vnnlib", "benchmark": "safenlp_2024", "onnx": "onnx/medical/perturbations_0.onnx",
@@ -23,11 +25,6 @@ def _safenlp(client: TestClient) -> dict[str, Any]:
     return bench
 
 
-def _supported(client: TestClient) -> bool:
-    return any(c["name"] == "source.provenance" and c["availability"] == "available"
-               for c in client.get("/api/engine").json()["capabilities"])
-
-
 def test_catalog_models_have_no_input_provenance(client: TestClient):
     model_id = next(m["model_id"] for m in client.get("/api/models").json() if m["source"] == "catalog")
     out = client.get(f"/api/models/{model_id}/provenance").json()
@@ -38,8 +35,7 @@ def test_catalog_models_have_no_input_provenance(client: TestClient):
 
 def test_safenlp_property_shows_its_source_sentence_and_neighbours(client: TestClient):
     bench = _safenlp(client)
-    if not _supported(client):
-        pytest.skip("the active ACT engine has no source.provenance")
+    assert "source.provenance" not in {c["name"] for c in client.get("/api/engine").json()["capabilities"]}
     model_id = client.post("/api/models", json={"source": INSTANCE}).json()["model_id"]
     out = client.get(f"/api/models/{model_id}/provenance").json()
     assert out["status"] == "available" and len(out["rows"]) == 1
@@ -59,12 +55,11 @@ def test_safenlp_property_shows_its_source_sentence_and_neighbours(client: TestC
     assert beyond.status_code == 422 and beyond.json()["error"]["code"] == "invalid_row"
 
 
-def test_engine_without_provenance_api_reports_unsupported(client: TestClient):
+def test_missing_dataset_metadata_reports_none(client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     _safenlp(client)
-    if _supported(client):
-        pytest.skip("the active ACT engine has source.provenance")
     model_id = client.post("/api/models", json={"source": INSTANCE}).json()["model_id"]
+    monkeypatch.setattr(model_sources, "vnnlib_root", lambda: tmp_path)
     out = client.get(f"/api/models/{model_id}/provenance").json()
-    assert (out["status"], out["rows"]) == ("unsupported", [None])
+    assert (out["status"], out["rows"]) == ("none", [None])
     near = client.post(f"/api/models/{model_id}/provenance/nearest", json={"row": 0, "point": [0.0] * 30})
-    assert near.status_code == 422 and near.json()["error"]["code"] == "capability_unavailable"
+    assert near.status_code == 404 and near.json()["error"]["code"] == "no_provenance"

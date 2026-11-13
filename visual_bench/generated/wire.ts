@@ -455,7 +455,7 @@ export type ValueLimit1 = number
 export type ModelId4 = string
 export type Reason3 = (string | null)
 export type Rows1 = (InputProvenanceOut | null)[]
-export type Status6 = ("available" | "none" | "unsupported")
+export type Status6 = ("available" | "none")
 export type Availability6 = ("available" | "not_configured")
 export type Kind18 = ("fake" | "real")
 export type Name7 = string
@@ -1311,7 +1311,7 @@ split: Split
 text: Text1
 }
 /**
- * What one ACT input row's VNN-LIB property was built from, as ACT's provenance sidecar records it.
+ * What one input row's VNN-LIB property was built from, as its dataset sidecar records it.
  *
  * This interface was referenced by `ActGuiWire`'s JSON-Schema
  * via the `definition` "InputProvenanceOut".

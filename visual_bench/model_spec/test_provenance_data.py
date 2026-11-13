@@ -1,7 +1,6 @@
-"""Input provenance through the bridge (MSB-07): ACT's provenance records copied into neutral contracts.
+"""Workbench dataset metadata: source matching, nearest examples and file-integrity checks.
 
-The sidecar is synthetic (written in tmp_path): it checks the adapter's mapping on top of ACT's own reader, not the
-safenlp_2024 reconstruction. Skipped unless the active ACT checkout has act.pipeline.gui.provenance_gui.
+Synthetic sidecars exercise the real reader without an ACT checkout or provider.
 """
 from __future__ import annotations
 
@@ -11,11 +10,10 @@ from pathlib import Path
 
 import pytest
 
-from engine_bridge.contracts import BridgeError, TextVariant, VnnlibInstance
-from engine_bridge.engine_session import capability_available
-from engine_bridge.model_spec import provenance, sources
+from visual_bench.model_spec import provenance
+from visual_bench.model_spec.provenance import TextVariant
 
-RECORDED = VnnlibInstance("bench", "net.onnx", "vnnlib/a.vnnlib")
+RECORDED = "vnnlib/a.vnnlib"
 
 
 def _sha(path: Path) -> str:
@@ -24,9 +22,8 @@ def _sha(path: Path) -> str:
 
 @pytest.fixture
 def bench(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    if not capability_available("source.provenance"):
-        pytest.skip("the active ACT checkout has no act.pipeline.gui.provenance_gui (source.provenance)")
-    monkeypatch.setattr(sources, "vnnlib_root", lambda: tmp_path)
+    monkeypatch.setenv("ACT_ROOT", str(tmp_path / "no-act-checkout"))
+    monkeypatch.setenv("ACT_CODE_ROOT", str(tmp_path / "no-act-checkout"))
     root = tmp_path / "bench"
     (root / "vnnlib").mkdir(parents=True)
     (root / "provenance").mkdir()
@@ -50,26 +47,24 @@ def bench(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return root
 
 
-def test_recorded_property_is_copied_out_of_act(bench: Path):
-    p = provenance.input_provenance(RECORDED)
+def test_recorded_property_exposes_its_dataset_metadata(bench: Path):
+    p = provenance.input_provenance(bench / RECORDED)
     assert p is not None
     assert (p.key, p.text, p.label, p.split, p.family_index, p.match_status) == (
         "vnnlib/a.vnnlib", "zero", 0, "train_pos", 3, "verified")
     assert p.anchor == (0.0, 0.0) and p.task.class_names == ("yes", "no") and p.family_title == "family f"
     assert p.variants == (TextVariant("zer0", "char_replacement", True, 0.9),)
-    assert provenance.has_provenance("bench") and not provenance.has_provenance("elsewhere")
-    assert provenance.input_provenance(VnnlibInstance("bench", "net.onnx", "vnnlib/b.vnnlib")) is None
+    assert provenance.input_provenance(bench / "vnnlib/b.vnnlib") is None
 
 
 def test_nearest_inputs_rank_known_examples_and_reject_other_dimensions(bench: Path):
-    near = provenance.nearest_inputs(RECORDED, [0.9, 0.1], k=2)
+    near = provenance.nearest_inputs(bench / RECORDED, [0.9, 0.1], k=2)
     assert [n.example_id for n in near] == ["t:1", "t:0"] and near[0].label == 1
     assert abs(near[0].distance - 0.02 ** 0.5) < 1e-12
-    with pytest.raises(BridgeError) as err:
-        provenance.nearest_inputs(RECORDED, [1.0, 2.0, 3.0])
-    assert err.value.code == "invalid_point"
+    with pytest.raises(ValueError, match="point has 3 values"):
+        provenance.nearest_inputs(bench / RECORDED, [1.0, 2.0, 3.0])
 
 
 def test_an_edited_instance_is_not_described(bench: Path):
     (bench / "vnnlib" / "a.vnnlib").write_text("; edited after the sidecar was built\n")
-    assert provenance.input_provenance(RECORDED) is None
+    assert provenance.input_provenance(bench / RECORDED) is None

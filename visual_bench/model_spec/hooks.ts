@@ -14,7 +14,7 @@ export const useSample = (dataset: string | null, index: number) =>
 export const useProvenance = (id: string | null) =>
   useQuery({ queryKey: keys.provenance(id), queryFn: () => api.provenance(id!), enabled: id !== null });
 
-/** ACT's provenance of one input row (source sentence, class names, source point), or null when there is none. */
+/** Dataset metadata of one input row (source sentence, class names, source point), or null when there is none. */
 export function useRowProvenance(id: string | null, row: number): InputProvenanceOut | null {
   const q = useProvenance(id);
   return q.status === "success" && q.data.status === "available" ? q.data.rows[row] ?? null : null;

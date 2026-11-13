@@ -41,7 +41,7 @@ class ModelSummary(Wire):
 class VnnlibInstanceOut(Wire):
     onnx: str  # one path, or one per network of a multi-network property, comma-separated in network order
     vnnlib: str
-    text: str | None = None  # source text of the property, when the active ACT engine records its provenance
+    text: str | None = None  # source text recorded in the benchmark's dataset metadata
 
 class VnnlibBenchmarkOut(Wire):
     benchmark: str
@@ -164,7 +164,7 @@ class TextVariantOut(Wire):
     cosine: float | None
 
 class InputProvenanceOut(Wire):
-    """What one ACT input row's VNN-LIB property was built from, as ACT's provenance sidecar records it."""
+    """What one input row's VNN-LIB property was built from, as its dataset sidecar records it."""
     row: int
     benchmark: str
     key: str  # instance path relative to the benchmark directory
@@ -175,7 +175,7 @@ class InputProvenanceOut(Wire):
     family_title: str
     family_index: int
     example_id: str | None
-    text: str | None  # None when ACT matched no source example
+    text: str | None  # None when no source example was matched
     label: int | None
     split: str | None
     anchor: list[float] | None  # the source example's point in the model input space
@@ -185,9 +185,8 @@ class InputProvenanceOut(Wire):
     match_detail: str
     sources: list[dict[str, str]]
 
-# available: ACT records provenance for at least one row; none: not a VNN-LIB model, or no row has provenance;
-# unsupported: the active ACT engine lacks the provenance API (capability source.provenance).
-ProvenanceStatus = Literal["available", "none", "unsupported"]
+# available: dataset metadata describes at least one row; none: not a VNN-LIB model, or no row has provenance.
+ProvenanceStatus = Literal["available", "none"]
 
 class ProvenanceOut(Wire):
     model_id: str
