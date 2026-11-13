@@ -84,6 +84,9 @@ def test_vnnlib_instance_load_and_dataset_sample(client: TestClient):
     ({"kind": "torch", "source_id": "mnist_conv_small", "index": 0, "eps": 0.1, "indices": [0, 1, 0]}, 422, "invalid_request"),
     ({"kind": "torch", "source_id": "mnist_conv_small", "index": 0, "eps": 0.1, "indices": [0, 10_000]}, 422, "invalid_instance"),
     ({"kind": "vnnlib", "benchmark": "cora_2024", "onnx": "../../etc/x.onnx", "vnnlib": "v.vnnlib"}, 422, "invalid_request"),
+    # Every network path of a multi-network property must stay inside the benchmark directory.
+    ({"kind": "vnnlib", "benchmark": "cora_2024", "onnx": "onnx/mnist-point.onnx,../x.onnx", "vnnlib": "v.vnnlib"}, 422,
+     "invalid_request"),
     ({"kind": "vnnlib", "benchmark": "cora_2024", "onnx": "onnx/missing.onnx", "vnnlib": "vnnlib/mnist-img0.vnnlib"}, 404, "source_not_found"),
 ])
 def test_invalid_model_loads_are_structured_errors(client: TestClient, tmp_path: Path, body, status, code):

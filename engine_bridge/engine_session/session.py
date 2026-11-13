@@ -68,6 +68,7 @@ _BASELINE_CAPABILITIES = (
     Capability("inspect.layer_bounds.interval", "available", "act.back_end.analyze.analyze after-facts"),
     Capability("observe.propagation", "available", "act.pipeline.gui.verifier_gui records during verify_once (ACT-06)"),
     Capability("source.vnnlib", "available", "act.front_end.vnnlib_loader.create_specs.create_specs_from_paths + TorchToACT"),
+    Capability("source.vnnlib.multi_network", "available", "create_specs_from_paths with one ONNX file per network of a multi-network VNN-LIB 2.0 property (data_model_loader.build_multi_network_model)"),
     Capability("source.onnx_classifier", "available", "act.front_end.vnnlib_loader.onnx_converter.convert_onnx_to_pytorch + TorchToACT"),
     Capability("events.bab_nodes", "available", "act.pipeline.gui.bab_gui BaBWave/BaBTerminal records of each committed BaB wave during verify_bab_batched (ACT-03)"),
     Capability("events.bab_summary", "available", "VerifyResult.metadata after completion"),

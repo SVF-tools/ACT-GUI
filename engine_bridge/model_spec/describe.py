@@ -106,7 +106,10 @@ def describe_model(path: Path) -> ModelDescription:
             succs=tuple(int(x) for x in net.succs.get(layer.id, [])),
             params=tuple(_param(k, v) for k, v in layer.params.items()),
         ))
-        if layer.kind == "INPUT_SPEC":
+        # A LIN_POLY layer without a box holds relations A·x <= b over the box of a BOX layer (e.g.
+        # between the inputs of a multi-network property): the box is the described input domain.
+        relations_only = layer.params.get("kind") == "LIN_POLY" and "lb" not in layer.params
+        if layer.kind == "INPUT_SPEC" and not relations_only:
             lb, ub = layer.params.get("lb"), layer.params.get("ub")
             rows = int(lb.shape[0]) if isinstance(lb, torch.Tensor) and lb.dim() >= 2 and lb.shape[0] > 0 else 1
             if (isinstance(lb, torch.Tensor) and isinstance(ub, torch.Tensor) and rows <= _MAX_SPEC_ROWS

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { fmt, indexRanges } from "../shared/wire";
 import type { ModelSummary, SourcesOut } from "../generated/wire";
 import { classLabel, Pixels } from "../shared/ui/pixels";
-import { fileStem, useSources, useSample, useLoadModel } from "./hooks";
+import { fileStem, netStem, useSources, useSample, useLoadModel } from "./hooks";
 import type { LoadModelBody } from "../generated/wire";
 import { useCapabilities } from "../engine/hooks";
 
@@ -199,7 +199,7 @@ function VnnlibForm({ s, current, onLoaded }: { s: SourcesOut; current: ModelSum
         </select>
       </label>
       <div className="batchrow">
-        <label title={`properties on ${fileStem(net)}: ${sameNet.length}`}>Batch size
+        <label title={`properties on ${netStem(net)}: ${sameNet.length}`}>Batch size
           <input type="number" min={1} max={limit} value={ks.length} onChange={(e) => resize(Number(e.target.value))} />
         </label>
         {batched && (
@@ -210,15 +210,15 @@ function VnnlibForm({ s, current, onLoaded }: { s: SourcesOut; current: ModelSum
           </label>
         )}
       </div>
-      <label>{batched ? `Property ${at + 1} of ${ks.length} (network ${fileStem(net)})` : "Instance (ONNX model · VNN-LIB property)"}
+      <label>{batched ? `Property ${at + 1} of ${ks.length} (network ${netStem(net)})` : "Instance (ONNX model · VNN-LIB property)"}
         <select value={ks[at]} onChange={(e) => pick(Number(e.target.value))}>
           {(batched ? sameNet : b.instances.map((_, k) => k)).map((k) => (
-            <option key={k} value={k}>{batched ? "" : `${fileStem(b.instances[k]!.onnx)} · `}{fileStem(b.instances[k]!.vnnlib)}</option>))}
+            <option key={k} value={k}>{batched ? "" : `${netStem(b.instances[k]!.onnx)} · `}{fileStem(b.instances[k]!.vnnlib)}</option>))}
         </select>
       </label>
       {batched && (
         <details className="batchchips">
-          <summary title={props.map(fileStem).join(", ")}>{ks.length} properties on {fileStem(net)}</summary>
+          <summary title={props.map(fileStem).join(", ")}>{ks.length} properties on {netStem(net)}</summary>
           <div className="chips" aria-label="batch properties">
             {ks.map((k, j) => (
               <button key={j} className={j === at ? "chip active" : ks.indexOf(k) !== j ? "chip warn" : "chip"}

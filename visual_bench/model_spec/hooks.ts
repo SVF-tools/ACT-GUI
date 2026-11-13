@@ -31,6 +31,11 @@ export function fileStem(path: string): string {
   return path.split("/").at(-1)!.replace(/\.(onnx|vnnlib)$/, "");
 }
 
+/** Name of an instance's network: its ONNX file, or the files of a multi-network property (comma-separated paths). */
+export function netStem(onnx: string): string {
+  return onnx.split(",").map(fileStem).join(" + ");
+}
+
 export function useRebuildModel() {
   const client = useQueryClient();
   return useMutation({

@@ -6,6 +6,7 @@ and fuzzes a built net exactly like a catalog net.
 """
 from __future__ import annotations
 
+import ast
 import contextlib
 import csv
 import io
@@ -51,10 +52,27 @@ def vnnlib_instances() -> tuple[VnnlibInstance, ...]:
             for row in csv.reader(f):
                 if len(row) < 2:
                     continue
-                onnx, vnn = (r.strip().removeprefix("./") for r in row[:2])
-                if (bench / onnx).is_file() and (bench / vnn).is_file():
+                onnx, vnn = _onnx_field(row[0]), row[1].strip().removeprefix("./")
+                if onnx and all((bench / p).is_file() for p in onnx.split(",")) and (bench / vnn).is_file():
                     out.append(VnnlibInstance(bench.name, onnx, vnn))
     return tuple(out)
+
+
+def _onnx_field(field: str) -> str | None:
+    """The ONNX column of instances.csv as the workbench names it: one path, or for a
+    multi-network property VNN-COMP's ``[(role, path), ...]`` list as its paths joined by
+    commas, in network order. None when the column cannot be read."""
+    field = field.strip()
+    if not field.startswith("["):
+        return field.removeprefix("./")
+    try:
+        return ",".join(str(path).strip().removeprefix("./") for _role, path in ast.literal_eval(field))
+    except (ValueError, SyntaxError, TypeError):
+        return None
+
+
+def _onnx_names(onnx: str) -> str:
+    return ", ".join(Path(p).name for p in onnx.split(","))
 
 
 def classifier_sources() -> tuple[ClassifierSource, ...]:
@@ -137,9 +155,10 @@ def build_vnnlib_net(inst: VnnlibInstance | Sequence[VnnlibInstance], out_path: 
         raise BridgeError("invalid_instance", "every property of a batch must use the same network (benchmark and ONNX file)")
     bench = vnnlib_root() / first.benchmark
     for i in insts:
-        if not ((bench / i.onnx).is_file() and (bench / i.vnnlib).is_file()):
+        if not (all((bench / p).is_file() for p in i.onnx.split(",")) and (bench / i.vnnlib).is_file()):
             raise BridgeError("source_not_found", f"VNN-LIB instance files missing: {i.benchmark}/{i.onnx}, {i.vnnlib}")
-    dataset = _dataset_hint(Path(first.onnx).stem) or _dataset_hint(Path(first.vnnlib).stem) or first.benchmark
+    dataset = (_dataset_hint(Path(first.onnx.split(",")[0]).stem) or _dataset_hint(Path(first.vnnlib).stem)
+               or first.benchmark)
     with _lock, act_imports():
         from act.back_end.serialization.serialization import save_net_to_file
         from act.front_end.spec_creator_base import LabeledInputTensor
@@ -149,9 +168,11 @@ def build_vnnlib_net(inst: VnnlibInstance | Sequence[VnnlibInstance], out_path: 
         device, dtype = get_default_device(), get_default_dtype()
         parsed = []
         for i in insts:
+            # One ONNX file per network of a multi-network property, in network order.
+            onnx_paths = [bench / p for p in i.onnx.split(",")]
             try:
-                _cat, _name, model, labeled, pairs = create_specs_from_paths(bench / i.onnx, bench / i.vnnlib,
-                                                                              category=i.benchmark)
+                _cat, _name, model, labeled, pairs = create_specs_from_paths(
+                    onnx_paths if len(onnx_paths) > 1 else onnx_paths[0], bench / i.vnnlib, category=i.benchmark)
             except SystemExit as exc:  # ACT's single-instance entry point exits on unsupported specs
                 raise BridgeError("unsupported_spec", f"{i.vnnlib}: {exc}") from exc
             except Exception as exc:
@@ -177,11 +198,11 @@ def build_vnnlib_net(inst: VnnlibInstance | Sequence[VnnlibInstance], out_path: 
     params: dict[str, str | int | float] = {"benchmark": first.benchmark, "onnx": first.onnx, "vnnlib": first.vnnlib,
                                             "queries": queries[0], "dataset": dataset}
     if len(insts) == 1:
-        return BuiltNet(f"VNN-LIB {first.benchmark}: {Path(first.onnx).name} + {Path(first.vnnlib).name}"
+        return BuiltNet(f"VNN-LIB {first.benchmark}: {_onnx_names(first.onnx)} + {Path(first.vnnlib).name}"
                         + (f" (query 1 of {queries[0]})" if queries[0] > 1 else ""), params)
     params |= {"batch": len(insts), "vnnlibs": ",".join(i.vnnlib for i in insts)}
     multi = sum(q > 1 for q in queries)
-    return BuiltNet(f"VNN-LIB {first.benchmark}: {Path(first.onnx).name}, batch of {len(insts)} properties"
+    return BuiltNet(f"VNN-LIB {first.benchmark}: {_onnx_names(first.onnx)}, batch of {len(insts)} properties"
                     + (f" (query 1 of each; {multi} have more)" if multi else ""), params, input_rows=len(insts))
 
 

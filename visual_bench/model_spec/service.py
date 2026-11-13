@@ -89,7 +89,10 @@ class ModelService:
     def sources(self) -> S.SourcesOut:
         self.engine.require_engine()
         groups: dict[str, list[S.VnnlibInstanceOut]] = {}
+        multi_network = self.engine.capability_available("source.vnnlib.multi_network")
         for inst in model_sources.vnnlib_instances():
+            if "," in inst.onnx and not multi_network:
+                continue  # the active ACT cannot combine the networks of a multi-network property
             groups.setdefault(inst.benchmark, []).append(S.VnnlibInstanceOut(onnx=inst.onnx, vnnlib=inst.vnnlib))
         return S.SourcesOut(
             vnnlib=[S.VnnlibBenchmarkOut(benchmark=b, instances=i) for b, i in groups.items()],
@@ -110,6 +113,8 @@ class ModelService:
     def load(self, req: S.LoadVnnlibRequest | S.LoadTorchRequest) -> tuple[S.ModelSummary, bool]:
         """Build a net from a source; the same content returns the existing model (idempotent by sha256)."""
         self.engine.require_capability("source.vnnlib" if isinstance(req, S.LoadVnnlibRequest) else "source.onnx_classifier")
+        if isinstance(req, S.LoadVnnlibRequest) and "," in req.onnx:
+            self.engine.require_capability("source.vnnlib.multi_network")
         self.models_root.mkdir(parents=True, exist_ok=True)
         tmp = self.models_root / f".build-{uuid.uuid4().hex}.json"
         try:

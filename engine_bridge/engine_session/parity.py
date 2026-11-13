@@ -144,6 +144,12 @@ def requirements() -> dict[str, tuple[Requirement, ...]]:
             Requirement("act.front_end.vnnlib_loader.create_specs:create_specs_from_paths", ("category",), positional=2),
             *_WRAP,
         ),
+        # create_specs_from_paths takes one ONNX file per network of a multi-network property.
+        "source.vnnlib.multi_network": (
+            Requirement("act.front_end.vnnlib_loader.data_model_loader:build_multi_network_model", positional=2),
+            Requirement("act.front_end.vnnlib_loader.create_specs:create_specs_from_paths", ("category",), positional=2),
+            *_WRAP,
+        ),
         "source.onnx_classifier": (
             Requirement("act.front_end.vnnlib_loader.onnx_converter:convert_onnx_to_pytorch", ("simplify",), positional=1),
             Requirement("act.front_end.vnnlib_loader.onnx_converter:get_onnx_input_shape", positional=1),
